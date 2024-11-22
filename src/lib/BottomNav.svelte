@@ -92,7 +92,7 @@
   }
 
   .nav-item.active {
-    color: #4285f4;
+    color: #E09453;
   }
 
   @media (prefers-color-scheme: dark) {
@@ -106,7 +106,7 @@
     }
 
     .nav-item.active {
-      color: #7aa7ff;
+      color: #E09453;
     }
   }
 </style> 
