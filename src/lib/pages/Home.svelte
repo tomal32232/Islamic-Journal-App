@@ -1,4 +1,5 @@
 <script>
+  import { onMount } from 'svelte';
   import BottomNav from '../BottomNav.svelte';
   import Profile from './Profile.svelte';
   import { 
@@ -8,14 +9,16 @@
     SunHorizon, 
     MoonStars 
   } from 'phosphor-svelte';
+  import { prayerTimesStore, loadingStore, errorStore, fetchPrayerTimes, locationStore } from '../services/prayerTimes';
   
   let currentPage = 'home';
   const date = new Date();
   
   // Format current time
   const currentTime = date.toLocaleTimeString('en-US', {
-    hour: '2-digit',
-    minute: '2-digit'
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
   });
 
   // Format date
@@ -33,51 +36,22 @@
   else if (hour < 17) greeting = 'Good Afternoon';
   else greeting = 'Good Evening';
 
+  const iconMap = {
+    SunDim,
+    Sun,
+    CloudSun,
+    SunHorizon,
+    MoonStars
+  };
+
   function handleTabChange(event) {
     currentPage = event.detail;
   }
 
-  let prayers = [
-    { 
-      name: 'Fajr', 
-      time: '5:43 AM', 
-      done: false,
-      icon: SunDim,  // Dawn
-      weight: 'regular'
-    },
-    { 
-      name: 'Dhuhr', 
-      time: '12:15 PM', 
-      done: false,
-      icon: Sun,  // Noon sun
-      weight: 'fill'
-    },
-    { 
-      name: 'Asr', 
-      time: '3:30 PM', 
-      done: false,
-      icon: CloudSun,  // Afternoon sun
-      weight: 'regular'
-    },
-    { 
-      name: 'Maghrib', 
-      time: '5:45 PM', 
-      done: false,
-      icon: SunHorizon,  // Sunset
-      weight: 'regular'
-    },
-    { 
-      name: 'Isha', 
-      time: '7:15 PM', 
-      done: false,
-      icon: MoonStars,  // Night
-      weight: 'regular'
-    }
-  ];
-
   function markAsDone(index) {
-    prayers[index].done = !prayers[index].done;
-    prayers = [...prayers]; // trigger reactivity
+    $prayerTimesStore = $prayerTimesStore.map((prayer, i) => 
+      i === index ? { ...prayer, done: !prayer.done } : prayer
+    );
   }
 
   // Get current week days
@@ -85,7 +59,6 @@
     const current = new Date();
     const week = [];
     
-    // Get Monday
     current.setDate(current.getDate() - current.getDay() + 1);
     
     for (let i = 0; i < 7; i++) {
@@ -101,6 +74,10 @@
   }
 
   const weekDays = getCurrentWeek();
+
+  onMount(() => {
+    fetchPrayerTimes();
+  });
 </script>
 
 <main class="home-container">
@@ -112,6 +89,9 @@
         <div class="datetime">
           <span class="time">{currentTime}</span>
           <span class="date">{formattedDate}</span>
+          {#if $locationStore}
+            <span class="location">{$locationStore}</span>
+          {/if}
         </div>
         <h1>{greeting}, Alex!</h1>
         
@@ -135,28 +115,34 @@
       <section class="prayer-times">
         <h2>Prayer Times</h2>
         <div class="prayer-list">
-          {#each prayers as prayer, i}
-            <div class="prayer-item">
-              <div class="prayer-info">
-                <svelte:component 
-                  this={prayer.icon} 
-                  size={20} 
-                  weight={prayer.weight}
-                  color={prayer.done ? "#E09453" : "#000000"}
-                />
-                <span>{prayer.name}</span>
+          {#if $loadingStore}
+            <div class="loading">Loading prayer times...</div>
+          {:else if $errorStore}
+            <div class="error">{$errorStore}</div>
+          {:else}
+            {#each $prayerTimesStore as prayer, i}
+              <div class="prayer-item">
+                <div class="prayer-info">
+                  <svelte:component 
+                    this={iconMap[prayer.icon]} 
+                    size={20} 
+                    weight={prayer.weight}
+                    color={prayer.done ? "#E09453" : "#000000"}
+                  />
+                  <span>{prayer.name}</span>
+                </div>
+                <div class="prayer-actions">
+                  <span class="prayer-time">{prayer.time}</span>
+                  <button 
+                    class="mark-button {prayer.done ? 'done' : ''}" 
+                    on:click={() => markAsDone(i)}
+                  >
+                    {prayer.done ? '✓' : 'Mark'}
+                  </button>
+                </div>
               </div>
-              <div class="prayer-actions">
-                <span class="prayer-time">{prayer.time}</span>
-                <button 
-                  class="mark-button {prayer.done ? 'done' : ''}" 
-                  on:click={() => markAsDone(i)}
-                >
-                  {prayer.done ? '✓' : 'Mark'}
-                </button>
-              </div>
-            </div>
-          {/each}
+            {/each}
+          {/if}
         </div>
       </section>
     {/if}
@@ -320,4 +306,12 @@
     flex-direction: column;
     gap: 0.25rem;
   }
+
+  .location {
+    display: block;
+    color: #666;
+    font-size: 0.875rem;
+    margin-top: 0.25rem;
+  }
 </style>
+
