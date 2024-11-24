@@ -10,6 +10,8 @@
     MoonStars 
   } from 'phosphor-svelte';
   import { prayerTimesStore, loadingStore, errorStore, fetchPrayerTimes, locationStore } from '../services/prayerTimes';
+  import { auth } from '../firebase';
+  import Tasbih from './Tasbih.svelte';
   
   let currentPage = 'home';
   const date = new Date();
@@ -75,7 +77,16 @@
 
   const weekDays = getCurrentWeek();
 
+  function capitalizeFirstLetter(string) {
+    return string ? string.charAt(0).toUpperCase() + string.slice(1).toLowerCase() : '';
+  }
+
+  let userName = capitalizeFirstLetter(auth.currentUser?.displayName?.split(' ')[0]) || 'Guest';
+
   onMount(() => {
+    auth.onAuthStateChanged((user) => {
+      userName = capitalizeFirstLetter(user?.displayName?.split(' ')[0]) || 'Guest';
+    });
     fetchPrayerTimes();
   });
 </script>
@@ -84,6 +95,8 @@
   <div class="content">
     {#if currentPage === 'profile'}
       <Profile />
+    {:else if currentPage === 'tasbih'}
+      <Tasbih />
     {:else if currentPage === 'home'}
       <header class="greeting">
         <div class="datetime">
@@ -93,7 +106,7 @@
             <span class="location">{$locationStore}</span>
           {/if}
         </div>
-        <h1>{greeting}, Alex!</h1>
+        <h1>{greeting}, {userName}!</h1>
         
         <div class="calendar-strip">
           {#each weekDays as { day, date, isToday }}
@@ -107,9 +120,9 @@
 
       <div class="quote-card">
         <blockquote>
-          "Nothing is impossible. The word itself says 'I'm possible'!"
+          "Indeed, with hardship comes ease." 
         </blockquote>
-        <cite>AUDREY HEPBURN - ACTRESS</cite>
+        <cite>Surah Ash-Sharh [94:5-6]</cite>
       </div>
 
       <section class="prayer-times">

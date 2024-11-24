@@ -1,0 +1,336 @@
+<script>
+  import { writable } from 'svelte/store';
+
+  const dhikrOptions = [
+    { arabic: 'سُبْحَانَ ٱللَّٰهِ', latin: 'SubhanAllah', meaning: 'Glory be to Allah' },
+    { arabic: 'ٱلْحَمْدُ لِلَّٰهِ', latin: 'Alhamdulillah', meaning: 'Praise be to Allah' },
+    { arabic: 'ٱللَّٰهُ أَكْبَرُ', latin: 'Allahu Akbar', meaning: 'Allah is Greater' },
+    { arabic: 'لَا إِلَٰهَ إِلَّا ٱللَّٰهُ', latin: 'La ilaha illAllah', meaning: 'There is no deity except Allah' }
+  ];
+
+  const targetOptions = [33, 100, 1000];
+  let customTarget = '';
+  let selectedTarget = 33;
+  let count = 0;
+  let selectedDhikr = dhikrOptions[0];
+  let isCounterMode = false;
+
+  function handleTargetChange(target) {
+    selectedTarget = target;
+    count = 0;
+  }
+
+  function handleCustomTarget() {
+    if (customTarget && !isNaN(customTarget)) {
+      selectedTarget = parseInt(customTarget);
+      count = 0;
+    }
+  }
+
+  function startCounter() {
+    isCounterMode = true;
+  }
+
+  function exitCounter() {
+    isCounterMode = false;
+    count = 0;
+  }
+
+  function increment() {
+    count++;
+    if (count === selectedTarget) {
+      if ('vibrate' in navigator) {
+        navigator.vibrate(200);
+      }
+    }
+  }
+
+  function reset() {
+    count = 0;
+  }
+</script>
+
+{#if !isCounterMode}
+  <div class="tasbih-container">
+    <div class="setup-card">
+      <h2>Select Dhikr</h2>
+      <div class="dhikr-options">
+        {#each dhikrOptions as dhikr}
+          <button 
+            class="dhikr-button {selectedDhikr === dhikr ? 'active' : ''}"
+            on:click={() => selectedDhikr = dhikr}
+          >
+            <span class="arabic">{dhikr.arabic}</span>
+            <span class="latin">{dhikr.latin}</span>
+          </button>
+        {/each}
+      </div>
+
+      <h2>Select Target</h2>
+      <div class="target-options">
+        {#each targetOptions as target}
+          <button 
+            class="target-button {selectedTarget === target ? 'active' : ''}"
+            on:click={() => handleTargetChange(target)}
+          >
+            {target}
+          </button>
+        {/each}
+        <div class="custom-target">
+          <input 
+            type="number" 
+            bind:value={customTarget} 
+            placeholder="Custom"
+            min="1"
+          />
+          <button on:click={handleCustomTarget}>Set</button>
+        </div>
+      </div>
+
+      <button class="start-button" on:click={startCounter}>
+        Start Dhikr
+      </button>
+    </div>
+  </div>
+{:else}
+  <div class="counter-mode">
+    <button class="exit-button" on:click={exitCounter}>Exit</button>
+    
+    <div class="counter-content">
+      <div class="dhikr-display">
+        <span class="arabic-large">{selectedDhikr.arabic}</span>
+        <span class="latin-large">{selectedDhikr.latin}</span>
+        <span class="meaning">{selectedDhikr.meaning}</span>
+      </div>
+
+      <div class="progress">
+        <span class="count-large">{count}</span>
+        <span class="target-display">of {selectedTarget}</span>
+      </div>
+
+      <button class="counter-button" on:click={increment}>
+        <div class="inner-circle">
+          <span class="tap-text">Tap</span>
+        </div>
+      </button>
+
+      <button class="reset-button" on:click={reset}>Reset</button>
+    </div>
+  </div>
+{/if}
+
+<style>
+  .tasbih-container {
+    padding: 1rem;
+    padding-bottom: 88px;
+    max-width: 600px;
+    margin: 0 auto;
+  }
+
+  .setup-card {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 12px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+
+  h2 {
+    font-size: 1rem;
+    color: #000;
+    margin-bottom: 1rem;
+  }
+
+  .dhikr-selector, .target-selector {
+    margin-bottom: 2rem;
+  }
+
+  .dhikr-options, .target-options {
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  .dhikr-button {
+    background: white;
+    border: 1px solid #E0E0E0;
+    padding: 1rem;
+    border-radius: 8px;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.2s ease;
+  }
+
+  .dhikr-button.active {
+    border-color: #216974;
+    background: #216974;
+    color: white;
+  }
+
+  .arabic {
+    font-size: 1.5rem;
+    font-weight: 500;
+  }
+
+  .latin {
+    font-size: 0.875rem;
+  }
+
+  .target-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .target-button {
+    background: white;
+    border: 1px solid #E0E0E0;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+  }
+
+  .target-button.active {
+    background: #216974;
+    border-color: #216974;
+    color: white;
+  }
+
+  .custom-target {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .custom-target input {
+    width: 100px;
+    padding: 0.5rem;
+    border: 1px solid #E0E0E0;
+    border-radius: 4px;
+  }
+
+  .start-button {
+    background: #216974;
+    color: white;
+    width: 100%;
+    padding: 1rem;
+    border: none;
+    border-radius: 8px;
+    font-size: 1.125rem;
+    margin-top: 2rem;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+  }
+
+  .counter-mode {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, #216974, #1a545d);
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    color: white;
+  }
+
+  .exit-button {
+    position: absolute;
+    top: 1rem;
+    left: 1rem;
+    background: rgba(255,255,255,0.2);
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+
+  .counter-content {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2rem;
+  }
+
+  .dhikr-display {
+    text-align: center;
+    margin-bottom: 2rem;
+  }
+
+  .arabic-large {
+    font-size: 2.5rem;
+    display: block;
+    margin-bottom: 0.5rem;
+  }
+
+  .latin-large {
+    font-size: 1.25rem;
+    display: block;
+    margin-bottom: 0.25rem;
+  }
+
+  .progress {
+    text-align: center;
+    margin-bottom: 2rem;
+  }
+
+  .count-large {
+    font-size: 4rem;
+    font-weight: 500;
+    display: block;
+  }
+
+  .target-display {
+    font-size: 1.25rem;
+    opacity: 0.8;
+  }
+
+  .counter-button {
+    width: 200px;
+    height: 200px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.1);
+    border: 2px solid rgba(255,255,255,0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .inner-circle {
+    width: 80%;
+    height: 80%;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .tap-text {
+    font-size: 1.5rem;
+    color: white;
+    opacity: 0.9;
+  }
+
+  .counter-button:active {
+    transform: scale(0.95);
+    background: rgba(255,255,255,0.15);
+  }
+
+  .reset-button {
+    background: rgba(255,255,255,0.1);
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1rem;
+  }
+</style>
