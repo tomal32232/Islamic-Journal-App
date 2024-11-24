@@ -42,7 +42,10 @@ export async function getPrayerHistory() {
   if (!user) return;
 
   const prayers = get(prayerTimesStore);
-  if (!prayers || prayers.length === 0) return;
+  if (!prayers || prayers.length === 0) {
+    console.log('Waiting for prayer times to load...');
+    return;
+  }
 
   // Get the last 7 days
   const sevenDaysAgo = new Date();
@@ -61,30 +64,29 @@ export async function getPrayerHistory() {
     history.push({ id: doc.id, ...doc.data() });
   });
 
+  console.log('Fetched history:', history);
+
   // Group pending prayers by date
   const pendingByDate = {};
   const today = new Date().toISOString().split('T')[0];
   
-  for (let i = 0; i < 7; i++) {
-    const date = new Date(sevenDaysAgo);
-    date.setDate(date.getDate() + i);
-    const dateStr = date.toISOString().split('T')[0];
-    
-    const prayersForDate = prayers.filter(prayer => {
-      const isPrayed = history.some(h => 
-        h.date === dateStr && h.prayerName === prayer.name
-      );
-      return !isPrayed;
-    });
+  // Only check today's prayers initially
+  const prayersForToday = prayers.filter(prayer => {
+    const isPrayed = history.some(h => 
+      h.date === today && h.prayerName === prayer.name
+    );
+    return !isPrayed;
+  });
 
-    if (prayersForDate.length > 0) {
-      pendingByDate[dateStr] = {
-        date: dateStr,
-        isToday: dateStr === today,
-        prayers: prayersForDate
-      };
-    }
+  if (prayersForToday.length > 0) {
+    pendingByDate[today] = {
+      date: today,
+      isToday: true,
+      prayers: prayersForToday
+    };
   }
+
+  console.log('Pending prayers:', pendingByDate);
 
   prayerHistoryStore.set({ pendingByDate, history });
   return { pendingByDate, history };

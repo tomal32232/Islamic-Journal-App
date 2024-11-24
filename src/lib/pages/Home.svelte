@@ -2,13 +2,7 @@
   import { onMount } from 'svelte';
   import BottomNav from '../BottomNav.svelte';
   import Profile from './Profile.svelte';
-  import { 
-    Sun, 
-    SunDim, 
-    CloudSun,
-    SunHorizon, 
-    MoonStars 
-  } from 'phosphor-svelte';
+  import { iconMap } from '../utils/icons';
   import { prayerTimesStore, loadingStore, errorStore, fetchPrayerTimes, locationStore } from '../services/prayerTimes';
   import { auth } from '../firebase';
   import Tasbih from './Tasbih.svelte';
@@ -40,14 +34,6 @@
   if (hour < 12) greeting = 'Good Morning';
   else if (hour < 17) greeting = 'Good Afternoon';
   else greeting = 'Good Evening';
-
-  const iconMap = {
-    SunDim,
-    Sun,
-    CloudSun,
-    SunHorizon,
-    MoonStars
-  };
 
   function handleTabChange(event) {
     currentPage = event.detail;
@@ -92,12 +78,47 @@
   let upcomingPrayer = null;
   let pendingPrayers = [];
 
-  function updatePrayerStatus() {
+  let upcomingCountdown = '';
+  let countdownEnded = false;
+
+  async function updateCountdown() {
+    if (!upcomingPrayer) return;
+    
+    const [time, period] = upcomingPrayer.time.split(' ');
+    const [hours, minutes] = time.split(':');
+    const now = new Date();
+    const prayerDate = new Date();
+    
+    let hour = parseInt(hours);
+    if (period === 'PM' && hour !== 12) hour += 12;
+    if (period === 'AM' && hour === 12) hour = 0;
+    
+    prayerDate.setHours(hour, parseInt(minutes), 0);
+    
+    const diff = prayerDate - now;
+    if (diff < 0) {
+      // Prayer time has passed
+      countdownEnded = true;
+      // Move to pending and find next upcoming prayer
+      await getPrayerHistory();
+      updatePrayerStatus();
+      return;
+    }
+    
+    const hrs = Math.floor(diff / (1000 * 60 * 60));
+    const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    const secs = Math.floor((diff % (1000 * 60)) / 1000);
+    
+    upcomingCountdown = `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    countdownEnded = false;
+  }
+
+  async function updatePrayerStatus() {
     const prayers = $prayerTimesStore;
     const now = new Date();
     
-    // Find upcoming prayer and pending prayers
-    pendingPrayers = prayers.filter(prayer => !prayer.status);
+    // Reset upcoming prayer
+    upcomingPrayer = null;
     
     // Find next upcoming prayer
     for (let prayer of prayers) {
@@ -111,7 +132,7 @@
       
       prayerDate.setHours(hour, parseInt(minutes), 0);
       
-      if (prayerDate > now) {
+      if (prayerDate > now && !prayer.status) {
         upcomingPrayer = prayer;
         break;
       }
@@ -121,6 +142,9 @@
     if (!upcomingPrayer && prayers.length > 0) {
       upcomingPrayer = prayers[0];
     }
+
+    // Update pending prayers
+    await getPrayerHistory();
   }
 
   async function markPrayerStatus(prayer, status) {
@@ -139,16 +163,26 @@
   }
 
   onMount(async () => {
-    auth.onAuthStateChanged((user) => {
+    auth.onAuthStateChanged(async (user) => {
       userName = capitalizeFirstLetter(user?.displayName?.split(' ')[0]) || 'Guest';
+      if (user) {
+        await fetchPrayerTimes();
+        await getPrayerHistory();
+        updatePrayerStatus();
+      }
     });
-    await fetchPrayerTimes();
-    await getPrayerHistory();
-    const interval = setInterval(updatePrayerStatus, 60000);
-    updatePrayerStatus();
-
-    return () => clearInterval(interval);
+    
+    const prayerInterval = setInterval(updatePrayerStatus, 60000);
+    const countdownInterval = setInterval(updateCountdown, 1000);
+    
+    return () => {
+      clearInterval(prayerInterval);
+      clearInterval(countdownInterval);
+    };
   });
+
+  // Add console log to debug
+  $: console.log('Prayer History Store:', $prayerHistoryStore);
 </script>
 
 <main class="home-container">
@@ -195,7 +229,7 @@
           <div class="loading">Loading prayer times...</div>
         {:else if $errorStore}
           <div class="error">{$errorStore}</div>
-        {:else if upcomingPrayer}
+        {:else if upcomingPrayer && !countdownEnded}
           <div class="upcoming-prayer">
             <div class="prayer-info">
               <svelte:component 
@@ -206,15 +240,18 @@
               <div class="prayer-details">
                 <span class="prayer-name">{upcomingPrayer.name}</span>
                 <span class="prayer-time">{upcomingPrayer.time}</span>
+                {#if upcomingCountdown}
+                  <span class="countdown">{upcomingCountdown}</span>
+                {/if}
               </div>
             </div>
           </div>
         {/if}
 
-        {#if Object.keys($prayerHistoryStore.pendingByDate).length > 0}
+        {#if Object.keys($prayerHistoryStore.pendingByDate || {}).length > 0}
           <div class="pending-prayers">
             <h3>Pending Actions</h3>
-            {#each Object.values($prayerHistoryStore.pendingByDate) as { date, isToday, prayers }}
+            {#each Object.entries($prayerHistoryStore.pendingByDate) as [date, { isToday, prayers }]}
               <div class="date-group">
                 <div class="date-header">
                   {isToday ? 'Today' : new Date(date).toLocaleDateString('en-US', { 
@@ -225,7 +262,15 @@
                 </div>
                 {#each prayers as prayer}
                   <div class="pending-prayer-item">
-                    <span>{prayer.name}</span>
+                    <div class="prayer-info">
+                      <svelte:component 
+                        this={iconMap[prayer.icon]} 
+                        size={20} 
+                        weight={prayer.weight}
+                      />
+                      <span>{prayer.name}</span>
+                      <span class="prayer-time">{prayer.time}</span>
+                    </div>
                     <div class="prayer-actions">
                       <button 
                         class="status-button ontime" 
@@ -422,6 +467,12 @@
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     margin-bottom: 1.5rem;
+    opacity: 1;
+    transition: opacity 0.3s ease;
+  }
+
+  .upcoming-prayer.ending {
+    opacity: 0;
   }
 
   .prayer-details {
@@ -441,20 +492,40 @@
   }
 
   .pending-prayer-item {
+    padding: 0.75rem 1rem;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 0.75rem;
     border-bottom: 1px solid #eee;
   }
 
+  .pending-prayer-item:last-child {
+    border-bottom: none;
+  }
+
+  .prayer-info {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .prayer-time {
+    color: #666;
+    font-size: 0.875rem;
+  }
+
+  .prayer-actions {
+    display: flex;
+    gap: 0.5rem;
+  }
+
   .status-button {
-    padding: 0.25rem 0.75rem;
+    padding: 0.375rem 0.75rem;
     border: none;
     border-radius: 4px;
     font-size: 0.75rem;
     cursor: pointer;
-    margin-left: 0.5rem;
+    transition: all 0.2s;
   }
 
   .status-button.ontime {
@@ -477,19 +548,17 @@
 
   .date-header {
     background: #f5f5f5;
-    padding: 0.5rem 1rem;
+    padding: 0.75rem 1rem;
     font-size: 0.875rem;
     color: #666;
     font-weight: 500;
   }
 
-  .pending-prayer-item {
-    padding: 0.75rem 1rem;
-    border-bottom: 1px solid #eee;
-  }
-
-  .pending-prayer-item:last-child {
-    border-bottom: none;
+  .countdown {
+    font-size: 1.25rem;
+    font-weight: 500;
+    color: #216974;
+    margin-top: 0.25rem;
   }
 </style>
 
