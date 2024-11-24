@@ -1,5 +1,7 @@
 <script>
   import { writable } from 'svelte/store';
+  import { onMount } from 'svelte';
+  import { saveTasbihSession, getWeeklyStats, weeklyStatsStore } from '../stores/tasbihStore';
 
   const dhikrOptions = [
     { arabic: 'سُبْحَانَ ٱللَّٰهِ', latin: 'SubhanAllah', meaning: 'Glory be to Allah' },
@@ -16,6 +18,12 @@
   let totalCount = 0;
   let selectedDhikr = dhikrOptions[0];
   let isCounterMode = false;
+  let weeklyStreak = 0;
+
+  onMount(async () => {
+    const stats = await getWeeklyStats();
+    weeklyStreak = stats?.streak || 0;
+  });
 
   function handleTargetChange(target) {
     selectedTarget = target;
@@ -33,7 +41,17 @@
     isCounterMode = true;
   }
 
-  function exitCounter() {
+  async function exitCounter() {
+    if (totalCount > 0) {
+      await saveTasbihSession({
+        dhikr: selectedDhikr,
+        count,
+        sets,
+        totalCount
+      });
+      const stats = await getWeeklyStats();
+      weeklyStreak = stats?.streak || 0;
+    }
     isCounterMode = false;
     count = 0;
   }
@@ -60,6 +78,10 @@
 {#if !isCounterMode}
   <div class="tasbih-container">
     <div class="setup-card">
+      <div class="streak-display">
+        <h3>Weekly Streak</h3>
+        <span class="streak-count">{weeklyStreak} days</span>
+      </div>
       <h2>Select Dhikr</h2>
       <div class="dhikr-options">
         {#each dhikrOptions as dhikr}
@@ -360,5 +382,19 @@
     opacity: 0.8;
     margin-top: 0.5rem;
     color: #E09453;  /* Using the accent color from your theme */
+  }
+
+  .streak-display {
+    text-align: center;
+    margin-bottom: 2rem;
+    padding: 1rem;
+    background: rgba(33, 105, 116, 0.1);
+    border-radius: 8px;
+  }
+
+  .streak-count {
+    font-size: 1.5rem;
+    color: #216974;
+    font-weight: 500;
   }
 </style>

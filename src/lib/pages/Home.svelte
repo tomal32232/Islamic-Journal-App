@@ -12,6 +12,9 @@
   import { prayerTimesStore, loadingStore, errorStore, fetchPrayerTimes, locationStore } from '../services/prayerTimes';
   import { auth } from '../firebase';
   import Tasbih from './Tasbih.svelte';
+  import WeeklyStreak from '../components/WeeklyStreak.svelte';
+  import Prayer from './Prayer.svelte';
+  import { savePrayerStatus, getPrayerHistory, prayerHistoryStore } from '../stores/prayerHistoryStore';
   
   let currentPage = 'home';
   const date = new Date();
@@ -58,18 +61,21 @@
 
   // Get current week days
   function getCurrentWeek() {
-    const current = new Date();
+    const today = new Date();
+    const sunday = new Date(today);
+    sunday.setDate(today.getDate() - today.getDay()); // Go back to last Sunday
+    
     const week = [];
-    
-    current.setDate(current.getDate() - current.getDay() + 1);
-    
     for (let i = 0; i < 7; i++) {
+      const current = new Date(sunday);
+      current.setDate(current.getDate() + i);
+      
       week.push({
         day: current.toLocaleDateString('en-US', { weekday: 'short' }).slice(0, 2),
         date: current.getDate(),
-        isToday: current.getDate() === new Date().getDate()
+        isToday: current.getDate() === today.getDate() &&
+                 current.getMonth() === today.getMonth()
       });
-      current.setDate(current.getDate() + 1);
     }
     
     return week;
@@ -83,11 +89,65 @@
 
   let userName = capitalizeFirstLetter(auth.currentUser?.displayName?.split(' ')[0]) || 'Guest';
 
-  onMount(() => {
+  let upcomingPrayer = null;
+  let pendingPrayers = [];
+
+  function updatePrayerStatus() {
+    const prayers = $prayerTimesStore;
+    const now = new Date();
+    
+    // Find upcoming prayer and pending prayers
+    pendingPrayers = prayers.filter(prayer => !prayer.status);
+    
+    // Find next upcoming prayer
+    for (let prayer of prayers) {
+      const [time, period] = prayer.time.split(' ');
+      const [hours, minutes] = time.split(':');
+      const prayerDate = new Date();
+      
+      let hour = parseInt(hours);
+      if (period === 'PM' && hour !== 12) hour += 12;
+      if (period === 'AM' && hour === 12) hour = 0;
+      
+      prayerDate.setHours(hour, parseInt(minutes), 0);
+      
+      if (prayerDate > now) {
+        upcomingPrayer = prayer;
+        break;
+      }
+    }
+
+    // If no upcoming prayer found today, set to first prayer of next day
+    if (!upcomingPrayer && prayers.length > 0) {
+      upcomingPrayer = prayers[0];
+    }
+  }
+
+  async function markPrayerStatus(prayer, status) {
+    await savePrayerStatus({
+      name: prayer.name,
+      time: prayer.time,
+      status
+    });
+    
+    $prayerTimesStore = $prayerTimesStore.map(p => 
+      p.name === prayer.name ? { ...p, status } : p
+    );
+    
+    // Update lists
+    updatePrayerStatus();
+  }
+
+  onMount(async () => {
     auth.onAuthStateChanged((user) => {
       userName = capitalizeFirstLetter(user?.displayName?.split(' ')[0]) || 'Guest';
     });
-    fetchPrayerTimes();
+    await fetchPrayerTimes();
+    await getPrayerHistory();
+    const interval = setInterval(updatePrayerStatus, 60000);
+    updatePrayerStatus();
+
+    return () => clearInterval(interval);
   });
 </script>
 
@@ -97,6 +157,8 @@
       <Profile />
     {:else if currentPage === 'tasbih'}
       <Tasbih />
+    {:else if currentPage === 'prayer'}
+      <Prayer />
     {:else if currentPage === 'home'}
       <header class="greeting">
         <div class="datetime">
@@ -118,6 +180,8 @@
         </div>
       </header>
 
+      <WeeklyStreak />
+
       <div class="quote-card">
         <blockquote>
           "Indeed, with hardship comes ease." 
@@ -126,37 +190,62 @@
       </div>
 
       <section class="prayer-times">
-        <h2>Prayer Times</h2>
-        <div class="prayer-list">
-          {#if $loadingStore}
-            <div class="loading">Loading prayer times...</div>
-          {:else if $errorStore}
-            <div class="error">{$errorStore}</div>
-          {:else}
-            {#each $prayerTimesStore as prayer, i}
-              <div class="prayer-item">
-                <div class="prayer-info">
-                  <svelte:component 
-                    this={iconMap[prayer.icon]} 
-                    size={20} 
-                    weight={prayer.weight}
-                    color={prayer.done ? "#E09453" : "#000000"}
-                  />
-                  <span>{prayer.name}</span>
+        <h2>Upcoming Prayer</h2>
+        {#if $loadingStore}
+          <div class="loading">Loading prayer times...</div>
+        {:else if $errorStore}
+          <div class="error">{$errorStore}</div>
+        {:else if upcomingPrayer}
+          <div class="upcoming-prayer">
+            <div class="prayer-info">
+              <svelte:component 
+                this={iconMap[upcomingPrayer.icon]} 
+                size={24} 
+                weight={upcomingPrayer.weight}
+              />
+              <div class="prayer-details">
+                <span class="prayer-name">{upcomingPrayer.name}</span>
+                <span class="prayer-time">{upcomingPrayer.time}</span>
+              </div>
+            </div>
+          </div>
+        {/if}
+
+        {#if Object.keys($prayerHistoryStore.pendingByDate).length > 0}
+          <div class="pending-prayers">
+            <h3>Pending Actions</h3>
+            {#each Object.values($prayerHistoryStore.pendingByDate) as { date, isToday, prayers }}
+              <div class="date-group">
+                <div class="date-header">
+                  {isToday ? 'Today' : new Date(date).toLocaleDateString('en-US', { 
+                    weekday: 'short', 
+                    month: 'short', 
+                    day: 'numeric' 
+                  })}
                 </div>
-                <div class="prayer-actions">
-                  <span class="prayer-time">{prayer.time}</span>
-                  <button 
-                    class="mark-button {prayer.done ? 'done' : ''}" 
-                    on:click={() => markAsDone(i)}
-                  >
-                    {prayer.done ? '✓' : 'Mark'}
-                  </button>
-                </div>
+                {#each prayers as prayer}
+                  <div class="pending-prayer-item">
+                    <span>{prayer.name}</span>
+                    <div class="prayer-actions">
+                      <button 
+                        class="status-button ontime" 
+                        on:click={() => markPrayerStatus(prayer, 'ontime')}
+                      >
+                        On time
+                      </button>
+                      <button 
+                        class="status-button late" 
+                        on:click={() => markPrayerStatus(prayer, 'late')}
+                      >
+                        Late
+                      </button>
+                    </div>
+                  </div>
+                {/each}
               </div>
             {/each}
-          {/if}
-        </div>
+          </div>
+        {/if}
       </section>
     {/if}
   </div>
@@ -325,6 +414,82 @@
     color: #666;
     font-size: 0.875rem;
     margin-top: 0.25rem;
+  }
+
+  .upcoming-prayer {
+    background: white;
+    padding: 1rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-bottom: 1.5rem;
+  }
+
+  .prayer-details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .pending-prayers {
+    margin-top: 1.5rem;
+  }
+
+  .pending-prayers h3 {
+    font-size: 1rem;
+    margin-bottom: 1rem;
+    color: #666;
+  }
+
+  .pending-prayer-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem;
+    border-bottom: 1px solid #eee;
+  }
+
+  .status-button {
+    padding: 0.25rem 0.75rem;
+    border: none;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    margin-left: 0.5rem;
+  }
+
+  .status-button.ontime {
+    background: #216974;
+    color: white;
+  }
+
+  .status-button.late {
+    background: #E09453;
+    color: white;
+  }
+
+  .date-group {
+    background: white;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+
+  .date-header {
+    background: #f5f5f5;
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    color: #666;
+    font-weight: 500;
+  }
+
+  .pending-prayer-item {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #eee;
+  }
+
+  .pending-prayer-item:last-child {
+    border-bottom: none;
   }
 </style>
 

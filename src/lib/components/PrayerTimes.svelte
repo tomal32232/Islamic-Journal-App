@@ -1,0 +1,202 @@
+<script>
+  import { onMount, onDestroy } from 'svelte';
+  import { prayerTimesStore } from '../stores/prayerTimes';
+  import { Sun, SunDim, CloudSun, SunHorizon, MoonStars } from 'phosphor-svelte';
+
+  let timeInterval;
+  let currentPrayer = null;
+  let nextPrayer = null;
+  let timeRemaining = '';
+
+  const icons = {
+    SunDim,
+    Sun,
+    CloudSun,
+    SunHorizon,
+    MoonStars
+  };
+
+  function getTimeRemaining(prayerTime) {
+    const now = new Date();
+    const [time, period] = prayerTime.split(' ');
+    const [hours, minutes] = time.split(':');
+    const prayerDate = new Date();
+    
+    let hour = parseInt(hours);
+    if (period === 'PM' && hour !== 12) hour += 12;
+    if (period === 'AM' && hour === 12) hour = 0;
+    
+    prayerDate.setHours(hour, parseInt(minutes), 0);
+    
+    const diff = prayerDate - now;
+    if (diff < 0) return null;
+    
+    const hrs = Math.floor(diff / (1000 * 60 * 60));
+    const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    return `${hrs}h ${mins}m`;
+  }
+
+  function updatePrayerStatus() {
+    const prayers = $prayerTimesStore;
+    const now = new Date();
+    
+    for (let i = 0; i < prayers.length; i++) {
+      const remaining = getTimeRemaining(prayers[i].time);
+      if (remaining) {
+        currentPrayer = prayers[i];
+        nextPrayer = prayers[i + 1] || prayers[0];
+        timeRemaining = remaining;
+        break;
+      }
+    }
+  }
+
+  function markPrayer(prayer, status) {
+    $prayerTimesStore = $prayerTimesStore.map(p => 
+      p.name === prayer.name ? { ...p, status } : p
+    );
+  }
+
+  onMount(() => {
+    timeInterval = setInterval(updatePrayerStatus, 60000);
+    updatePrayerStatus();
+  });
+
+  onDestroy(() => {
+    if (timeInterval) clearInterval(timeInterval);
+  });
+</script>
+
+<div class="prayer-times-container">
+  {#each $prayerTimesStore as prayer}
+    <div class="prayer-card {prayer === currentPrayer ? 'current' : ''}">
+      <div class="prayer-info">
+        <svelte:component 
+          this={icons[prayer.icon]} 
+          size={24} 
+          weight={prayer.weight} 
+        />
+        <div class="prayer-details">
+          <span class="prayer-name">{prayer.name}</span>
+          <span class="prayer-time">{prayer.time}</span>
+        </div>
+      </div>
+
+      {#if prayer === currentPrayer}
+        <div class="time-remaining">
+          <span>Time remaining: {timeRemaining}</span>
+        </div>
+      {/if}
+
+      {#if prayer.status}
+        <div class="prayer-status {prayer.status}">
+          {prayer.status === 'ontime' ? 'Prayed on time' : 'Prayed late'}
+        </div>
+      {:else if prayer === currentPrayer || getTimeRemaining(prayer.time) === null}
+        <div class="prayer-actions">
+          <button 
+            class="status-button ontime" 
+            on:click={() => markPrayer(prayer, 'ontime')}
+          >
+            Prayed on time
+          </button>
+          <button 
+            class="status-button late" 
+            on:click={() => markPrayer(prayer, 'late')}
+          >
+            Prayed late
+          </button>
+        </div>
+      {/if}
+    </div>
+  {/each}
+</div>
+
+<style>
+  .prayer-times-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1rem;
+  }
+
+  .prayer-card {
+    background: white;
+    padding: 1rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+
+  .prayer-card.current {
+    border: 2px solid #216974;
+  }
+
+  .prayer-info {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .prayer-details {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .prayer-name {
+    font-weight: 500;
+  }
+
+  .prayer-time {
+    font-size: 0.875rem;
+    color: #666;
+  }
+
+  .time-remaining {
+    margin-top: 0.5rem;
+    font-size: 0.875rem;
+    color: #216974;
+  }
+
+  .prayer-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+  }
+
+  .status-button {
+    flex: 1;
+    padding: 0.5rem;
+    border: none;
+    border-radius: 4px;
+    font-size: 0.875rem;
+    cursor: pointer;
+  }
+
+  .status-button.ontime {
+    background: #216974;
+    color: white;
+  }
+
+  .status-button.late {
+    background: #E09453;
+    color: white;
+  }
+
+  .prayer-status {
+    margin-top: 0.5rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.875rem;
+    text-align: center;
+  }
+
+  .prayer-status.ontime {
+    background: rgba(33, 105, 116, 0.1);
+    color: #216974;
+  }
+
+  .prayer-status.late {
+    background: rgba(224, 148, 83, 0.1);
+    color: #E09453;
+  }
+</style> 
