@@ -19,6 +19,7 @@
   let selectedDhikr = dhikrOptions[0];
   let isCounterMode = false;
   let weeklyStreak = 0;
+  let target = 33;
 
   onMount(async () => {
     const stats = await getWeeklyStats();
@@ -73,6 +74,12 @@
     sets = 0;
     totalCount = 0;
   }
+
+  function setTarget(value) {
+    target = parseInt(value) || 33;
+    selectedTarget = target;
+    count = 0;
+  }
 </script>
 
 {#if !isCounterMode}
@@ -95,24 +102,45 @@
         {/each}
       </div>
 
-      <h2>Select Target</h2>
-      <div class="target-options">
-        {#each targetOptions as target}
+      <div class="target-selector">
+        <h3>Select Target</h3>
+        <div class="target-options">
           <button 
-            class="target-button {selectedTarget === target ? 'active' : ''}"
-            on:click={() => handleTargetChange(target)}
+            class="target-button {target === 33 ? 'active' : ''}" 
+            on:click={() => setTarget(33)}
           >
-            {target}
+            33
           </button>
-        {/each}
-        <div class="custom-target">
-          <input 
-            type="number" 
-            bind:value={customTarget} 
+          <button 
+            class="target-button {target === 66 ? 'active' : ''}" 
+            on:click={() => setTarget(66)}
+          >
+            66
+          </button>
+          <button 
+            class="target-button {target === 99 ? 'active' : ''}" 
+            on:click={() => setTarget(99)}
+          >
+            99
+          </button>
+          <button 
+            class="target-button {target === 100 ? 'active' : ''}" 
+            on:click={() => setTarget(100)}
+          >
+            100
+          </button>
+        </div>
+        
+        <div class="custom-target {target === parseInt(customTarget) ? 'active' : ''}">
+          <input
+            type="number"
+            bind:value={customTarget}
+            on:focus={() => setTarget(customTarget)}
             placeholder="Custom"
             min="1"
+            max="999"
           />
-          <button on:click={handleCustomTarget}>Set</button>
+          <span>times</span>
         </div>
       </div>
 
@@ -166,13 +194,21 @@
   }
 
   h2 {
-    font-size: 1rem;
-    color: #000;
+    font-size: 1.25rem;
+    color: #216974;
     margin-bottom: 1rem;
+    font-weight: 500;
+  }
+
+  h3 {
+    font-size: 1.25rem;
+    color: #216974;
+    margin-bottom: 1rem;
+    font-weight: 500;
   }
 
   .dhikr-selector, .target-selector {
-    margin-bottom: 2rem;
+    margin-bottom: 1.5rem;
   }
 
   .dhikr-options {
@@ -209,36 +245,80 @@
     font-size: 0.75rem;
   }
 
+  .target-selector {
+    margin-bottom: 1.5rem;
+  }
+
   .target-options {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
     gap: 0.5rem;
+    margin-bottom: 0.75rem;
   }
 
   .target-button {
     background: white;
     border: 1px solid #E0E0E0;
-    padding: 0.5rem 1rem;
-    border-radius: 4px;
+    padding: 0.5rem;
+    border-radius: 6px;
     transition: all 0.2s ease;
+    font-size: 0.875rem;
+    text-align: center;
+    color: #216974;
+  }
+
+  .target-button:hover {
+    border-color: #216974;
+    transform: translateY(-1px);
   }
 
   .target-button.active {
     background: #216974;
     border-color: #216974;
     color: white;
+    font-weight: 500;
   }
 
   .custom-target {
     display: flex;
+    align-items: center;
     gap: 0.5rem;
+    background: white;
+    padding: 0.5rem;
+    border-radius: 6px;
+    border: 1px solid #E0E0E0;
   }
 
   .custom-target input {
-    width: 100px;
-    padding: 0.5rem;
-    border: 1px solid #E0E0E0;
+    width: 80px;
+    border: none;
+    padding: 0.25rem;
+    font-size: 0.875rem;
+    color: #216974;
+    text-align: center;
+  }
+
+  .custom-target input:focus {
+    outline: none;
+  }
+
+  .custom-target.active {
+    border-color: #216974;
+    background: #216974;
+  }
+
+  .custom-target.active input {
+    background: white;
     border-radius: 4px;
+  }
+
+  .custom-target span {
+    color: #666;
+    font-size: 0.875rem;
+  }
+
+  .custom-target.active span {
+    color: white;
   }
 
   .start-button {

@@ -13,7 +13,7 @@ function formatTo12Hour(time24) {
   return `${hour12}:${minutes} ${ampm}`;
 }
 
-async function getCurrentLocation() {
+export async function getCurrentLocation() {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
       reject(new Error('Geolocation is not supported by your browser'));
