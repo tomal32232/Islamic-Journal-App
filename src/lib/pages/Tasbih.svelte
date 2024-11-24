@@ -12,6 +12,8 @@
   let customTarget = '';
   let selectedTarget = 33;
   let count = 0;
+  let sets = 0;
+  let totalCount = 0;
   let selectedDhikr = dhikrOptions[0];
   let isCounterMode = false;
 
@@ -38,15 +40,20 @@
 
   function increment() {
     count++;
+    totalCount++;
     if (count === selectedTarget) {
       if ('vibrate' in navigator) {
         navigator.vibrate(200);
       }
+      sets++;
+      count = 0;
     }
   }
 
   function reset() {
     count = 0;
+    sets = 0;
+    totalCount = 0;
   }
 </script>
 
@@ -104,8 +111,10 @@
       </div>
 
       <div class="progress">
+        <span class="sets-display">Set {sets + 1}</span>
         <span class="count-large">{count}</span>
         <span class="target-display">of {selectedTarget}</span>
+        <span class="total-count">Total: {totalCount}</span>
       </div>
 
       <button class="counter-button" on:click={increment}>
@@ -277,6 +286,10 @@
   .progress {
     text-align: center;
     margin-bottom: 2rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
   }
 
   .count-large {
@@ -332,5 +345,20 @@
     border-radius: 4px;
     cursor: pointer;
     font-size: 1rem;
+  }
+
+  .sets-display {
+    font-size: 1.25rem;
+    opacity: 0.8;
+    display: block;
+    margin-bottom: 0.5rem;
+  }
+
+  .total-count {
+    display: block;
+    font-size: 1rem;
+    opacity: 0.8;
+    margin-top: 0.5rem;
+    color: #E09453;  /* Using the accent color from your theme */
   }
 </style>
