@@ -170,7 +170,9 @@
   {:else if $nearbyMosquesStore.length > 0}
     <div class="mosque-list">
       {#each $nearbyMosquesStore as mosque}
-        <div class="mosque-card">
+        <div class="mosque-card" 
+          on:click={() => window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mosque.name + ' ' + mosque.address)}`, '_blank')}
+        >
           <div class="mosque-info">
             <span class="mosque-name">{mosque.name}</span>
             <span class="mosque-address">{mosque.address}</span>
