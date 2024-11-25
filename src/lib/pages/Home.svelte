@@ -201,10 +201,10 @@
             {/if}
           </div>
         </div>
-        <blockquote>
-          "Indeed, with hardship comes ease." 
-        </blockquote>
-        <cite>Surah Ash-Sharh [94:5-6]</cite>
+        <div class="quote-section">
+          <blockquote>"Indeed, with hardship comes ease."</blockquote>
+          <cite>Surah Ash-Sharh [94:5-6]</cite>
+        </div>
       </div>
 
       <div class="calendar-strip">
@@ -265,46 +265,51 @@
   .quote-card {
     background: #216974;
     color: white;
-    padding: 1.5rem;
+    padding: 1rem;
     border-radius: 12px;
-    margin-bottom: 1.5rem;
-    text-align: center;
+    margin-bottom: 1rem;
   }
 
   .greeting-section {
-    margin-bottom: 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.75rem;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    padding-bottom: 1.5rem;
   }
 
   .greeting-section h1 {
     color: white;
-    font-size: 1.25rem;
+    font-size: 1.125rem;
     font-weight: 500;
-    margin-bottom: 0.75rem;
+    margin: 0;
   }
 
   .datetime {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.25rem;
+    text-align: right;
   }
 
   .time {
-    font-size: 1.25rem;
+    display: block;
+    font-size: 1rem;
     font-weight: 500;
     color: white;
   }
 
   .date, .location {
-    font-size: 0.875rem;
+    display: block;
+    font-size: 0.75rem;
     color: rgba(255, 255, 255, 0.8);
   }
 
+  .quote-section {
+    text-align: center;
+  }
+
   blockquote {
-    font-size: 1rem;
-    margin: 1rem 0 0.5rem;
+    font-size: 0.875rem;
+    margin: 0 0 0.25rem;
   }
 
   cite {
