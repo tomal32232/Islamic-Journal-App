@@ -1,6 +1,6 @@
 <script>
   import { writable } from 'svelte/store';
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { saveTasbihSession, getWeeklyStats, weeklyStatsStore } from '../stores/tasbihStore';
 
   const dhikrOptions = [
@@ -42,7 +42,7 @@
     isCounterMode = true;
   }
 
-  async function exitCounter() {
+  async function saveSession() {
     if (totalCount > 0) {
       await saveTasbihSession({
         dhikr: selectedDhikr,
@@ -53,6 +53,10 @@
       const stats = await getWeeklyStats();
       weeklyStreak = stats?.streak || 0;
     }
+  }
+
+  async function exitCounter() {
+    await saveSession();
     isCounterMode = false;
     count = 0;
   }
@@ -80,6 +84,25 @@
     selectedTarget = target;
     count = 0;
   }
+
+  function handleBeforeUnload(event) {
+    if (isCounterMode && totalCount > 0) {
+      saveSession();
+      event.preventDefault();
+      event.returnValue = '';
+    }
+  }
+
+  onMount(() => {
+    window.addEventListener('beforeunload', handleBeforeUnload);
+  });
+
+  onDestroy(() => {
+    if (isCounterMode && totalCount > 0) {
+      saveSession();
+    }
+    window.removeEventListener('beforeunload', handleBeforeUnload);
+  });
 </script>
 
 {#if !isCounterMode}
