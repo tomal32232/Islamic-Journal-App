@@ -187,32 +187,34 @@
 
 <main class="home-container">
   <div class="content">
-    {#if currentPage === 'profile'}
-      <Profile />
-    {:else if currentPage === 'tasbih'}
-      <Tasbih />
-    {:else if currentPage === 'prayer'}
+    {#if currentPage === 'prayer'}
       <Prayer />
     {:else if currentPage === 'home'}
-      <header class="greeting">
-        <div class="datetime">
-          <span class="time">{currentTime}</span>
-          <span class="date">{formattedDate}</span>
-          {#if $locationStore}
-            <span class="location">{$locationStore}</span>
-          {/if}
+      <div class="quote-card">
+        <div class="greeting-section">
+          <h1>{greeting}, {userName}!</h1>
+          <div class="datetime">
+            <span class="time">{currentTime}</span>
+            <span class="date">{formattedDate}</span>
+            {#if $locationStore}
+              <span class="location">{$locationStore}</span>
+            {/if}
+          </div>
         </div>
-        <h1>{greeting}, {userName}!</h1>
-        
-        <div class="calendar-strip">
-          {#each weekDays as { day, date, isToday }}
-            <div class="day-item {isToday ? 'active' : ''}">
-              <span class="day">{day}</span>
-              <span class="date-num">{date}</span>
-            </div>
-          {/each}
-        </div>
-      </header>
+        <blockquote>
+          "Indeed, with hardship comes ease." 
+        </blockquote>
+        <cite>Surah Ash-Sharh [94:5-6]</cite>
+      </div>
+
+      <div class="calendar-strip">
+        {#each weekDays as { day, date, isToday }}
+          <div class="day-item {isToday ? 'active' : ''}">
+            <span class="day">{day}</span>
+            <span class="date-num">{date}</span>
+          </div>
+        {/each}
+      </div>
 
       <section class="prayer-times">
         {#if $loadingStore}
@@ -242,13 +244,6 @@
       </section>
 
       <WeeklyStreak />
-
-      <div class="quote-card">
-        <blockquote>
-          "Indeed, with hardship comes ease." 
-        </blockquote>
-        <cite>Surah Ash-Sharh [94:5-6]</cite>
-      </div>
     {/if}
   </div>
   <BottomNav activeTab={currentPage} on:tabChange={handleTabChange} />
@@ -267,31 +262,54 @@
     margin: 0 auto;
   }
 
-  .datetime {
-    text-align: center;
+  .quote-card {
+    background: #216974;
+    color: white;
+    padding: 1.5rem;
+    border-radius: 12px;
     margin-bottom: 1.5rem;
-    padding-top: 0.5rem;
+    text-align: center;
+  }
+
+  .greeting-section {
+    margin-bottom: 1.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding-bottom: 1.5rem;
+  }
+
+  .greeting-section h1 {
+    color: white;
+    font-size: 1.25rem;
+    font-weight: 500;
+    margin-bottom: 0.75rem;
+  }
+
+  .datetime {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
   }
 
   .time {
-    display: block;
-    font-size: 1.5rem;
-    font-weight: 500;
-    color: #000;
-    margin-bottom: 0.25rem;
-  }
-
-  .date {
-    color: #666;
-    font-size: 0.875rem;
-  }
-
-  h1 {
-    text-align: center;
     font-size: 1.25rem;
-    margin-bottom: 1.5rem;
-    color: #000;
     font-weight: 500;
+    color: white;
+  }
+
+  .date, .location {
+    font-size: 0.875rem;
+    color: rgba(255, 255, 255, 0.8);
+  }
+
+  blockquote {
+    font-size: 1rem;
+    margin: 1rem 0 0.5rem;
+  }
+
+  cite {
+    font-size: 0.75rem;
+    opacity: 0.8;
   }
 
   .calendar-strip {
@@ -323,25 +341,6 @@
   .day-item.active .date-num {
     color: #E09453;
     font-weight: 500;
-  }
-
-  .quote-card {
-    background: #216974;
-    color: white;
-    padding: 1.5rem;
-    border-radius: 12px;
-    margin-bottom: 1.5rem;
-    text-align: center;
-  }
-
-  blockquote {
-    font-size: 1rem;
-    margin-bottom: 0.5rem;
-  }
-
-  cite {
-    font-size: 0.75rem;
-    opacity: 0.8;
   }
 
   .prayer-times {
@@ -401,13 +400,6 @@
     color: #666;
     text-align: center;
     padding: 0.5rem;
-  }
-
-  .location {
-    display: block;
-    color: #666;
-    font-size: 0.875rem;
-    margin-top: 0.25rem;
   }
 
   .pending-prayers {
