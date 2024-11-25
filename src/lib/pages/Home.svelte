@@ -242,6 +242,39 @@
       </section>
 
       <WeeklyStreak />
+
+      <section class="pending-prayers">
+        {#if pendingPrayers.length > 0}
+          <h3>Pending Prayers</h3>
+          {#each pendingPrayers as prayer}
+            <div class="pending-prayer-item">
+              <div class="prayer-info">
+                <svelte:component 
+                  this={iconMap[prayer.icon]} 
+                  size={20} 
+                  weight={prayer.weight}
+                />
+                <span>{prayer.name}</span>
+                <span class="prayer-time">{prayer.time}</span>
+              </div>
+              <div class="prayer-actions">
+                <button 
+                  class="status-button ontime" 
+                  on:click={() => markPrayerStatus(prayer, 'ontime')}
+                >
+                  On time
+                </button>
+                <button 
+                  class="status-button late" 
+                  on:click={() => markPrayerStatus(prayer, 'late')}
+                >
+                  Late
+                </button>
+              </div>
+            </div>
+          {/each}
+        {/if}
+      </section>
     {:else if currentPage === 'prayer'}
       <Prayer />
     {:else if currentPage === 'tasbih'}

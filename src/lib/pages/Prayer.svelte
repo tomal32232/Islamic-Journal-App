@@ -136,23 +136,7 @@
               </div>
             </div>
           </div>
-
-          {#if !prayer.status && (prayer === currentPrayer || getTimeRemaining(prayer.time) === 'Time passed')}
-            <div class="prayer-actions">
-              <button 
-                class="status-button ontime" 
-                on:click={() => markPrayerStatus(i, 'ontime')}
-              >
-                Prayed on time
-              </button>
-              <button 
-                class="status-button late" 
-                on:click={() => markPrayerStatus(i, 'late')}
-              >
-                Prayed late
-              </button>
-            </div>
-          {:else if prayer.status}
+          {#if prayer.status}
             <div class="status-badge {prayer.status}">
               {prayer.status === 'ontime' ? 'Prayed on time' : 'Prayed late'}
             </div>
