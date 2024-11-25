@@ -214,17 +214,7 @@
         </div>
       </header>
 
-      <WeeklyStreak />
-
-      <div class="quote-card">
-        <blockquote>
-          "Indeed, with hardship comes ease." 
-        </blockquote>
-        <cite>Surah Ash-Sharh [94:5-6]</cite>
-      </div>
-
       <section class="prayer-times">
-        <h2>Upcoming Prayer</h2>
         {#if $loadingStore}
           <div class="loading">Loading prayer times...</div>
         {:else if $errorStore}
@@ -234,12 +224,14 @@
             <div class="prayer-info">
               <svelte:component 
                 this={iconMap[upcomingPrayer.icon]} 
-                size={24} 
+                size={18} 
                 weight={upcomingPrayer.weight}
               />
               <div class="prayer-details">
-                <span class="prayer-name">{upcomingPrayer.name}</span>
-                <span class="prayer-time">{upcomingPrayer.time}</span>
+                <div class="name-time">
+                  <span class="prayer-name">{upcomingPrayer.name}</span>
+                  <span class="prayer-time">{upcomingPrayer.time}</span>
+                </div>
                 {#if upcomingCountdown}
                   <span class="countdown">{upcomingCountdown}</span>
                 {/if}
@@ -247,51 +239,16 @@
             </div>
           </div>
         {/if}
-
-        {#if Object.keys($prayerHistoryStore.pendingByDate || {}).length > 0}
-          <div class="pending-prayers">
-            <h3>Pending Actions</h3>
-            {#each Object.entries($prayerHistoryStore.pendingByDate) as [date, { isToday, prayers }]}
-              <div class="date-group">
-                <div class="date-header">
-                  {isToday ? 'Today' : new Date(date).toLocaleDateString('en-US', { 
-                    weekday: 'short', 
-                    month: 'short', 
-                    day: 'numeric' 
-                  })}
-                </div>
-                {#each prayers as prayer}
-                  <div class="pending-prayer-item">
-                    <div class="prayer-info">
-                      <svelte:component 
-                        this={iconMap[prayer.icon]} 
-                        size={20} 
-                        weight={prayer.weight}
-                      />
-                      <span>{prayer.name}</span>
-                      <span class="prayer-time">{prayer.time}</span>
-                    </div>
-                    <div class="prayer-actions">
-                      <button 
-                        class="status-button ontime" 
-                        on:click={() => markPrayerStatus(prayer, 'ontime')}
-                      >
-                        On time
-                      </button>
-                      <button 
-                        class="status-button late" 
-                        on:click={() => markPrayerStatus(prayer, 'late')}
-                      >
-                        Late
-                      </button>
-                    </div>
-                  </div>
-                {/each}
-              </div>
-            {/each}
-          </div>
-        {/if}
       </section>
+
+      <WeeklyStreak />
+
+      <div class="quote-card">
+        <blockquote>
+          "Indeed, with hardship comes ease." 
+        </blockquote>
+        <cite>Surah Ash-Sharh [94:5-6]</cite>
+      </div>
     {/if}
   </div>
   <BottomNav activeTab={currentPage} on:tabChange={handleTabChange} />
@@ -389,69 +346,61 @@
 
   .prayer-times {
     background: white;
-    padding: 1rem 1.5rem;
+    padding: 0.75rem 1rem;
     border-radius: 12px;
     border: 1px solid rgba(226, 148, 83, 0.2);
-  }
-
-  .prayer-times h2 {
-    font-size: 1rem;
-    color: #000;
     margin-bottom: 1rem;
-    padding-left: 0.5rem;
   }
 
-  .prayer-item {
+  .upcoming-prayer {
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    padding: 0.75rem 0;
-    border-bottom: 1px solid #eee;
+    justify-content: space-between;
   }
 
   .prayer-info {
     display: flex;
     align-items: center;
     gap: 0.75rem;
-    color: #000;
+    width: 100%;
   }
 
-  .prayer-actions {
+  .prayer-details {
     display: flex;
+    justify-content: space-between;
     align-items: center;
-    gap: 1rem;
+    width: 100%;
+  }
+
+  .name-time {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+  }
+
+  .prayer-name {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #216974;
   }
 
   .prayer-time {
-    color: #000;
-    font-size: 0.875rem;
-  }
-
-  .mark-button {
-    background: transparent;
-    border: 1px solid #E09453;
-    color: #E09453;
-    padding: 0.25rem 0.75rem;
-    border-radius: 4px;
     font-size: 0.75rem;
-    cursor: pointer;
-    transition: all 0.2s ease;
+    color: #666;
   }
 
-  .mark-button.done {
-    background: #E09453;
-    color: white;
+  .countdown {
+    font-size: 1rem;
+    font-weight: 500;
+    color: #E09453;
+    margin-left: auto;
   }
 
-  /* Remove the border from the last prayer item */
-  .prayer-item:last-child {
-    border-bottom: none;
-  }
-
-  .prayer-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
+  .loading, .error {
+    font-size: 0.875rem;
+    color: #666;
+    text-align: center;
+    padding: 0.5rem;
   }
 
   .location {
@@ -459,26 +408,6 @@
     color: #666;
     font-size: 0.875rem;
     margin-top: 0.25rem;
-  }
-
-  .upcoming-prayer {
-    background: white;
-    padding: 1rem;
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    margin-bottom: 1.5rem;
-    opacity: 1;
-    transition: opacity 0.3s ease;
-  }
-
-  .upcoming-prayer.ending {
-    opacity: 0;
-  }
-
-  .prayer-details {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
   }
 
   .pending-prayers {
@@ -501,17 +430,6 @@
 
   .pending-prayer-item:last-child {
     border-bottom: none;
-  }
-
-  .prayer-info {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-  }
-
-  .prayer-time {
-    color: #666;
-    font-size: 0.875rem;
   }
 
   .prayer-actions {
@@ -552,13 +470,6 @@
     font-size: 0.875rem;
     color: #666;
     font-weight: 500;
-  }
-
-  .countdown {
-    font-size: 1.25rem;
-    font-weight: 500;
-    color: #216974;
-    margin-top: 0.25rem;
   }
 </style>
 
