@@ -187,9 +187,7 @@
 
 <main class="home-container">
   <div class="content">
-    {#if currentPage === 'prayer'}
-      <Prayer />
-    {:else if currentPage === 'home'}
+    {#if currentPage === 'home'}
       <div class="quote-card">
         <div class="greeting-section">
           <h1>{greeting}, {userName}!</h1>
@@ -244,6 +242,12 @@
       </section>
 
       <WeeklyStreak />
+    {:else if currentPage === 'prayer'}
+      <Prayer />
+    {:else if currentPage === 'tasbih'}
+      <Tasbih />
+    {:else if currentPage === 'profile'}
+      <Profile />
     {/if}
   </div>
   <BottomNav activeTab={currentPage} on:tabChange={handleTabChange} />
