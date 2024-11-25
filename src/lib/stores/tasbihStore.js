@@ -80,19 +80,35 @@ export async function getWeeklyStats() {
     });
   }
 
-  const stats = { dailyCounts, streak: calculateStreak(dailyCounts) };
+  const stats = calculateStreakStats(dailyCounts);
   weeklyStatsStore.set(stats);
   return stats;
 }
 
-function calculateStreak(dailyCounts) {
-  let streak = 0;
-  for (let i = dailyCounts.length - 1; i >= 0; i--) {
+function calculateStreakStats(dailyCounts) {
+  let currentStreak = 0;
+  let totalDays = 0;
+
+  // Count days up to today
+  for (let i = 0; i < dailyCounts.length; i++) {
+    if (dailyCounts[i].isToday) {
+      totalDays = i + 1;
+      break;
+    }
+  }
+
+  // Calculate current streak
+  for (let i = totalDays - 1; i >= 0; i--) {
     if (dailyCounts[i].count > 0) {
-      streak++;
+      currentStreak++;
     } else {
       break;
     }
   }
-  return streak;
+
+  return {
+    currentStreak,
+    totalDays,
+    dailyCounts
+  };
 } 

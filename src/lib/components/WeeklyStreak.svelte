@@ -2,15 +2,24 @@
   import { onMount } from 'svelte';
   import { weeklyStatsStore, getWeeklyStats } from '../stores/tasbihStore';
 
+  let stats = {
+    currentStreak: 0,
+    totalDays: 7
+  };
+
   onMount(async () => {
-    await getWeeklyStats();
+    const weeklyStats = await getWeeklyStats();
+    stats = weeklyStats;
   });
 </script>
 
 <div class="streak-card">
   <div class="streak-header">
     <h2>Weekly Dhikr Streak</h2>
-    <span class="streak-count">{$weeklyStatsStore.streak} Days</span>
+    <div class="streak-stats">
+      <span class="streak-count">{stats.currentStreak}/{stats.totalDays} Days</span>
+      <span class="streak-subtitle">{stats.totalDays - stats.currentStreak} Days Missed</span>
+    </div>
   </div>
 
   <div class="chart">
@@ -57,10 +66,22 @@
     margin: 0;
   }
 
+  .streak-stats {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+  }
+
   .streak-count {
+    font-size: 1.125rem;
     color: #216974;
     font-weight: 500;
-    font-size: 0.875rem;
+  }
+
+  .streak-subtitle {
+    font-size: 0.75rem;
+    color: #E09453;
+    margin-top: 0.125rem;
   }
 
   .chart {
@@ -116,7 +137,7 @@
   }
 
   .bar.has-count {
-    min-height: 25px;
+    background: #216974;
   }
 
   .bar.today {
