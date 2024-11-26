@@ -23,7 +23,10 @@
       const todayStr = today.toLocaleDateString('en-CA');
       
       const dayPrayers = $prayerHistoryStore.history.filter(h => h.date === dateStr);
-      const pendingPrayers = dayPrayers.filter(p => p.status === 'pending').length;
+      
+      // Count both 'missed' status and pending prayers
+      const missedCount = dayPrayers.filter(p => p.status === 'missed').length;
+      const pendingCount = dayPrayers.filter(p => p.status === 'pending').length;
       
       const stats = {
         date: dateStr,
@@ -31,7 +34,7 @@
         total: $prayerTimesStore.length,
         ontime: dayPrayers.filter(p => p.status === 'ontime').length,
         late: dayPrayers.filter(p => p.status === 'late').length,
-        missed: pendingPrayers,
+        missed: missedCount + pendingCount, // Combine both missed and pending
         weekday: current.toLocaleDateString('en-US', { weekday: 'short' })
       };
       
