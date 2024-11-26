@@ -14,25 +14,9 @@
   const dispatch = createEventDispatcher();
   
   let currentPage = 'home';
-  const date = new Date();
   
-  // Format current time
-  const currentTime = date.toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true
-  });
-
-  // Format date
-  const formattedDate = date.toLocaleDateString('en-US', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric'
-  });
-
   // Get greeting based on time of day
-  const hour = date.getHours();
+  const hour = new Date().getHours();
   let greeting = '';
   if (hour < 12) greeting = 'Good Morning';
   else if (hour < 17) greeting = 'Good Afternoon';
@@ -188,6 +172,36 @@
 
   // Add console log to debug
   $: console.log('Prayer History Store:', $prayerHistoryStore);
+
+  function getCurrentTime() {
+    const now = new Date();
+    return now.toLocaleTimeString('en-US', { 
+      hour: 'numeric', 
+      minute: '2-digit',
+      hour12: true 
+    });
+  }
+
+  function getFormattedDate() {
+    const now = new Date();
+    return now.toLocaleDateString('en-US', { 
+      weekday: 'long', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+  }
+
+  let currentTime = getCurrentTime();
+  let formattedDate = getFormattedDate();
+
+  onMount(() => {
+    const timeInterval = setInterval(() => {
+      currentTime = getCurrentTime();
+      formattedDate = getFormattedDate();
+    }, 1000);
+
+    return () => clearInterval(timeInterval);
+  });
 </script>
 
 <main class="home-container">

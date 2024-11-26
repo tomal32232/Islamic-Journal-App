@@ -26,7 +26,7 @@
       
       const stats = {
         date: dateStr,
-        isToday: current.getTime() === new Date(today.setHours(0,0,0,0)).getTime(),
+        isToday: current.toDateString() === today.toDateString(),
         total: $prayerTimesStore.length,
         ontime: dayPrayers.filter(p => p.status === 'ontime').length,
         late: dayPrayers.filter(p => p.status === 'late').length,
