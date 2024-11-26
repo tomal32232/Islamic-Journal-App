@@ -4,13 +4,30 @@
 
   let stats = {
     currentStreak: 0,
-    totalDays: 7
+    totalDays: 4
   };
+
+  function calculateStreak(dailyCounts) {
+    let streak = 0;
+    dailyCounts.forEach(day => {
+      if (day.count > 0 && !day.isToday) {
+        streak++;
+      }
+    });
+    return streak;
+  }
 
   onMount(async () => {
     const weeklyStats = await getWeeklyStats();
-    stats = weeklyStats;
+    stats.currentStreak = calculateStreak($weeklyStatsStore.dailyCounts);
+    stats.totalDays = 4;
   });
+
+  $: {
+    if ($weeklyStatsStore.dailyCounts) {
+      stats.currentStreak = calculateStreak($weeklyStatsStore.dailyCounts);
+    }
+  }
 </script>
 
 <div class="streak-card">
