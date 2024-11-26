@@ -13,7 +13,6 @@
     firstDay.setDate(today.getDate() - today.getDay());
     firstDay.setHours(0, 0, 0, 0);
     
-    // Generate 7 days starting from Sunday
     for (let i = 0; i < 7; i++) {
       const current = new Date(firstDay);
       current.setDate(firstDay.getDate() + i);
@@ -21,12 +20,13 @@
       
       const dayPrayers = $prayerHistoryStore.history.filter(h => h.date === dateStr);
       const pendingPrayers = dayPrayers.filter(p => p.status === 'pending').length;
-      const completedPrayers = dayPrayers.filter(p => p.status === 'ontime' || p.status === 'late').length;
-      const upcomingPrayers = dayPrayers.filter(p => p.status === 'upcoming').length;
+      
+      // Get today's date in YYYY-MM-DD format for comparison
+      const todayStr = today.toLocaleDateString('en-CA'); // Returns YYYY-MM-DD format
       
       const stats = {
         date: dateStr,
-        isToday: current.toDateString() === today.toDateString(),
+        isToday: dateStr === todayStr, // Compare date strings in YYYY-MM-DD format
         total: $prayerTimesStore.length,
         ontime: dayPrayers.filter(p => p.status === 'ontime').length,
         late: dayPrayers.filter(p => p.status === 'late').length,
