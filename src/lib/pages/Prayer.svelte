@@ -144,7 +144,9 @@
           </div>
           {#if prayer.status}
             <div class="status-badge {prayer.status}">
-              {prayer.status === 'ontime' ? 'Prayed on time' : 'Prayed late'}
+              {prayer.status === 'ontime' ? 'Prayed on time' : 
+               prayer.status === 'late' ? 'Prayed late' : 
+               prayer.status === 'missed' ? 'Missed' : ''}
             </div>
           {/if}
         </div>
@@ -316,6 +318,11 @@
   .status-badge.late {
     background: rgba(224, 148, 83, 0.1);
     color: #E09453;
+  }
+
+  .status-badge.missed {
+    background: rgba(239, 68, 68, 0.1);
+    color: #EF4444;
   }
 
   .mosque-section {

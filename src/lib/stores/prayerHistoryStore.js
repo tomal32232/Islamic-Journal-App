@@ -61,12 +61,14 @@ export async function updatePrayerStatuses() {
 
   const today = new Date().toISOString().split('T')[0];
   const now = new Date();
+  const endOfDay = new Date();
+  endOfDay.setHours(23, 59, 59, 999);
 
   const historyQuery = query(
     collection(db, 'prayer_history'),
     where('userId', '==', user.uid),
     where('date', '==', today),
-    where('status', '==', 'upcoming')
+    where('status', 'in', ['upcoming', 'pending'])
   );
 
   const querySnapshot = await getDocs(historyQuery);
@@ -75,11 +77,19 @@ export async function updatePrayerStatuses() {
     const prayer = doc.data();
     const prayerTime = convertPrayerTimeToDate(prayer.time);
     
-    if (prayerTime < now) {
+    // If it's end of day and prayer is still not marked
+    if (now >= endOfDay && (prayer.status === 'upcoming' || prayer.status === 'pending')) {
+      await setDoc(doc.ref, {
+        ...prayer,
+        status: 'missed'
+      }, { merge: true });
+    }
+    // If prayer time has passed but not end of day
+    else if (prayerTime < now && prayer.status === 'upcoming') {
       await setDoc(doc.ref, {
         ...prayer,
         status: 'pending'
-      });
+      }, { merge: true });
     }
   });
 

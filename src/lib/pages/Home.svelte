@@ -10,6 +10,8 @@
   import Prayer from './Prayer.svelte';
   import { savePrayerStatus, getPrayerHistory, prayerHistoryStore, convertPrayerTimeToDate, updatePrayerStatuses } from '../stores/prayerHistoryStore';
   import WeeklyPrayerHistory from '../components/WeeklyPrayerHistory.svelte';
+  import { createEventDispatcher } from 'svelte';
+  const dispatch = createEventDispatcher();
   
   let currentPage = 'home';
   const date = new Date();
@@ -240,6 +242,18 @@
                 {/if}
               </div>
             </div>
+          </div>
+        {:else}
+          <div class="no-prayers-card">
+            <p class="no-prayers-message">No more prayers scheduled for today</p>
+            {#if pendingPrayers.length > 0}
+              <p class="pending-notice">
+                You have {pendingPrayers.length} unmarked {pendingPrayers.length === 1 ? 'prayer' : 'prayers'}. 
+                <button class="link-button" on:click={() => dispatch('showNotifications')}>
+                  Mark them now
+                </button>
+              </p>
+            {/if}
           </div>
         {/if}
       </section>
@@ -508,6 +522,43 @@
     font-size: 0.875rem;
     color: #666;
     font-weight: 500;
+  }
+
+  .no-prayers-card {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 12px;
+    text-align: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    border: 1px solid #eee;
+  }
+
+  .no-prayers-message {
+    color: #666;
+    font-size: 1rem;
+    margin: 0;
+    margin-bottom: 0.5rem;
+  }
+
+  .pending-notice {
+    color: #E09453;
+    font-size: 0.875rem;
+    margin: 0;
+  }
+
+  .link-button {
+    background: none;
+    border: none;
+    color: #216974;
+    font-weight: 500;
+    padding: 0;
+    margin: 0;
+    cursor: pointer;
+    text-decoration: underline;
+  }
+
+  .link-button:hover {
+    color: #185761;
   }
 </style>
 
