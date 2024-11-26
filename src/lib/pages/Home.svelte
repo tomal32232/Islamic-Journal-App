@@ -8,7 +8,8 @@
   import Tasbih from './Tasbih.svelte';
   import WeeklyStreak from '../components/WeeklyStreak.svelte';
   import Prayer from './Prayer.svelte';
-  import { savePrayerStatus, getPrayerHistory, prayerHistoryStore } from '../stores/prayerHistoryStore';
+  import { savePrayerStatus, getPrayerHistory, prayerHistoryStore, convertPrayerTimeToDate, updatePrayerStatuses } from '../stores/prayerHistoryStore';
+  import WeeklyPrayerHistory from '../components/WeeklyPrayerHistory.svelte';
   
   let currentPage = 'home';
   const date = new Date();
@@ -114,52 +115,52 @@
   }
 
   async function updatePrayerStatus() {
-    const prayers = $prayerTimesStore;
-    const now = new Date();
+    const { history } = await getPrayerHistory();
+    pendingPrayers = history.filter(prayer => prayer.status === 'pending');
     
-    // Reset upcoming prayer
+    const now = new Date();
     upcomingPrayer = null;
     
-    // Find next upcoming prayer
-    for (let prayer of prayers) {
-      const [time, period] = prayer.time.split(' ');
-      const [hours, minutes] = time.split(':');
-      const prayerDate = new Date();
-      
-      let hour = parseInt(hours);
-      if (period === 'PM' && hour !== 12) hour += 12;
-      if (period === 'AM' && hour === 12) hour = 0;
-      
-      prayerDate.setHours(hour, parseInt(minutes), 0);
-      
-      if (prayerDate > now && !prayer.status) {
+    for (const prayer of $prayerTimesStore) {
+      if (!prayer?.time) continue;
+      const prayerTime = convertPrayerTimeToDate(prayer.time);
+      if (prayerTime > now && !upcomingPrayer) {
         upcomingPrayer = prayer;
         break;
       }
     }
-
-    // If no upcoming prayer found today, set to first prayer of next day
-    if (!upcomingPrayer && prayers.length > 0) {
-      upcomingPrayer = prayers[0];
-    }
-
-    // Update pending prayers
-    await getPrayerHistory();
   }
 
   async function markPrayerStatus(prayer, status) {
+    if (!prayer?.name && !prayer?.prayerName) {
+      console.error('Invalid prayer data:', prayer);
+      return;
+    }
+
     await savePrayerStatus({
-      name: prayer.name,
+      name: prayer.prayerName || prayer.name,
       time: prayer.time,
       status
     });
     
-    $prayerTimesStore = $prayerTimesStore.map(p => 
-      p.name === prayer.name ? { ...p, status } : p
-    );
-    
-    // Update lists
-    updatePrayerStatus();
+    await getPrayerHistory();
+    await updatePrayerStatus();
+  }
+
+  function checkPrayerNotifications() {
+    $prayerTimesStore.forEach(prayer => {
+      if (prayer.isPast && !prayer.notified) {
+        // Show notification
+        if (Notification.permission === "granted") {
+          new Notification(`Prayer Reminder`, {
+            body: `Time for ${prayer.name} prayer has passed. Don't forget to mark it.`,
+            icon: '/icon.png'
+          });
+        }
+        // Update store to mark as notified
+        prayer.notified = true;
+      }
+    });
   }
 
   onMount(async () => {
@@ -174,10 +175,12 @@
     
     const prayerInterval = setInterval(updatePrayerStatus, 60000);
     const countdownInterval = setInterval(updateCountdown, 1000);
+    const notificationInterval = setInterval(checkPrayerNotifications, 60000);
     
     return () => {
       clearInterval(prayerInterval);
       clearInterval(countdownInterval);
+      clearInterval(notificationInterval);
     };
   });
 
@@ -242,6 +245,7 @@
       </section>
 
       <WeeklyStreak />
+      <WeeklyPrayerHistory />
 
       <section class="pending-prayers">
         {#if pendingPrayers.length > 0}

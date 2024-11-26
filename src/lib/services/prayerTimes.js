@@ -56,11 +56,18 @@ export async function fetchPrayerTimes() {
     const timings = data.data.timings;
     
     const prayers = [
-      { name: 'Fajr', time: formatTo12Hour(timings.Fajr), done: false, icon: 'SunDim', weight: 'regular' },
-      { name: 'Dhuhr', time: formatTo12Hour(timings.Dhuhr), done: false, icon: 'Sun', weight: 'fill' },
-      { name: 'Asr', time: formatTo12Hour(timings.Asr), done: false, icon: 'CloudSun', weight: 'regular' },
-      { name: 'Maghrib', time: formatTo12Hour(timings.Maghrib), done: false, icon: 'SunHorizon', weight: 'regular' },
-      { name: 'Isha', time: formatTo12Hour(timings.Isha), done: false, icon: 'MoonStars', weight: 'regular' }
+      { 
+        name: 'Fajr', 
+        time: formatTo12Hour(timings.Fajr), 
+        done: false, 
+        icon: 'SunDim', 
+        weight: 'regular',
+        isPast: isPrayerPast(timings.Fajr)
+      },
+      { name: 'Dhuhr', time: formatTo12Hour(timings.Dhuhr), done: false, icon: 'Sun', weight: 'fill', isPast: isPrayerPast(timings.Dhuhr) },
+      { name: 'Asr', time: formatTo12Hour(timings.Asr), done: false, icon: 'CloudSun', weight: 'regular', isPast: isPrayerPast(timings.Asr) },
+      { name: 'Maghrib', time: formatTo12Hour(timings.Maghrib), done: false, icon: 'SunHorizon', weight: 'regular', isPast: isPrayerPast(timings.Maghrib) },
+      { name: 'Isha', time: formatTo12Hour(timings.Isha), done: false, icon: 'MoonStars', weight: 'regular', isPast: isPrayerPast(timings.Isha) }
     ];
     
     prayerTimesStore.set(prayers);
@@ -71,4 +78,12 @@ export async function fetchPrayerTimes() {
   } finally {
     loadingStore.set(false);
   }
+}
+
+function isPrayerPast(time24) {
+  const now = new Date();
+  const [hours, minutes] = time24.split(':');
+  const prayerDate = new Date();
+  prayerDate.setHours(parseInt(hours), parseInt(minutes), 0);
+  return now > prayerDate;
 }

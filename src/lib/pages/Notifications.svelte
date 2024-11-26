@@ -1,6 +1,6 @@
 <script>
   import { ArrowLeft } from 'phosphor-svelte';
-  import { prayerHistoryStore, savePrayerStatus } from '../stores/prayerHistoryStore';
+  import { prayerHistoryStore, savePrayerStatus, getPrayerHistory } from '../stores/prayerHistoryStore';
   import { iconMap } from '../utils/icons';
 
   export let onBack;
@@ -11,6 +11,9 @@
       time: prayer.time,
       status
     });
+    
+    // Refresh the prayer history after marking
+    await getPrayerHistory();
   }
 </script>
 

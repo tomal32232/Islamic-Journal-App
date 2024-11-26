@@ -7,7 +7,7 @@
     fetchPrayerTimes,
     getCurrentLocation 
   } from '../services/prayerTimes';
-  import { savePrayerStatus, getPrayerHistory, prayerHistoryStore } from '../stores/prayerHistoryStore';
+  import { savePrayerStatus, getPrayerHistory, prayerHistoryStore, initializeTodaysPrayers, updatePrayerStatuses } from '../stores/prayerHistoryStore';
   import { iconMap } from '../utils/icons';
   import { nearbyMosquesStore, mosqueLoadingStore, fetchNearbyMosques } from '../services/mosqueService';
 
@@ -82,9 +82,15 @@
 
   onMount(async () => {
     await fetchPrayerTimes();
-    const coords = await getCurrentLocation();
-    await fetchNearbyMosques(coords.latitude, coords.longitude);
-    timeInterval = setInterval(updatePrayerStatus, 60000);
+    await initializeTodaysPrayers($prayerTimesStore);
+    
+    // Update prayer statuses every minute
+    timeInterval = setInterval(async () => {
+      await updatePrayerStatuses();
+      updatePrayerStatus();
+    }, 60000);
+    
+    await updatePrayerStatuses();
     updatePrayerStatus();
   });
 

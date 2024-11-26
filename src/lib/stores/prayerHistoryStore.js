@@ -17,76 +17,167 @@ export const prayerHistoryStore = writable({
   history: []
 });
 
+// Initialize today's prayers in Firestore
+export async function initializeTodaysPrayers(prayers) {
+  const user = auth.currentUser;
+  if (!user) return;
+
+  const today = new Date().toISOString().split('T')[0];
+  const historyQuery = query(
+    collection(db, 'prayer_history'),
+    where('userId', '==', user.uid),
+    where('date', '==', today)
+  );
+
+  // Check if prayers are already initialized for today
+  const snapshot = await getDocs(historyQuery);
+  if (!snapshot.empty) {
+    console.log('Prayers already initialized for today');
+    return;
+  }
+  
+  // Initialize prayers with 'upcoming' status
+  for (const prayer of prayers) {
+    const prayerId = `${today}-${prayer.name.toLowerCase()}`;
+    const prayerRef = doc(collection(db, 'prayer_history'));
+    
+    await setDoc(prayerRef, {
+      userId: user.uid,
+      prayerId,
+      prayerName: prayer.name,
+      time: prayer.time,
+      status: 'upcoming',
+      date: today,
+      timestamp: Timestamp.now()
+    });
+  }
+
+  await getPrayerHistory();
+}
+
+export async function updatePrayerStatuses() {
+  const user = auth.currentUser;
+  if (!user) return;
+
+  const today = new Date().toISOString().split('T')[0];
+  const now = new Date();
+
+  const historyQuery = query(
+    collection(db, 'prayer_history'),
+    where('userId', '==', user.uid),
+    where('date', '==', today),
+    where('status', '==', 'upcoming')
+  );
+
+  const querySnapshot = await getDocs(historyQuery);
+  
+  querySnapshot.forEach(async (doc) => {
+    const prayer = doc.data();
+    const prayerTime = convertPrayerTimeToDate(prayer.time);
+    
+    if (prayerTime < now) {
+      await setDoc(doc.ref, {
+        ...prayer,
+        status: 'pending'
+      });
+    }
+  });
+
+  await getPrayerHistory();
+}
+
 export async function savePrayerStatus(prayerData) {
   const user = auth.currentUser;
   if (!user) return;
 
-  const prayerDate = new Date();
-  const dateStr = prayerDate.toISOString().split('T')[0];
+  if (!prayerData?.name) {
+    console.error('Prayer name is undefined:', prayerData);
+    return;
+  }
 
-  const prayerRef = doc(collection(db, 'prayer_history'));
-  await setDoc(prayerRef, {
-    userId: user.uid,
-    prayerName: prayerData.name,
-    time: prayerData.time,
-    status: prayerData.status,
-    date: dateStr,
-    timestamp: Timestamp.now()
-  });
+  const today = new Date().toISOString().split('T')[0];
+  const prayerId = `${today}-${prayerData.name.toLowerCase()}`;
+
+  // Query to find existing prayer document
+  const prayerQuery = query(
+    collection(db, 'prayer_history'),
+    where('userId', '==', user.uid),
+    where('prayerId', '==', prayerId)
+  );
+
+  const querySnapshot = await getDocs(prayerQuery);
+  
+  if (!querySnapshot.empty) {
+    // Update existing prayer document
+    const docRef = querySnapshot.docs[0].ref;
+    await setDoc(docRef, {
+      ...querySnapshot.docs[0].data(),
+      status: prayerData.status,
+      timestamp: Timestamp.now()
+    }, { merge: true });
+  } else {
+    // If not found (shouldn't happen normally), create new
+    const prayerRef = doc(collection(db, 'prayer_history'));
+    await setDoc(prayerRef, {
+      userId: user.uid,
+      prayerId,
+      prayerName: prayerData.name,
+      time: prayerData.time,
+      status: prayerData.status,
+      date: today,
+      timestamp: Timestamp.now()
+    });
+  }
 
   await getPrayerHistory();
+}
+
+export function convertPrayerTimeToDate(timeStr) {
+  const [time, period] = timeStr.split(' ');
+  const [hours, minutes] = time.split(':');
+  const now = new Date();
+  let hour = parseInt(hours);
+  
+  if (period === 'PM' && hour !== 12) hour += 12;
+  if (period === 'AM' && hour === 12) hour = 0;
+  
+  now.setHours(hour, parseInt(minutes), 0, 0);
+  return now;
 }
 
 export async function getPrayerHistory() {
   const user = auth.currentUser;
   if (!user) return;
 
-  const prayers = get(prayerTimesStore);
-  if (!prayers || prayers.length === 0) {
-    console.log('Waiting for prayer times to load...');
-    return;
-  }
-
-  // Get the last 7 days
-  const sevenDaysAgo = new Date();
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-  sevenDaysAgo.setHours(0, 0, 0, 0);
-
+  const today = new Date().toISOString().split('T')[0];
+  
   const historyQuery = query(
     collection(db, 'prayer_history'),
     where('userId', '==', user.uid),
-    where('timestamp', '>=', Timestamp.fromDate(sevenDaysAgo))
+    where('date', '==', today)
   );
 
   const querySnapshot = await getDocs(historyQuery);
   const history = [];
-  querySnapshot.forEach(doc => {
-    history.push({ id: doc.id, ...doc.data() });
-  });
-
-  console.log('Fetched history:', history);
-
-  // Group pending prayers by date
-  const pendingByDate = {};
-  const today = new Date().toISOString().split('T')[0];
+  const pendingPrayers = [];
   
-  // Only check today's prayers initially
-  const prayersForToday = prayers.filter(prayer => {
-    const isPrayed = history.some(h => 
-      h.date === today && h.prayerName === prayer.name
-    );
-    return !isPrayed;
+  querySnapshot.forEach(doc => {
+    const data = doc.data();
+    history.push({ id: doc.id, ...data });
+    
+    if (data.status === 'pending') {
+      pendingPrayers.push({ id: doc.id, ...data });
+    }
   });
 
-  if (prayersForToday.length > 0) {
+  const pendingByDate = {};
+  if (pendingPrayers.length > 0) {
     pendingByDate[today] = {
       date: today,
       isToday: true,
-      prayers: prayersForToday
+      prayers: pendingPrayers
     };
   }
-
-  console.log('Pending prayers:', pendingByDate);
 
   prayerHistoryStore.set({ pendingByDate, history });
   return { pendingByDate, history };

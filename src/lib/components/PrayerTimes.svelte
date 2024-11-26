@@ -2,6 +2,8 @@
   import { onMount, onDestroy } from 'svelte';
   import { prayerTimesStore } from '../stores/prayerTimes';
   import { Sun, SunDim, CloudSun, SunHorizon, MoonStars } from 'phosphor-svelte';
+  import { savePrayerStatus } from '../stores/prayerHistoryStore';
+  import { getPrayerHistory } from '../stores/prayerHistoryStore';
 
   let timeInterval;
   let currentPrayer = null;
@@ -51,10 +53,18 @@
     }
   }
 
-  function markPrayer(prayer, status) {
+  async function markPrayer(prayer, status) {
+    await savePrayerStatus({
+      name: prayer.name,
+      time: prayer.time,
+      status
+    });
+    
     $prayerTimesStore = $prayerTimesStore.map(p => 
       p.name === prayer.name ? { ...p, status } : p
     );
+    
+    await getPrayerHistory();
   }
 
   onMount(() => {

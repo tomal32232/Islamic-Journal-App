@@ -44,9 +44,9 @@
     position: absolute;
     top: 0;
     right: 0;
-    background: #E09453;
-    color: white;
-    border-radius: 50%;
+    background: rgb(0, 0, 0);
+    color: #ffffff;
+    border-radius: 999px;
     min-width: 18px;
     height: 18px;
     font-size: 11px;
@@ -55,5 +55,6 @@
     justify-content: center;
     font-weight: 500;
     padding: 0 4px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
   }
 </style> 
