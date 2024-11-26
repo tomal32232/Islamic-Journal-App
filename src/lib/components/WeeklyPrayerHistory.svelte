@@ -8,29 +8,31 @@
     const today = new Date();
     const days = [];
     
-    // Get the first day of current week (Sunday)
-    const firstDay = new Date(today);
-    firstDay.setDate(today.getDate() - today.getDay());
-    firstDay.setHours(0, 0, 0, 0);
+    // Get last Sunday (start of the week)
+    const sunday = new Date(today);
+    sunday.setDate(today.getDate() - today.getDay());
+    sunday.setHours(0, 0, 0, 0);
     
+    // Generate days from Sunday to Saturday
     for (let i = 0; i < 7; i++) {
-      const current = new Date(firstDay);
-      current.setDate(firstDay.getDate() + i);
-      const dateStr = current.toISOString().split('T')[0];
+      const current = new Date(sunday);
+      current.setDate(sunday.getDate() + i);
+      
+      // Get date in YYYY-MM-DD format
+      const dateStr = current.toLocaleDateString('en-CA');
+      const todayStr = today.toLocaleDateString('en-CA');
       
       const dayPrayers = $prayerHistoryStore.history.filter(h => h.date === dateStr);
       const pendingPrayers = dayPrayers.filter(p => p.status === 'pending').length;
       
-      // Get today's date in YYYY-MM-DD format for comparison
-      const todayStr = today.toLocaleDateString('en-CA'); // Returns YYYY-MM-DD format
-      
       const stats = {
         date: dateStr,
-        isToday: dateStr === todayStr, // Compare date strings in YYYY-MM-DD format
+        isToday: dateStr === todayStr,
         total: $prayerTimesStore.length,
         ontime: dayPrayers.filter(p => p.status === 'ontime').length,
         late: dayPrayers.filter(p => p.status === 'late').length,
-        missed: pendingPrayers
+        missed: pendingPrayers,
+        weekday: current.toLocaleDateString('en-US', { weekday: 'short' })
       };
       
       days.push(stats);
@@ -48,7 +50,7 @@
       {#each weeklyStats as day}
         <div class="day-card {day.isToday ? 'current' : ''}">
           <span class="date">
-            {new Date(day.date).toLocaleDateString('en-US', { weekday: 'short' })}
+            {day.weekday}
           </span>
           <div class="prayer-counts">
             <span class="count ontime">{day.ontime}</span>
