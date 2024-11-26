@@ -10,7 +10,7 @@
   function calculateStreak(dailyCounts) {
     let streak = 0;
     dailyCounts.forEach(day => {
-      if (day.count > 0 && !day.isToday) {
+      if (day.count > 0) {
         streak++;
       }
     });
