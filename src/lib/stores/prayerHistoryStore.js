@@ -59,10 +59,19 @@ export async function updatePrayerStatuses() {
   const user = auth.currentUser;
   if (!user) return;
 
-  const today = new Date().toISOString().split('T')[0];
+  // Get current date in local timezone
   const now = new Date();
+  const today = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD format in local timezone
 
-  // Query all pending prayers (not just today's)
+  console.log('Current Date Check:', {
+    now: now.toISOString(),
+    nowLocal: now.toString(),
+    today,
+    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    timestamp: Timestamp.now()
+  });
+
+  // Query all pending prayers
   const historyQuery = query(
     collection(db, 'prayer_history'),
     where('userId', '==', user.uid),
@@ -70,21 +79,52 @@ export async function updatePrayerStatuses() {
   );
 
   const querySnapshot = await getDocs(historyQuery);
+  const updatePromises = [];
   
-  querySnapshot.forEach(async (doc) => {
+  querySnapshot.forEach((doc) => {
     const prayer = doc.data();
     const prayerDate = new Date(prayer.date);
-    prayerDate.setHours(23, 59, 59, 999); // End of prayer's day
     
-    // If prayer date has passed and still pending, mark as missed
-    if (now > prayerDate && prayer.status === 'pending') {
-      await setDoc(doc.ref, {
-        ...prayer,
-        status: 'missed'
-      }, { merge: true });
+    console.log('Checking prayer:', {
+      name: prayer.prayerName,
+      date: prayer.date,
+      status: prayer.status,
+      currentDate: today,
+      isPastDate: prayerDate.toISOString().split('T')[0] < today
+    });
+
+    // If prayer date is before today, mark as missed
+    if (prayerDate.toISOString().split('T')[0] < today) {
+      console.log('Marking as missed:', {
+        name: prayer.prayerName,
+        date: prayer.date,
+        previousStatus: prayer.status
+      });
+      
+      updatePromises.push(
+        setDoc(doc.ref, {
+          ...prayer,
+          status: 'missed',
+          timestamp: Timestamp.now()
+        }, { merge: true }).then(() => {
+          console.log('Successfully updated prayer status:', {
+            name: prayer.prayerName,
+            date: prayer.date,
+            newStatus: 'missed',
+            timestamp: new Date().toISOString()
+          });
+        }).catch(error => {
+          console.error('Error updating prayer status:', {
+            name: prayer.prayerName,
+            date: prayer.date,
+            error: error.message
+          });
+        })
+      );
     }
   });
 
+  await Promise.all(updatePromises);
   await getPrayerHistory();
 }
 
