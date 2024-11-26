@@ -20,6 +20,9 @@
       const dateStr = current.toISOString().split('T')[0];
       
       const dayPrayers = $prayerHistoryStore.history.filter(h => h.date === dateStr);
+      const pendingPrayers = dayPrayers.filter(p => p.status === 'pending').length;
+      const completedPrayers = dayPrayers.filter(p => p.status === 'ontime' || p.status === 'late').length;
+      const upcomingPrayers = dayPrayers.filter(p => p.status === 'upcoming').length;
       
       const stats = {
         date: dateStr,
@@ -27,7 +30,7 @@
         total: $prayerTimesStore.length,
         ontime: dayPrayers.filter(p => p.status === 'ontime').length,
         late: dayPrayers.filter(p => p.status === 'late').length,
-        missed: $prayerTimesStore.length - dayPrayers.length
+        missed: pendingPrayers
       };
       
       days.push(stats);
