@@ -55,6 +55,61 @@ export async function initializeTodaysPrayers(prayers) {
   await getPrayerHistory();
 }
 
+export async function initializeMonthlyPrayers(prayers) {
+  const user = auth.currentUser;
+  if (!user) return;
+
+  // Get dates for next 30 days
+  const dates = [];
+  for (let i = 0; i < 30; i++) {
+    const date = new Date();
+    date.setDate(date.getDate() + i);
+    dates.push(date.toISOString().split('T')[0]);
+  }
+
+  // Check existing prayers
+  const existingPrayers = new Set();
+  for (const date of dates) {
+    const historyQuery = query(
+      collection(db, 'prayer_history'),
+      where('userId', '==', user.uid),
+      where('date', '==', date)
+    );
+    const snapshot = await getDocs(historyQuery);
+    snapshot.forEach(doc => {
+      existingPrayers.add(`${doc.data().date}-${doc.data().prayerName.toLowerCase()}`);
+    });
+  }
+
+  // Initialize missing prayers
+  const batch = [];
+  for (const date of dates) {
+    for (const prayer of prayers) {
+      const prayerId = `${date}-${prayer.name.toLowerCase()}`;
+      
+      // Skip if prayer already exists
+      if (existingPrayers.has(prayerId)) continue;
+
+      const prayerRef = doc(collection(db, 'prayer_history'));
+      batch.push(
+        setDoc(prayerRef, {
+          userId: user.uid,
+          prayerId,
+          prayerName: prayer.name,
+          time: prayer.time,
+          status: 'pending',
+          date: date,
+          timestamp: Timestamp.now()
+        })
+      );
+    }
+  }
+
+  // Execute all updates
+  await Promise.all(batch);
+  await getPrayerHistory();
+}
+
 export async function updatePrayerStatuses() {
   const user = auth.currentUser;
   if (!user) return;

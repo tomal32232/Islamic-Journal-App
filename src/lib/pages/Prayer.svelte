@@ -7,7 +7,7 @@
     fetchPrayerTimes,
     getCurrentLocation 
   } from '../services/prayerTimes';
-  import { savePrayerStatus, getPrayerHistory, prayerHistoryStore, initializeTodaysPrayers, updatePrayerStatuses } from '../stores/prayerHistoryStore';
+  import { savePrayerStatus, getPrayerHistory, prayerHistoryStore, initializeMonthlyPrayers, updatePrayerStatuses } from '../stores/prayerHistoryStore';
   import { iconMap } from '../utils/icons';
   import { nearbyMosquesStore, mosqueLoadingStore, fetchNearbyMosques } from '../services/mosqueService';
 
@@ -82,17 +82,14 @@
 
   onMount(async () => {
     try {
-      // Get coordinates first
       const coords = await getCurrentLocation();
       
-      // Then fetch mosques with the coordinates
       if (coords) {
         await fetchNearbyMosques(coords.latitude, coords.longitude);
       }
       
-      // Existing prayer time fetching
       await fetchPrayerTimes();
-      await initializeTodaysPrayers($prayerTimesStore);
+      await initializeMonthlyPrayers($prayerTimesStore);
       
       timeInterval = setInterval(async () => {
         await updatePrayerStatuses();
