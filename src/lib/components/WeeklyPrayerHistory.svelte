@@ -2,8 +2,9 @@
   import { onMount } from 'svelte';
   import { prayerHistoryStore, getPrayerHistory } from '../stores/prayerHistoryStore';
   import { prayerTimesStore } from '../stores/prayerTimes';
+  import { iconMap } from '../utils/icons';
 
-  let weeklyStats = [];
+  let weeklyGrid = [];
   
   function getCurrentWeekDays() {
     const today = new Date();
@@ -18,150 +19,216 @@
     for (let i = 0; i < 7; i++) {
       const current = new Date(sunday);
       current.setDate(sunday.getDate() + i);
-      
-      // Get date in YYYY-MM-DD format
-      const dateStr = current.toLocaleDateString('en-CA');
-      const todayStr = today.toLocaleDateString('en-CA');
-      
-      const dayPrayers = $prayerHistoryStore.history.filter(h => h.date === dateStr);
-      
-      // Count both 'missed' status and pending prayers
-      const missedCount = dayPrayers.filter(p => p.status === 'missed').length;
-      const pendingCount = dayPrayers.filter(p => p.status === 'pending').length;
-      
-      const stats = {
-        date: dateStr,
-        isToday: dateStr === todayStr,
-        total: $prayerTimesStore.length,
-        ontime: dayPrayers.filter(p => p.status === 'ontime').length,
-        late: dayPrayers.filter(p => p.status === 'late').length,
-        missed: missedCount + pendingCount, // Combine both missed and pending
-        weekday: current.toLocaleDateString('en-US', { weekday: 'short' })
-      };
-      
-      days.push(stats);
+      days.push({
+        date: current.toLocaleDateString('en-CA'), // YYYY-MM-DD format
+        dayName: current.toLocaleDateString('en-US', { weekday: 'short' }),
+        dayNumber: current.getDate(),
+        isToday: current.toLocaleDateString() === today.toLocaleDateString()
+      });
     }
     return days;
   }
 
+  function generatePrayerGrid() {
+    const days = getCurrentWeekDays();
+    const prayers = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
+    const grid = [];
+
+    prayers.forEach(prayer => {
+      const row = {
+        name: prayer,
+        icon: $prayerTimesStore.find(p => p.name === prayer)?.icon || 'Sun',
+        weight: $prayerTimesStore.find(p => p.name === prayer)?.weight || 'regular',
+        days: days.map(day => {
+          const prayerRecord = $prayerHistoryStore.history.find(
+            h => h.date === day.date && h.prayerName === prayer
+          );
+          return {
+            date: day.date,
+            status: prayerRecord?.status || 'pending',
+            isToday: day.isToday
+          };
+        })
+      };
+      grid.push(row);
+    });
+
+    return { days, grid };
+  }
+
   onMount(async () => {
     await getPrayerHistory();
-    weeklyStats = getCurrentWeekDays();
   });
 
-  // Add reactive statement to update when store changes
-  $: {
-    if ($prayerHistoryStore.history.length > 0) {
-      weeklyStats = getCurrentWeekDays();
-    }
+  $: if ($prayerHistoryStore.history) {
+    const gridData = generatePrayerGrid();
+    weeklyGrid = gridData.grid;
   }
 </script>
 
 <div class="prayer-history">
   <h3>Weekly Prayer History</h3>
-  <div class="history-scroll">
-    <div class="days-container">
-      {#each weeklyStats as day}
-        <div class="day-card {day.isToday ? 'current' : ''}">
-          <span class="date">
-            {day.weekday}
-          </span>
-          <div class="prayer-counts">
-            <span class="count ontime">{day.ontime}</span>
-            <span class="count late">{day.late}</span>
-            <span class="count missed">{day.missed}</span>
-          </div>
+  <div class="history-grid">
+    <div class="header-row">
+      <div class="prayer-label"></div>
+      {#each getCurrentWeekDays() as day}
+        <div class="day-column {day.isToday ? 'today' : ''}">
+          <span class="day-name">{day.dayName}</span>
+          <span class="day-number">{day.dayNumber}</span>
         </div>
       {/each}
     </div>
+
+    {#each weeklyGrid as row}
+      <div class="prayer-row">
+        <div class="prayer-label">
+          <svelte:component this={iconMap[row.icon]} size={18} weight={row.weight} />
+          <span>{row.name}</span>
+        </div>
+        {#each row.days as day}
+          <div class="status-cell">
+            <div class="status-dot {day.status}"></div>
+          </div>
+        {/each}
+      </div>
+    {/each}
   </div>
+
   <div class="legend">
-    <span class="legend-item ontime">On time</span>
-    <span class="legend-item late">Late</span>
-    <span class="legend-item missed">Missed</span>
+    <div class="legend-item">
+      <div class="status-dot ontime"></div>
+      <span>On time</span>
+    </div>
+    <div class="legend-item">
+      <div class="status-dot late"></div>
+      <span>Late</span>
+    </div>
+    <div class="legend-item">
+      <div class="status-dot missed"></div>
+      <span>Missed</span>
+    </div>
   </div>
 </div>
 
 <style>
   .prayer-history {
-    margin-top: 1.5rem;
     background: white;
-    border-radius: 8px;
-    padding: 1rem;
+    border-radius: 12px;
+    padding: 1.5rem;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-bottom: 1.5rem;
   }
 
   h3 {
-    font-size: 1rem;
-    color: #666;
-    margin-bottom: 1rem;
+    font-size: 1.25rem;
+    color: #216974;
+    margin-bottom: 1.5rem;
   }
 
-  .history-scroll {
+  .history-grid {
+    width: 100%;
     overflow-x: auto;
-    margin: 0 -1rem;
-    padding: 0 1rem;
-    -webkit-overflow-scrolling: touch;
   }
 
-  .days-container {
-    display: flex;
-    gap: 0.75rem;
+  .header-row {
+    display: grid;
+    grid-template-columns: 120px repeat(7, 1fr);
+    gap: 0.5rem;
+    margin-bottom: 1rem;
     padding-bottom: 0.5rem;
+    border-bottom: 1px solid #eee;
   }
 
-  .day-card {
-    min-width: 60px;
-    text-align: center;
-    padding: 0.75rem 0.5rem;
-    background: #f5f5f5;
-    border-radius: 8px;
-  }
-
-  .day-card.current {
-    background: rgba(224, 148, 83, 0.1);
-    border: 1px solid #E09453;
-  }
-
-  .date {
-    font-size: 0.75rem;
-    color: #666;
-    display: block;
-    margin-bottom: 0.5rem;
-  }
-
-  .prayer-counts {
+  .day-column {
     display: flex;
     flex-direction: column;
+    align-items: center;
     gap: 0.25rem;
   }
 
-  .count {
+  .day-column.today {
+    color: #216974;
     font-weight: 500;
-    font-size: 1rem;
-    padding: 0.25rem;
-    border-radius: 4px;
   }
 
-  .count.ontime { color: #216974; }
-  .count.late { color: #E09453; }
-  .count.missed { color: #ff0000; }
+  .day-name {
+    font-size: 0.875rem;
+    color: #666;
+  }
+
+  .day-number {
+    font-size: 1rem;
+  }
+
+  .prayer-row {
+    display: grid;
+    grid-template-columns: 120px repeat(7, 1fr);
+    gap: 0.5rem;
+    align-items: center;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid #f5f5f5;
+  }
+
+  .prayer-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #216974;
+    font-weight: 500;
+  }
+
+  .status-cell {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .status-dot {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 2px solid #eee;
+  }
+
+  .status-dot.ontime {
+    background: #216974;
+    border-color: #216974;
+  }
+
+  .status-dot.late {
+    background: #E09453;
+    border-color: #E09453;
+  }
+
+  .status-dot.missed {
+    background: #EF4444;
+    border-color: #EF4444;
+  }
+
+  .status-dot.pending {
+    background: white;
+    border: 2px solid #eee;
+  }
 
   .legend {
     display: flex;
     justify-content: center;
-    gap: 1rem;
-    margin-top: 0.75rem;
-    font-size: 0.75rem;
+    gap: 1.5rem;
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid #eee;
   }
 
   .legend-item {
     display: flex;
     align-items: center;
-    gap: 0.25rem;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    color: #666;
   }
 
-  .legend-item.ontime { color: #216974; }
-  .legend-item.late { color: #E09453; }
-  .legend-item.missed { color: #ff0000; }
+  .legend-item .status-dot {
+    width: 12px;
+    height: 12px;
+  }
 </style>
