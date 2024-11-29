@@ -1,7 +1,8 @@
 <script>
   import { ArrowLeft } from 'phosphor-svelte';
-  import { prayerHistoryStore, savePrayerStatus, getPrayerHistory } from '../stores/prayerHistoryStore';
+  import { prayerHistoryStore, savePrayerStatus, getPrayerHistory, updatePrayerStatuses } from '../stores/prayerHistoryStore';
   import { iconMap } from '../utils/icons';
+  import { onMount } from 'svelte';
 
   export let onBack;
   
@@ -26,6 +27,11 @@
     });
     await getPrayerHistory();
   }
+
+  onMount(async () => {
+    await updatePrayerStatuses();
+    await getPrayerHistory();
+  });
 </script>
 
 <div class="notifications-container">

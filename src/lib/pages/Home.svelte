@@ -102,6 +102,7 @@
   }
 
   async function updatePrayerStatus() {
+    await updatePrayerStatuses();
     const { history } = await getPrayerHistory();
     pendingPrayers = history.filter(prayer => prayer.status === 'pending');
     

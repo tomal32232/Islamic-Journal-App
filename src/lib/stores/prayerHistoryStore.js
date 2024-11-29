@@ -116,23 +116,35 @@ export async function updatePrayerStatuses() {
 
   const now = new Date();
   const today = new Date().toLocaleDateString('en-CA');
+  console.log('=== Checking Past Prayers ===');
+  console.log('Current Date:', now);
+  console.log('Today in en-CA format:', today);
 
-  // Only mark prayers as missed if they're from previous days
   const historyQuery = query(
     collection(db, 'prayer_history'),
     where('userId', '==', user.uid),
-    where('status', '==', 'pending')
+    where('status', 'in', ['pending', 'upcoming'])
   );
 
   const querySnapshot = await getDocs(historyQuery);
   const updatePromises = [];
   
+  console.log('\nFound prayers to check:', querySnapshot.size);
+  
   querySnapshot.forEach((doc) => {
     const prayer = doc.data();
     const prayerDate = new Date(prayer.date);
+    const prayerDateStr = prayerDate.toLocaleDateString('en-CA');
     
-    // Only mark as missed if it's from a previous day
-    if (prayerDate.toLocaleDateString('en-CA') < today) {
+    console.log('\nPrayer Details:');
+    console.log('- Name:', prayer.prayerName);
+    console.log('- Date:', prayerDateStr);
+    console.log('- Time:', prayer.time);
+    console.log('- Status:', prayer.status);
+    console.log('Is before today?', prayerDateStr < today);
+
+    if (prayerDateStr < today) {
+      console.log('→ Marking as missed:', prayer.prayerName);
       updatePromises.push(
         setDoc(doc.ref, {
           ...prayer,
@@ -212,6 +224,9 @@ export async function getPrayerHistory() {
   const user = auth.currentUser;
   if (!user) return { history: [], pendingByDate: {}, missedByDate: {} };
 
+  // First update any past prayers to missed status
+  await updatePrayerStatuses();
+
   const historyQuery = query(
     collection(db, 'prayer_history'),
     where('userId', '==', user.uid),
@@ -269,7 +284,7 @@ export async function getPrayerHistory() {
   return { history, pendingByDate, missedByDate };
 }
 
-function getPrayerDateTime(date, time) {
+export function getPrayerDateTime(date, time) {
   const [timeStr, period] = time.split(' ');
   const [hours, minutes] = timeStr.split(':');
   const prayerDate = new Date(date);
