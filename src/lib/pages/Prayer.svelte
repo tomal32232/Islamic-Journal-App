@@ -73,18 +73,19 @@
     const prayers = $prayerTimesStore;
     
     for (let i = 0; i < prayers.length; i++) {
-      const remaining = getTimeRemaining(prayers[i].time);
-      if (remaining !== 'Time passed') {
-        currentPrayer = prayers[i];
-        timeRemaining = remaining;
+      const prayerTime = convertPrayerTimeToDate(prayers[i].time);
+      if (prayerTime > now) {
+        prayers[i].isCurrent = true;
+        currentPrayerCountdown = updateCountdown(prayers[i]);
         break;
       }
     }
-    updateDailyStats();
+    
+    $prayerTimesStore = prayers;
   }
 
   function updateCountdown(prayer) {
-    if (!prayer?.time) return;
+    if (!prayer?.time) return null;
     
     const [time, period] = prayer.time.split(' ');
     const [hours, minutes] = time.split(':');
@@ -445,7 +446,7 @@
   }
 
   .countdown {
-    font-size: 1.125rem;
+    font-size: 1rem;
     font-weight: 500;
     color: #216974;
     margin-left: auto;
