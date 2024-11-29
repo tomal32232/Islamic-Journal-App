@@ -81,17 +81,29 @@
   }
 
   onMount(async () => {
-    await fetchPrayerTimes();
-    await initializeTodaysPrayers($prayerTimesStore);
-    
-    // Update prayer statuses every minute
-    timeInterval = setInterval(async () => {
+    try {
+      // Get coordinates first
+      const coords = await getCurrentLocation();
+      
+      // Then fetch mosques with the coordinates
+      if (coords) {
+        await fetchNearbyMosques(coords.latitude, coords.longitude);
+      }
+      
+      // Existing prayer time fetching
+      await fetchPrayerTimes();
+      await initializeTodaysPrayers($prayerTimesStore);
+      
+      timeInterval = setInterval(async () => {
+        await updatePrayerStatuses();
+        updatePrayerStatus();
+      }, 60000);
+      
       await updatePrayerStatuses();
       updatePrayerStatus();
-    }, 60000);
-    
-    await updatePrayerStatuses();
-    updatePrayerStatus();
+    } catch (error) {
+      console.error('Error initializing:', error);
+    }
   });
 
   onDestroy(() => {
