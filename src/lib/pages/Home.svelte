@@ -234,29 +234,38 @@
         {/each}
       </div>
 
-      <section class="prayer-times">
-        {#if $loadingStore}
-          <div class="loading">Loading prayer times...</div>
-        {:else if $errorStore}
-          <div class="error">{$errorStore}</div>
-        {:else if upcomingPrayer && !countdownEnded}
-          <div class="upcoming-prayer">
+      <section class="upcoming-prayer">
+        {#if upcomingPrayer}
+          <div class="prayer-card">
             <div class="prayer-info">
-              <svelte:component 
-                this={iconMap[upcomingPrayer.icon]} 
-                size={18} 
-                weight={upcomingPrayer.weight}
-              />
-              <div class="prayer-details">
-                <div class="name-time">
-                  <span class="prayer-name">{upcomingPrayer.name}</span>
-                  <span class="prayer-time">{upcomingPrayer.time}</span>
+              <div class="prayer-header">
+                <div class="prayer-icon">
+                  <svelte:component 
+                    this={iconMap[upcomingPrayer.icon]} 
+                    size={24} 
+                    weight={upcomingPrayer.weight}
+                    color="#216974"
+                  />
                 </div>
-                {#if upcomingCountdown}
-                  <span class="countdown">{upcomingCountdown}</span>
-                {/if}
+                <div class="prayer-details">
+                  <div class="name-time">
+                    <span class="prayer-name">{upcomingPrayer.name}</span>
+                    <span class="prayer-time">{upcomingPrayer.time}</span>
+                  </div>
+                  {#if upcomingCountdown}
+                    <span class="countdown">{upcomingCountdown}</span>
+                  {/if}
+                </div>
               </div>
             </div>
+            {#if pendingPrayers.length > 0}
+              <div class="pending-notice">
+                You have {pendingPrayers.length} unmarked {pendingPrayers.length === 1 ? 'prayer' : 'prayers'}. 
+                <button class="link-button" on:click={() => dispatch('showNotifications')}>
+                  Mark them now
+                </button>
+              </div>
+            {/if}
           </div>
         {:else}
           <div class="no-prayers-card">
@@ -275,39 +284,6 @@
 
       <WeeklyStreak />
       <WeeklyPrayerHistory />
-
-      <section class="pending-prayers">
-        {#if pendingPrayers.length > 0}
-          <h3>Pending Prayers</h3>
-          {#each pendingPrayers as prayer}
-            <div class="pending-prayer-item">
-              <div class="prayer-info">
-                <svelte:component 
-                  this={iconMap[prayer.icon]} 
-                  size={20} 
-                  weight={prayer.weight}
-                />
-                <span>{prayer.name}</span>
-                <span class="prayer-time">{prayer.time}</span>
-              </div>
-              <div class="prayer-actions">
-                <button 
-                  class="status-button ontime" 
-                  on:click={() => markPrayerStatus(prayer, 'ontime')}
-                >
-                  On time
-                </button>
-                <button 
-                  class="status-button late" 
-                  on:click={() => markPrayerStatus(prayer, 'late')}
-                >
-                  Late
-                </button>
-              </div>
-            </div>
-          {/each}
-        {/if}
-      </section>
     {:else if currentPage === 'prayer'}
       <Prayer />
     {:else if currentPage === 'tasbih'}
@@ -429,47 +405,69 @@
   }
 
   .upcoming-prayer {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+    margin-bottom: 1rem;
   }
 
-  .prayer-info {
+  .prayer-card {
+    background: white;
+    padding: 1.25rem;
+    border-radius: 12px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    border: 1px solid #eee;
+  }
+
+  .prayer-header {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    width: 100%;
+    gap: 1rem;
+  }
+
+  .prayer-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    background: rgba(33, 105, 116, 0.1);
+    border-radius: 8px;
   }
 
   .prayer-details {
+    flex: 1;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    width: 100%;
   }
 
   .name-time {
     display: flex;
     flex-direction: column;
-    gap: 0.125rem;
+    gap: 0.25rem;
   }
 
   .prayer-name {
-    font-size: 0.875rem;
     font-weight: 500;
     color: #216974;
+    font-size: 1rem;
   }
 
   .prayer-time {
-    font-size: 0.75rem;
+    font-size: 0.875rem;
     color: #666;
   }
 
   .countdown {
-    font-size: 1rem;
+    font-size: 1.125rem;
     font-weight: 500;
     color: #E09453;
-    margin-left: auto;
+  }
+
+  .pending-notice {
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid #eee;
+    font-size: 0.875rem;
+    color: #666;
   }
 
   .loading, .error {
@@ -490,15 +488,35 @@
   }
 
   .pending-prayer-item {
-    padding: 0.75rem 1rem;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border-bottom: 1px solid #eee;
+    padding: 1rem;
+    background: white;
+    border-radius: 8px;
+    margin-bottom: 0.5rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
   }
 
-  .pending-prayer-item:last-child {
-    border-bottom: none;
+  .prayer-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .prayer-name {
+    font-weight: 500;
+    color: #216974;
+  }
+
+  .prayer-date {
+    font-size: 0.875rem;
+    color: #666;
+  }
+
+  .prayer-time {
+    font-size: 0.875rem;
+    color: #666;
   }
 
   .prayer-actions {
@@ -507,12 +525,16 @@
   }
 
   .status-button {
-    padding: 0.375rem 0.75rem;
+    padding: 0.5rem 1rem;
     border: none;
     border-radius: 4px;
-    font-size: 0.75rem;
     cursor: pointer;
-    transition: all 0.2s;
+    font-weight: 500;
+    transition: opacity 0.2s;
+  }
+
+  .status-button:hover {
+    opacity: 0.9;
   }
 
   .status-button.ontime {
@@ -558,9 +580,11 @@
   }
 
   .pending-notice {
-    color: #E09453;
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid #eee;
     font-size: 0.875rem;
-    margin: 0;
+    color: #666;
   }
 
   .link-button {
@@ -569,13 +593,12 @@
     color: #216974;
     font-weight: 500;
     padding: 0;
-    margin: 0;
     cursor: pointer;
     text-decoration: underline;
   }
 
   .link-button:hover {
-    color: #185761;
+    opacity: 0.8;
   }
 </style>
 
