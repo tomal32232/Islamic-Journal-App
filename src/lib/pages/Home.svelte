@@ -11,6 +11,7 @@
   import { savePrayerStatus, getPrayerHistory, prayerHistoryStore, convertPrayerTimeToDate, updatePrayerStatuses } from '../stores/prayerHistoryStore';
   import WeeklyPrayerHistory from '../components/WeeklyPrayerHistory.svelte';
   import { createEventDispatcher } from 'svelte';
+  import Journal from './Journal.svelte';
   const dispatch = createEventDispatcher();
   
   let currentPage = 'home';
@@ -311,6 +312,8 @@
       <Prayer />
     {:else if currentPage === 'tasbih'}
       <Tasbih />
+    {:else if currentPage === 'journal'}
+      <Journal />
     {:else if currentPage === 'profile'}
       <Profile />
     {/if}
