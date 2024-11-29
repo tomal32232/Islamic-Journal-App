@@ -86,23 +86,17 @@ export async function getWeeklyStats() {
 }
 
 function calculateStreakStats(dailyCounts) {
+  const today = new Date();
+  const dayOfWeek = today.getDay(); // 0 = Sunday, 6 = Saturday
+  
+  // Total days should be days elapsed in the week (including today)
+  const totalDays = dayOfWeek + 1;
+  
+  // Calculate current streak up to today
   let currentStreak = 0;
-  let totalDays = 0;
-
-  // Count days up to today
-  for (let i = 0; i < dailyCounts.length; i++) {
-    if (dailyCounts[i].isToday) {
-      totalDays = i + 1;
-      break;
-    }
-  }
-
-  // Calculate current streak
-  for (let i = totalDays - 1; i >= 0; i--) {
+  for (let i = 0; i < totalDays; i++) {
     if (dailyCounts[i].count > 0) {
       currentStreak++;
-    } else {
-      break;
     }
   }
 

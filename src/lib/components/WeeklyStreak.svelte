@@ -4,28 +4,21 @@
 
   let stats = {
     currentStreak: 0,
-    totalDays: 4
+    totalDays: 0
   };
-
-  function calculateStreak(dailyCounts) {
-    let streak = 0;
-    dailyCounts.forEach(day => {
-      if (day.count > 0) {
-        streak++;
-      }
-    });
-    return streak;
-  }
 
   onMount(async () => {
     const weeklyStats = await getWeeklyStats();
-    stats.currentStreak = calculateStreak($weeklyStatsStore.dailyCounts);
-    stats.totalDays = 4;
+    if (weeklyStats) {
+      stats.currentStreak = weeklyStats.currentStreak;
+      stats.totalDays = weeklyStats.totalDays;
+    }
   });
 
   $: {
     if ($weeklyStatsStore.dailyCounts) {
-      stats.currentStreak = calculateStreak($weeklyStatsStore.dailyCounts);
+      stats.currentStreak = $weeklyStatsStore.currentStreak;
+      stats.totalDays = $weeklyStatsStore.totalDays;
     }
   }
 </script>
