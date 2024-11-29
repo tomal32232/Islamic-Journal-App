@@ -82,7 +82,7 @@
     {#each weeklyGrid as row}
       <div class="prayer-row">
         <div class="prayer-label">
-          <svelte:component this={iconMap[row.icon]} size={18} weight={row.weight} />
+          <svelte:component this={iconMap[row.icon]} size={16} weight={row.weight} />
           <span>{row.name}</span>
         </div>
         {#each row.days as day}
@@ -114,28 +114,27 @@
   .prayer-history {
     background: white;
     border-radius: 12px;
-    padding: 1.5rem;
+    padding: 1rem;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    margin-bottom: 1.5rem;
+    margin-bottom: 1rem;
   }
 
   h3 {
-    font-size: 1.25rem;
+    font-size: 1rem;
     color: #216974;
-    margin-bottom: 1.5rem;
+    margin-bottom: 1rem;
   }
 
   .history-grid {
     width: 100%;
-    overflow-x: auto;
   }
 
   .header-row {
     display: grid;
-    grid-template-columns: 120px repeat(7, 1fr);
-    gap: 0.5rem;
-    margin-bottom: 1rem;
-    padding-bottom: 0.5rem;
+    grid-template-columns: 80px repeat(7, 1fr);
+    gap: 0.25rem;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.25rem;
     border-bottom: 1px solid #eee;
   }
 
@@ -143,7 +142,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.25rem;
+    gap: 0.125rem;
   }
 
   .day-column.today {
@@ -152,29 +151,30 @@
   }
 
   .day-name {
-    font-size: 0.875rem;
+    font-size: 0.75rem;
     color: #666;
   }
 
   .day-number {
-    font-size: 1rem;
+    font-size: 0.875rem;
   }
 
   .prayer-row {
     display: grid;
-    grid-template-columns: 120px repeat(7, 1fr);
-    gap: 0.5rem;
+    grid-template-columns: 80px repeat(7, 1fr);
+    gap: 0.25rem;
     align-items: center;
-    padding: 0.75rem 0;
+    padding: 0.5rem 0;
     border-bottom: 1px solid #f5f5f5;
   }
 
   .prayer-label {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.375rem;
     color: #216974;
     font-weight: 500;
+    font-size: 0.875rem;
   }
 
   .status-cell {
@@ -184,8 +184,8 @@
   }
 
   .status-dot {
-    width: 24px;
-    height: 24px;
+    width: 20px;
+    height: 20px;
     border-radius: 50%;
     border: 2px solid #eee;
   }
@@ -213,22 +213,48 @@
   .legend {
     display: flex;
     justify-content: center;
-    gap: 1.5rem;
-    margin-top: 1.5rem;
-    padding-top: 1rem;
+    gap: 1rem;
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
     border-top: 1px solid #eee;
   }
 
   .legend-item {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    font-size: 0.875rem;
+    gap: 0.375rem;
+    font-size: 0.75rem;
     color: #666;
   }
 
   .legend-item .status-dot {
-    width: 12px;
-    height: 12px;
+    width: 10px;
+    height: 10px;
+  }
+
+  @media (max-width: 480px) {
+    .prayer-history {
+      padding: 0.75rem;
+      margin: 0.5rem;
+    }
+
+    .header-row, .prayer-row {
+      grid-template-columns: 70px repeat(7, 1fr);
+      gap: 0.2rem;
+    }
+
+    .prayer-label {
+      font-size: 0.75rem;
+      gap: 0.25rem;
+    }
+
+    .status-dot {
+      width: 16px;
+      height: 16px;
+    }
+
+    .legend {
+      gap: 0.75rem;
+    }
   }
 </style>
