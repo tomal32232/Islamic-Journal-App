@@ -287,27 +287,27 @@
   .weekly-stats {
     display: flex;
     justify-content: space-around;
-    padding: 1rem;
-    margin: 1rem 0;
+    padding: 0.75rem;
+    margin: 0.5rem 0;
     background: #f8f8f8;
     border-radius: 8px;
+    gap: 1rem;
   }
 
   .stat-item {
     display: flex;
-    flex-direction: column;
     align-items: center;
-    gap: 0.25rem;
+    gap: 0.5rem;
   }
 
   .stat-number {
-    font-size: 1.5rem;
+    font-size: 1rem;
     font-weight: 500;
     color: #216974;
   }
 
   .stat-label {
-    font-size: 0.875rem;
+    font-size: 0.75rem;
     color: #666;
   }
 
