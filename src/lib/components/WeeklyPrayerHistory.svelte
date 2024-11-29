@@ -123,8 +123,9 @@
           <span>{row.name}</span>
         </div>
         {#each row.days as day}
+          {@const isPending = $prayerHistoryStore.pendingByDate[day.date]?.prayers.some(p => p.prayerName === row.name)}
           <div class="status-cell">
-            <div class="status-dot {day.status}"></div>
+            <div class="status-dot {day.status} {day.status === 'pending' && isPending ? 'has-notification' : ''}"></div>
           </div>
         {/each}
       </div>
@@ -240,6 +241,12 @@
     height: 14px;
     border-radius: 50%;
     border: 1.5px solid #eee;
+    position: relative;
+  }
+
+  .status-dot.pending.has-notification {
+    background: white;
+    border: 2px solid #216974;
   }
 
   .status-dot.ontime {
