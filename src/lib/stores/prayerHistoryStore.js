@@ -224,9 +224,9 @@ export async function getPrayerHistory() {
   const user = auth.currentUser;
   if (!user) return { history: [], pendingByDate: {}, missedByDate: {} };
 
-  // First update any past prayers to missed status
   await updatePrayerStatuses();
 
+  const today = new Date().toLocaleDateString('en-CA');
   const historyQuery = query(
     collection(db, 'prayer_history'),
     where('userId', '==', user.uid),
@@ -242,24 +242,30 @@ export async function getPrayerHistory() {
     const prayer = doc.data();
     history.push(prayer);
     
+    const prayerDateTime = getPrayerDateTime(prayer.date, prayer.time);
+    const now = new Date();
+
     if (prayer.status === 'pending') {
-      const prayerDateTime = getPrayerDateTime(prayer.date, prayer.time);
-      if (prayerDateTime < new Date()) {
+      // Only show today's passed prayers in pending
+      if (prayer.date === today && prayerDateTime < now) {
         if (!pendingByDate[prayer.date]) {
           pendingByDate[prayer.date] = {
-            isToday: prayer.date === new Date().toLocaleDateString('en-CA'),
+            isToday: true,
             prayers: []
           };
         }
         pendingByDate[prayer.date].prayers.push(prayer);
       }
     } else if (prayer.status === 'missed') {
-      if (!missedByDate[prayer.date]) {
-        missedByDate[prayer.date] = {
-          prayers: []
-        };
+      // Show all missed prayers from past dates
+      if (prayer.date < today) {
+        if (!missedByDate[prayer.date]) {
+          missedByDate[prayer.date] = {
+            prayers: []
+          };
+        }
+        missedByDate[prayer.date].prayers.push(prayer);
       }
-      missedByDate[prayer.date].prayers.push(prayer);
     }
   });
 
