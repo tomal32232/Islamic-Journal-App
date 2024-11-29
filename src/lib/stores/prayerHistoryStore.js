@@ -244,45 +244,67 @@ export function convertPrayerTimeToDate(timeStr) {
 
 export async function getPrayerHistory() {
   const user = auth.currentUser;
-  if (!user) return { history: [] };
+  if (!user) return;
 
-  // Get Sunday of current week
+  // Get current week's date range
   const today = new Date();
   const sunday = new Date(today);
   sunday.setDate(today.getDate() - today.getDay());
   sunday.setHours(0, 0, 0, 0);
   
+  const saturday = new Date(sunday);
+  saturday.setDate(sunday.getDate() + 6);
+  saturday.setHours(23, 59, 59, 999);
+
   const historyQuery = query(
     collection(db, 'prayer_history'),
     where('userId', '==', user.uid),
-    where('timestamp', '>=', Timestamp.fromDate(sunday))
+    where('date', '>=', sunday.toLocaleDateString('en-CA')),
+    where('date', '<=', saturday.toLocaleDateString('en-CA'))
   );
 
-  const querySnapshot = await getDocs(historyQuery);
+  const snapshot = await getDocs(historyQuery);
   const history = [];
-  const pendingPrayers = [];
-  
-  querySnapshot.forEach(doc => {
-    const data = doc.data();
-    history.push({ id: doc.id, ...data });
-    
-    if (data.status === 'pending') {
-      pendingPrayers.push({ id: doc.id, ...data });
-    }
-  });
-
   const pendingByDate = {};
-  pendingPrayers.forEach(prayer => {
-    if (!pendingByDate[prayer.date]) {
-      pendingByDate[prayer.date] = {
-        date: prayer.date,
-        isToday: prayer.date === today.toISOString().split('T')[0],
-        prayers: []
-      };
+  const now = new Date();
+
+  snapshot.forEach(doc => {
+    const prayer = doc.data();
+    const prayerDateTime = getPrayerDateTime(prayer.date, prayer.time);
+    
+    // Add to history for Weekly Prayer History
+    history.push(prayer);
+    
+    // Only add to pending if it's a past prayer
+    if (prayer.status === 'pending' && prayerDateTime < now) {
+      if (!pendingByDate[prayer.date]) {
+        pendingByDate[prayer.date] = {
+          isToday: prayer.date === today.toLocaleDateString('en-CA'),
+          prayers: []
+        };
+      }
+      pendingByDate[prayer.date].prayers.push(prayer);
     }
-    pendingByDate[prayer.date].prayers.push(prayer);
   });
 
-  prayerHistoryStore.set({ pendingByDate, history });
+  prayerHistoryStore.set({
+    pendingByDate,
+    history
+  });
+
   return { pendingByDate, history };
+}
+
+// Helper function to convert prayer date and time to DateTime
+export function getPrayerDateTime(date, time) {
+  const [timeStr, period] = time.split(' ');
+  const [hours, minutes] = timeStr.split(':');
+  const prayerDate = new Date(date);
+  
+  let hour = parseInt(hours);
+  if (period === 'PM' && hour !== 12) hour += 12;
+  if (period === 'AM' && hour === 12) hour = 0;
+  
+  prayerDate.setHours(hour, parseInt(minutes), 0);
+  return prayerDate;
 } 

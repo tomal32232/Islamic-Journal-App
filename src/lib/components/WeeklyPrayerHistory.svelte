@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { prayerHistoryStore, getPrayerHistory } from '../stores/prayerHistoryStore';
+  import { prayerHistoryStore, getPrayerHistory, getPrayerDateTime } from '../stores/prayerHistoryStore';
   import { prayerTimesStore } from '../stores/prayerTimes';
   import { iconMap } from '../utils/icons';
 
@@ -43,9 +43,23 @@
           const prayerRecord = $prayerHistoryStore.history.find(
             h => h.date === day.date && h.prayerName === prayer
           );
+
+          // Get current time for comparison
+          const now = new Date();
+          const prayerDateTime = prayerRecord ? getPrayerDateTime(day.date, prayerRecord.time) : null;
+          
+          let status = 'pending';
+          if (prayerRecord) {
+            if (['ontime', 'late', 'missed'].includes(prayerRecord.status)) {
+              status = prayerRecord.status;
+            } else if (prayerDateTime && prayerDateTime < now) {
+              status = 'missed';
+            }
+          }
+
           return {
             date: day.date,
-            status: prayerRecord?.status || 'pending',
+            status,
             isToday: day.isToday
           };
         })
@@ -57,12 +71,16 @@
   }
 
   onMount(async () => {
+    console.log('WeeklyPrayerHistory mounted');
     await getPrayerHistory();
+    console.log('Prayer history:', $prayerHistoryStore);
   });
 
   $: if ($prayerHistoryStore.history) {
+    console.log('Generating grid with history:', $prayerHistoryStore.history);
     const gridData = generatePrayerGrid();
     weeklyGrid = gridData.grid;
+    console.log('Generated grid:', weeklyGrid);
   }
 </script>
 
