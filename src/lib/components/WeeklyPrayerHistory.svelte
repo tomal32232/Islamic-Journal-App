@@ -5,6 +5,11 @@
   import { iconMap } from '../utils/icons';
 
   let weeklyGrid = [];
+  let weeklyStats = {
+    ontime: 0,
+    late: 0,
+    missed: 0
+  };
   
   function getCurrentWeekDays() {
     const today = new Date();
@@ -33,6 +38,13 @@
     const days = getCurrentWeekDays();
     const prayers = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
     const grid = [];
+    
+    // Add weekly stats object
+    let weeklyStats = {
+      ontime: 0,
+      late: 0,
+      missed: 0
+    };
 
     prayers.forEach(prayer => {
       const row = {
@@ -54,8 +66,13 @@
           let status = 'pending';
           if (prayerRecord) {
             status = prayerRecord.status;
+            // Count weekly stats
+            if (status === 'ontime') weeklyStats.ontime++;
+            else if (status === 'late') weeklyStats.late++;
+            else if (status === 'missed') weeklyStats.missed++;
           } else if (day.date < today || (day.date === today && prayerDateTime < now)) {
             status = 'missed';
+            weeklyStats.missed++;
           }
 
           return {
@@ -68,7 +85,7 @@
       grid.push(row);
     });
 
-    return { days, grid };
+    return { days, grid, weeklyStats };
   }
 
   onMount(async () => {
@@ -81,6 +98,7 @@
     console.log('Generating grid with history:', $prayerHistoryStore.history);
     const gridData = generatePrayerGrid();
     weeklyGrid = gridData.grid;
+    weeklyStats = gridData.weeklyStats;
     console.log('Generated grid:', weeklyGrid);
   }
 </script>
@@ -111,6 +129,21 @@
         {/each}
       </div>
     {/each}
+  </div>
+
+  <div class="weekly-stats">
+    <div class="stat-item">
+      <span class="stat-number">{weeklyStats.ontime}</span>
+      <span class="stat-label">On Time</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-number">{weeklyStats.late}</span>
+      <span class="stat-label">Late</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-number">{weeklyStats.missed}</span>
+      <span class="stat-label">Missed</span>
+    </div>
   </div>
 
   <div class="legend">
@@ -251,6 +284,33 @@
     height: 8px;
   }
 
+  .weekly-stats {
+    display: flex;
+    justify-content: space-around;
+    padding: 1rem;
+    margin: 1rem 0;
+    background: #f8f8f8;
+    border-radius: 8px;
+  }
+
+  .stat-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  .stat-number {
+    font-size: 1.5rem;
+    font-weight: 500;
+    color: #216974;
+  }
+
+  .stat-label {
+    font-size: 0.875rem;
+    color: #666;
+  }
+
   @media (max-width: 480px) {
     .prayer-history {
       padding: 0.75rem;
@@ -275,6 +335,19 @@
 
     .legend {
       gap: 0.75rem;
+    }
+
+    .weekly-stats {
+      padding: 0.75rem;
+      margin: 0.75rem 0;
+    }
+
+    .stat-number {
+      font-size: 1.25rem;
+    }
+
+    .stat-label {
+      font-size: 0.75rem;
     }
   }
 </style>

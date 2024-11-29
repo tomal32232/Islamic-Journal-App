@@ -103,8 +103,10 @@
 
   async function updatePrayerStatus() {
     await updatePrayerStatuses();
-    const { history } = await getPrayerHistory();
-    pendingPrayers = history.filter(prayer => prayer.status === 'pending');
+    
+    // Use the same counting logic as NotificationIcon
+    pendingPrayers = Object.values($prayerHistoryStore.pendingByDate)
+      .reduce((prayers, { prayers: datePrayers }) => [...prayers, ...datePrayers], []);
     
     const now = new Date();
     upcomingPrayer = null;
