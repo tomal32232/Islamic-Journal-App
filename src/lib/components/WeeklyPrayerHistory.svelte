@@ -313,8 +313,8 @@
 
   @media (max-width: 480px) {
     .prayer-history {
-      padding: 0.75rem;
-      margin: 0.5rem;
+      padding: 1rem;
+      margin-bottom: 1rem;
     }
 
     .header-row, .prayer-row {
