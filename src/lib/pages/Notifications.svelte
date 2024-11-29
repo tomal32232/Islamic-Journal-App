@@ -4,8 +4,9 @@
   import { iconMap } from '../utils/icons';
 
   export let onBack;
+  
+  let activeTab = 'pending'; // 'pending' or 'missed'
 
-  // Helper function to get icon and weight based on prayer name
   function getPrayerIcon(prayerName) {
     const iconConfig = {
       'Fajr': { icon: 'SunDim', weight: 'regular' },
@@ -14,8 +15,7 @@
       'Maghrib': { icon: 'SunHorizon', weight: 'regular' },
       'Isha': { icon: 'MoonStars', weight: 'regular' }
     };
-
-    return iconConfig[prayerName] || { icon: 'Sun', weight: 'regular' }; // Default fallback
+    return iconConfig[prayerName] || { icon: 'Sun', weight: 'regular' };
   }
 
   async function markPrayerStatus(prayer, status) {
@@ -33,61 +33,130 @@
     <button class="back-button" on:click={onBack}>
       <ArrowLeft size={24} />
     </button>
-    <h1>Pending Prayers</h1>
+    <div class="tabs">
+      <button 
+        class="tab-button {activeTab === 'pending' ? 'active' : ''}"
+        on:click={() => activeTab = 'pending'}
+      >
+        Pending Actions
+      </button>
+      <button 
+        class="tab-button {activeTab === 'missed' ? 'active' : ''}"
+        on:click={() => activeTab = 'missed'}
+      >
+        Missed Prayers
+      </button>
+    </div>
   </header>
 
-  {#if Object.keys($prayerHistoryStore.pendingByDate).length === 0}
-    <div class="empty-state">
-      <span class="empty-icon">🎉</span>
-      <p>All caught up!</p>
-      <p class="subtitle">No pending prayers to mark</p>
-    </div>
-  {:else}
-    {#each Object.entries($prayerHistoryStore.pendingByDate) as [date, { isToday, prayers }]}
-      <div class="date-group">
-        <div class="date-header">
-          {isToday ? 'Today' : new Date(date).toLocaleDateString('en-US', { 
-            weekday: 'short', 
-            month: 'short', 
-            day: 'numeric' 
-          })}
-        </div>
-        
-        {#each prayers as prayer}
-          {@const iconDetails = getPrayerIcon(prayer.prayerName)}
-          <div class="prayer-card">
-            <div class="prayer-info">
-              <div class="icon-wrapper">
-                <svelte:component 
-                  this={iconMap[iconDetails.icon]} 
-                  size={20} 
-                  weight={iconDetails.weight}
-                  color="#216974"
-                />
-              </div>
-              <div class="prayer-details">
-                <span class="prayer-name">{prayer.prayerName}</span>
-                <span class="prayer-time">{prayer.time}</span>
-              </div>
-            </div>
-            <div class="prayer-actions">
-              <button 
-                class="status-button ontime" 
-                on:click={() => markPrayerStatus(prayer, 'ontime')}
-              >
-                On time
-              </button>
-              <button 
-                class="status-button late" 
-                on:click={() => markPrayerStatus(prayer, 'late')}
-              >
-                Late
-              </button>
-            </div>
-          </div>
-        {/each}
+  {#if activeTab === 'pending'}
+    {#if Object.keys($prayerHistoryStore.pendingByDate).length === 0}
+      <div class="empty-state">
+        <span class="empty-icon">🎉</span>
+        <p>All caught up!</p>
+        <p class="subtitle">No pending prayers to mark</p>
       </div>
-    {/each}
+    {:else}
+      {#each Object.entries($prayerHistoryStore.pendingByDate) as [date, { isToday, prayers }]}
+        <div class="date-group">
+          <div class="date-header">
+            {isToday ? 'Today' : new Date(date).toLocaleDateString('en-US', { 
+              weekday: 'short', 
+              month: 'short', 
+              day: 'numeric' 
+            })}
+          </div>
+          
+          {#each prayers as prayer}
+            {@const iconDetails = getPrayerIcon(prayer.prayerName)}
+            <div class="prayer-card">
+              <div class="prayer-info">
+                <div class="icon-wrapper">
+                  <svelte:component 
+                    this={iconMap[iconDetails.icon]} 
+                    size={20} 
+                    weight={iconDetails.weight}
+                    color="#216974"
+                  />
+                </div>
+                <div class="prayer-details">
+                  <span class="prayer-name">{prayer.prayerName}</span>
+                  <span class="prayer-time">{prayer.time}</span>
+                </div>
+              </div>
+              <div class="prayer-actions">
+                <button 
+                  class="status-button ontime" 
+                  on:click={() => markPrayerStatus(prayer, 'ontime')}
+                >
+                  On time
+                </button>
+                <button 
+                  class="status-button late" 
+                  on:click={() => markPrayerStatus(prayer, 'late')}
+                >
+                  Late
+                </button>
+              </div>
+            </div>
+          {/each}
+        </div>
+      {/each}
+    {/if}
+  {:else}
+    {#if Object.keys($prayerHistoryStore.missedByDate).length === 0}
+      <div class="empty-state">
+        <span class="empty-icon">🙏</span>
+        <p>No missed prayers</p>
+        <p class="subtitle">Keep up the good work!</p>
+      </div>
+    {:else}
+      {#each Object.entries($prayerHistoryStore.missedByDate) as [date, { prayers }]}
+        <div class="date-group">
+          <div class="date-header">
+            {new Date(date).toLocaleDateString('en-US', { 
+              weekday: 'short', 
+              month: 'short', 
+              day: 'numeric' 
+            })}
+          </div>
+          
+          {#each prayers as prayer}
+            {@const iconDetails = getPrayerIcon(prayer.prayerName)}
+            <div class="prayer-card">
+              <div class="prayer-info">
+                <div class="icon-wrapper">
+                  <svelte:component 
+                    this={iconMap[iconDetails.icon]} 
+                    size={20} 
+                    weight={iconDetails.weight}
+                    color="#216974"
+                  />
+                </div>
+                <div class="prayer-details">
+                  <span class="prayer-name">{prayer.prayerName}</span>
+                  <span class="prayer-time">{prayer.time}</span>
+                </div>
+              </div>
+              <div class="prayer-actions">
+                <button 
+                  class="status-button ontime" 
+                  on:click={() => markPrayerStatus(prayer, 'ontime')}
+                >
+                  On time
+                </button>
+                <button 
+                  class="status-button late" 
+                  on:click={() => markPrayerStatus(prayer, 'late')}
+                >
+                  Late
+                </button>
+              </div>
+            </div>
+          {/each}
+        </div>
+      {/each}
+    {/if}
   {/if}
 </div>
 
@@ -109,6 +178,7 @@
     background: white;
     padding: 1rem 0;
     z-index: 10;
+    border-bottom: 1px solid #eee;
   }
 
   h1 {
@@ -259,5 +329,28 @@
     .status-button {
       padding: 0.625rem;
     }
+  }
+
+  .tabs {
+    display: flex;
+    gap: 1rem;
+    margin-left: auto;
+  }
+
+  .tab-button {
+    background: none;
+    border: none;
+    padding: 0.5rem 1rem;
+    color: #666;
+    font-size: 0.875rem;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+  }
+
+  .tab-button.active {
+    color: #216974;
+    border-bottom-color: #216974;
+    font-weight: 500;
   }
 </style> 
