@@ -238,8 +238,9 @@
       </div>
 
       <section class="upcoming-prayer">
-        {#if upcomingPrayer}
-          <div class="prayer-card">
+        <div class="prayer-card">
+          <h2>Next Prayer</h2>
+          {#if upcomingPrayer}
             <div class="prayer-info">
               <div class="prayer-header">
                 <div class="prayer-icon">
@@ -269,20 +270,20 @@
                 </button>
               </div>
             {/if}
-          </div>
-        {:else}
-          <div class="no-prayers-card">
-            <p class="no-prayers-message">No more prayers scheduled for today</p>
-            {#if pendingPrayers.length > 0}
-              <p class="pending-notice">
-                You have {pendingPrayers.length} unmarked {pendingPrayers.length === 1 ? 'prayer' : 'prayers'}. 
-                <button class="link-button" on:click={() => dispatch('showNotifications')}>
-                  Mark them now
-                </button>
-              </p>
-            {/if}
-          </div>
-        {/if}
+          {:else}
+            <div class="no-prayers-message">
+              <p>No more prayers scheduled for today</p>
+              {#if pendingPrayers.length > 0}
+                <p class="pending-notice">
+                  You have {pendingPrayers.length} unmarked {pendingPrayers.length === 1 ? 'prayer' : 'prayers'}. 
+                  <button class="link-button" on:click={() => dispatch('showNotifications')}>
+                    Mark them now
+                  </button>
+                </p>
+              {/if}
+            </div>
+          {/if}
+        </div>
       </section>
 
       <WeeklyStreak />
@@ -413,10 +414,15 @@
 
   .prayer-card {
     background: white;
-    padding: 1.25rem;
-    border-radius: 12px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-    border: 1px solid #eee;
+    padding: 1rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+
+  .prayer-card h2 {
+    font-size: 1rem;
+    color: #216974;
+    margin-bottom: 1rem;
   }
 
   .prayer-header {
@@ -602,6 +608,18 @@
 
   .link-button:hover {
     opacity: 0.8;
+  }
+
+  .prayer-card h2 {
+    font-size: 1rem;
+    color: #216974;
+    margin-bottom: 1rem;
+  }
+
+  .no-prayers-message {
+    text-align: center;
+    color: #666;
+    margin: 1rem 0;
   }
 </style>
 
