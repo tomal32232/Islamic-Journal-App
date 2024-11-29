@@ -71,8 +71,8 @@
   }
 
   h2 {
-    font-size: 0.875rem;
-    color: #666;
+    font-size: 1rem;
+    color: #216974;
     margin: 0;
   }
 
@@ -83,7 +83,7 @@
   }
 
   .streak-count {
-    font-size: 1.125rem;
+    font-size: 1rem;
     color: #216974;
     font-weight: 500;
   }
