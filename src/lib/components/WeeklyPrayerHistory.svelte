@@ -46,15 +46,16 @@
 
           // Get current time for comparison
           const now = new Date();
-          const prayerDateTime = prayerRecord ? getPrayerDateTime(day.date, prayerRecord.time) : null;
+          const today = new Date().toLocaleDateString('en-CA');
+          const prayerDateTime = getPrayerDateTime(day.date, 
+            $prayerTimesStore.find(p => p.name === prayer)?.time || '00:00 AM'
+          );
           
           let status = 'pending';
           if (prayerRecord) {
-            if (['ontime', 'late', 'missed'].includes(prayerRecord.status)) {
-              status = prayerRecord.status;
-            } else if (prayerDateTime && prayerDateTime < now) {
-              status = 'missed';
-            }
+            status = prayerRecord.status;
+          } else if (day.date < today || (day.date === today && prayerDateTime < now)) {
+            status = 'missed';
           }
 
           return {
