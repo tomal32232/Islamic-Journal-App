@@ -1,5 +1,6 @@
 <script>
-  import { prayerHistoryStore } from '../stores/prayerHistoryStore';
+  import { onMount } from 'svelte';
+  import { prayerHistoryStore, getPrayerHistory } from '../stores/prayerHistoryStore';
   import { prayerTimesStore } from '../stores/prayerTimes';
 
   let weeklyStats = [];
@@ -43,7 +44,17 @@
     return days;
   }
 
-  $: weeklyStats = getCurrentWeekDays();
+  onMount(async () => {
+    await getPrayerHistory();
+    weeklyStats = getCurrentWeekDays();
+  });
+
+  // Add reactive statement to update when store changes
+  $: {
+    if ($prayerHistoryStore.history.length > 0) {
+      weeklyStats = getCurrentWeekDays();
+    }
+  }
 </script>
 
 <div class="prayer-history">

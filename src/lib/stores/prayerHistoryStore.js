@@ -189,14 +189,18 @@ export function convertPrayerTimeToDate(timeStr) {
 
 export async function getPrayerHistory() {
   const user = auth.currentUser;
-  if (!user) return;
+  if (!user) return { history: [] };
 
-  const today = new Date().toISOString().split('T')[0];
+  // Get Sunday of current week
+  const today = new Date();
+  const sunday = new Date(today);
+  sunday.setDate(today.getDate() - today.getDay());
+  sunday.setHours(0, 0, 0, 0);
   
   const historyQuery = query(
     collection(db, 'prayer_history'),
     where('userId', '==', user.uid),
-    where('date', '==', today)
+    where('timestamp', '>=', Timestamp.fromDate(sunday))
   );
 
   const querySnapshot = await getDocs(historyQuery);
@@ -213,13 +217,16 @@ export async function getPrayerHistory() {
   });
 
   const pendingByDate = {};
-  if (pendingPrayers.length > 0) {
-    pendingByDate[today] = {
-      date: today,
-      isToday: true,
-      prayers: pendingPrayers
-    };
-  }
+  pendingPrayers.forEach(prayer => {
+    if (!pendingByDate[prayer.date]) {
+      pendingByDate[prayer.date] = {
+        date: prayer.date,
+        isToday: prayer.date === today.toISOString().split('T')[0],
+        prayers: []
+      };
+    }
+    pendingByDate[prayer.date].prayers.push(prayer);
+  });
 
   prayerHistoryStore.set({ pendingByDate, history });
   return { pendingByDate, history };
