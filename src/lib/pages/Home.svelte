@@ -304,6 +304,7 @@
 <style>
   .home-container {
     padding: 1rem;
+    padding-top: calc(1rem + 20px);
     padding-bottom: 88px;
     background: #FFFFFF;
     min-height: 100vh;

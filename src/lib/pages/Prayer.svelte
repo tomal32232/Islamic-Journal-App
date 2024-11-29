@@ -20,6 +20,9 @@
     pending: 0
   };
 
+  let countdownInterval;
+  let currentPrayerCountdown = '';
+
   function updateDailyStats() {
     const prayers = $prayerTimesStore;
     dailyStats = prayers.reduce((stats, prayer) => {
@@ -80,6 +83,58 @@
     updateDailyStats();
   }
 
+  function updateCountdown(prayer) {
+    if (!prayer?.time) return;
+    
+    const [time, period] = prayer.time.split(' ');
+    const [hours, minutes] = time.split(':');
+    const now = new Date();
+    const prayerDate = new Date();
+    
+    let hour = parseInt(hours);
+    if (period === 'PM' && hour !== 12) hour += 12;
+    if (period === 'AM' && hour === 12) hour = 0;
+    
+    prayerDate.setHours(hour, parseInt(minutes), 0);
+    
+    const diff = prayerDate - now;
+    if (diff < 0) return null;
+    
+    const hrs = Math.floor(diff / (1000 * 60 * 60));
+    const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    const secs = Math.floor((diff % (1000 * 60)) / 1000);
+    
+    return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  }
+
+  function isToday(prayerTime) {
+    const today = new Date().toLocaleDateString('en-CA');
+    const prayerDate = convertPrayerTimeToDate(prayerTime);
+    return prayerDate.toLocaleDateString('en-CA') === today;
+  }
+
+  function withinMarkingWindow(prayerTime) {
+    const prayerDate = convertPrayerTimeToDate(prayerTime);
+    const now = new Date();
+    const diff = now - prayerDate;
+    // Allow marking within 6 hours of prayer time
+    return diff < (6 * 60 * 60 * 1000);
+  }
+
+  function convertPrayerTimeToDate(prayerTime) {
+    const [time, period] = prayerTime.split(' ');
+    const [hours, minutes] = time.split(':');
+    const now = new Date();
+    const prayerDate = new Date(now);
+    
+    let hour = parseInt(hours);
+    if (period === 'PM' && hour !== 12) hour += 12;
+    if (period === 'AM' && hour === 12) hour = 0;
+    
+    prayerDate.setHours(hour, parseInt(minutes), 0, 0);
+    return prayerDate;
+  }
+
   onMount(async () => {
     try {
       const coords = await getCurrentLocation();
@@ -98,6 +153,13 @@
       
       await updatePrayerStatuses();
       updatePrayerStatus();
+
+      countdownInterval = setInterval(() => {
+        const currentPrayer = $prayerTimesStore.find(p => p.isCurrent);
+        if (currentPrayer) {
+          currentPrayerCountdown = updateCountdown(currentPrayer);
+        }
+      }, 1000);
     } catch (error) {
       console.error('Error initializing:', error);
     }
@@ -105,6 +167,7 @@
 
   onDestroy(() => {
     if (timeInterval) clearInterval(timeInterval);
+    clearInterval(countdownInterval);
   });
 </script>
 
@@ -133,29 +196,38 @@
     <div class="error">{$errorStore}</div>
   {:else}
     <div class="prayer-list">
-      {#each $prayerTimesStore as prayer, i}
-        <div class="prayer-card {prayer === currentPrayer ? 'current' : ''}">
-          <div class="prayer-header">
-            <div class="prayer-info">
-              <svelte:component 
-                this={iconMap[prayer.icon]} 
-                size={24} 
-                weight={prayer.weight}
-              />
-              <div class="prayer-details">
-                <span class="prayer-name">{prayer.name}</span>
-                <span class="prayer-time">{prayer.time}</span>
-                {#if prayer === currentPrayer}
-                  <span class="time-remaining">{timeRemaining}</span>
-                {/if}
-              </div>
+      {#each $prayerTimesStore.filter(p => isToday(p.time)) as prayer, index}
+        <div class="prayer-card {prayer.isCurrent ? 'current' : ''}">
+          <div class="prayer-info">
+            <svelte:component 
+              this={iconMap[prayer.icon]} 
+              size={24} 
+              weight={prayer.weight}
+              color="#216974"
+            />
+            <div class="prayer-details">
+              <span class="prayer-name">{prayer.name}</span>
+              <span class="prayer-time">{prayer.time}</span>
             </div>
+            {#if prayer.isCurrent && currentPrayerCountdown}
+              <span class="countdown">{currentPrayerCountdown}</span>
+            {/if}
           </div>
-          {#if prayer.status}
-            <div class="status-badge {prayer.status}">
-              {prayer.status === 'ontime' ? 'Prayed on time' : 
-               prayer.status === 'late' ? 'Prayed late' : 
-               prayer.status === 'missed' ? 'Missed' : ''}
+          
+          {#if prayer.isPast && !prayer.status && withinMarkingWindow(prayer.time)}
+            <div class="prayer-actions">
+              <button 
+                class="status-button ontime" 
+                on:click={() => markPrayerStatus(index, 'ontime')}
+              >
+                Prayed on time
+              </button>
+              <button 
+                class="status-button late" 
+                on:click={() => markPrayerStatus(index, 'late')}
+              >
+                Prayed late
+              </button>
             </div>
           {/if}
         </div>
@@ -370,5 +442,12 @@
   .mosque-distance {
     font-size: 0.75rem;
     color: #216974;
+  }
+
+  .countdown {
+    font-size: 1.125rem;
+    font-weight: 500;
+    color: #216974;
+    margin-left: auto;
   }
 </style>
