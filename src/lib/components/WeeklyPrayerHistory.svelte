@@ -184,10 +184,10 @@
   }
 
   .status-dot {
-    width: 20px;
-    height: 20px;
+    width: 14px;
+    height: 14px;
     border-radius: 50%;
-    border: 2px solid #eee;
+    border: 1.5px solid #eee;
   }
 
   .status-dot.ontime {
@@ -207,7 +207,7 @@
 
   .status-dot.pending {
     background: white;
-    border: 2px solid #eee;
+    border: 1.5px solid #eee;
   }
 
   .legend {
@@ -228,8 +228,8 @@
   }
 
   .legend-item .status-dot {
-    width: 10px;
-    height: 10px;
+    width: 8px;
+    height: 8px;
   }
 
   @media (max-width: 480px) {
@@ -249,8 +249,9 @@
     }
 
     .status-dot {
-      width: 16px;
-      height: 16px;
+      width: 12px;
+      height: 12px;
+      border-width: 1.5px;
     }
 
     .legend {
