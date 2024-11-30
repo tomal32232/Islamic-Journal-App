@@ -71,17 +71,18 @@
   function updatePrayerStatus() {
     const now = new Date();
     const prayers = $prayerTimesStore;
+    let foundCurrent = false;
     
-    for (let i = 0; i < prayers.length; i++) {
-      const prayerTime = convertPrayerTimeToDate(prayers[i].time);
-      if (prayerTime > now) {
-        prayers[i].isCurrent = true;
-        currentPrayerCountdown = updateCountdown(prayers[i]);
-        break;
+    $prayerTimesStore = prayers.map(prayer => {
+      if (!foundCurrent && prayer.time) {
+        const prayerTime = convertPrayerTimeToDate(prayer.time);
+        if (prayerTime > now) {
+          foundCurrent = true;
+          return { ...prayer, isCurrent: true };
+        }
       }
-    }
-    
-    $prayerTimesStore = prayers;
+      return { ...prayer, isCurrent: false };
+    });
   }
 
   function updateCountdown(prayer) {
@@ -138,31 +139,35 @@
 
   onMount(async () => {
     try {
-      const coords = await getCurrentLocation();
+      // Run these in parallel
+      const [coords] = await Promise.all([
+        getCurrentLocation(),
+        fetchPrayerTimes(),
+        getPrayerHistory()
+      ]);
       
       if (coords) {
-        await fetchNearbyMosques(coords.latitude, coords.longitude);
+        fetchNearbyMosques(coords.latitude, coords.longitude);
       }
       
-      await fetchPrayerTimes();
-      await initializeMonthlyPrayers($prayerTimesStore);
-      
-      timeInterval = setInterval(async () => {
-        await updatePrayerStatuses();
-        updatePrayerStatus();
-      }, 60000);
-      
-      await updatePrayerStatuses();
       updatePrayerStatus();
-
+      updateDailyStats();
+      
+      // Set up intervals
+      timeInterval = setInterval(updatePrayerStatus, 60000);
       countdownInterval = setInterval(() => {
         const currentPrayer = $prayerTimesStore.find(p => p.isCurrent);
         if (currentPrayer) {
           currentPrayerCountdown = updateCountdown(currentPrayer);
         }
       }, 1000);
+
+      return () => {
+        clearInterval(timeInterval);
+        clearInterval(countdownInterval);
+      };
     } catch (error) {
-      console.error('Error initializing:', error);
+      console.error('Error initializing prayer tab:', error);
     }
   });
 
@@ -171,7 +176,6 @@
     clearInterval(countdownInterval);
   });
 </script>
-
 <div class="prayer-container">
   <div class="daily-stats">
     <h2>Today's Progress</h2>
@@ -452,3 +456,4 @@
     margin-left: auto;
   }
 </style>
+
