@@ -6,6 +6,8 @@
   
   $: filteredHistory = filterPrayerHistory($prayerHistoryStore.history, selectedFilter);
   $: groupedHistory = groupHistoryByDate(filteredHistory);
+  $: summary = calculateSummary(filteredHistory);
+  $: prayerPatterns = analyzePrayerPatterns(filteredHistory);
 
   function filterPrayerHistory(history, days) {
     const today = new Date();
@@ -60,6 +62,63 @@
       weekday: 'short',
       day: 'numeric'
     });
+  }
+
+  function calculateSummary(history) {
+    const total = history.length;
+    const ontime = history.filter(p => p.status === 'ontime').length;
+    const late = history.filter(p => p.status === 'late').length;
+    const missed = history.filter(p => p.status === 'missed').length;
+    const pending = history.filter(p => p.status === 'pending').length;
+
+    return {
+      total,
+      ontime,
+      late,
+      missed,
+      pending,
+      ontimePercentage: total ? Math.round((ontime / total) * 100) : 0,
+      latePercentage: total ? Math.round((late / total) * 100) : 0,
+      missedPercentage: total ? Math.round((missed / total) * 100) : 0
+    };
+  }
+
+  function analyzePrayerPatterns(history) {
+    const patterns = {
+      missed: {},
+      late: {}
+    };
+
+    // Initialize counters
+    prayers.forEach(prayer => {
+      patterns.missed[prayer] = 0;
+      patterns.late[prayer] = 0;
+    });
+
+    // Count missed and late prayers
+    history.forEach(prayer => {
+      if (prayer.status === 'missed') {
+        patterns.missed[prayer.prayerName]++;
+      } else if (prayer.status === 'late') {
+        patterns.late[prayer.prayerName]++;
+      }
+    });
+
+    // Sort prayers by frequency
+    const missedSorted = Object.entries(patterns.missed)
+      .sort(([,a], [,b]) => b - a)
+      .filter(([,count]) => count > 0)
+      .slice(0, 2);
+    
+    const lateSorted = Object.entries(patterns.late)
+      .sort(([,a], [,b]) => b - a)
+      .filter(([,count]) => count > 0)
+      .slice(0, 2);
+
+    return {
+      mostMissed: missedSorted,
+      mostLate: lateSorted
+    };
   }
 
   const prayers = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
@@ -118,6 +177,58 @@
       <div class="legend-item">
         <div class="legend-dot missed"></div>
         <span>Missed</span>
+      </div>
+    </div>
+
+    <div class="summary-section">
+      <div class="summary-stats">
+        <div class="stat-box">
+          <span class="stat-label">Total Prayers</span>
+          <span class="stat-value">{summary.total}</span>
+        </div>
+        <div class="stat-box ontime">
+          <span class="stat-label">On Time</span>
+          <span class="stat-value">{summary.ontime}</span>
+          <span class="stat-percentage">({summary.ontimePercentage}%)</span>
+        </div>
+        <div class="stat-box late">
+          <span class="stat-label">Late</span>
+          <span class="stat-value">{summary.late}</span>
+          <span class="stat-percentage">({summary.latePercentage}%)</span>
+        </div>
+        <div class="stat-box missed">
+          <span class="stat-label">Missed</span>
+          <span class="stat-value">{summary.missed}</span>
+          <span class="stat-percentage">({summary.missedPercentage}%)</span>
+        </div>
+      </div>
+
+      <div class="patterns-section">
+        {#if prayerPatterns.mostMissed.length > 0}
+          <div class="pattern-item">
+            <span class="pattern-label">Most Missed:</span>
+            <div class="pattern-prayers">
+              {#each prayerPatterns.mostMissed as [prayer, count]}
+                <span class="prayer-stat missed">
+                  {prayer} ({count} times)
+                </span>
+              {/each}
+            </div>
+          </div>
+        {/if}
+
+        {#if prayerPatterns.mostLate.length > 0}
+          <div class="pattern-item">
+            <span class="pattern-label">Most Late:</span>
+            <div class="pattern-prayers">
+              {#each prayerPatterns.mostLate as [prayer, count]}
+                <span class="prayer-stat late">
+                  {prayer} ({count} times)
+                </span>
+              {/each}
+            </div>
+          </div>
+        {/if}
       </div>
     </div>
   {/if}
@@ -273,6 +384,106 @@
     font-size: 0.875rem;
   }
 
+  .summary-section {
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid #eee;
+  }
+
+  .summary-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .stat-box {
+    background: #f8f8f8;
+    padding: 1rem;
+    border-radius: 8px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .stat-box.ontime {
+    background: rgba(33, 105, 116, 0.1);
+  }
+
+  .stat-box.late {
+    background: rgba(224, 148, 83, 0.1);
+  }
+
+  .stat-box.missed {
+    background: rgba(239, 68, 68, 0.1);
+  }
+
+  .stat-label {
+    font-size: 0.75rem;
+    color: #666;
+  }
+
+  .stat-value {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #216974;
+  }
+
+  .stat-box.late .stat-value {
+    color: #E09453;
+  }
+
+  .stat-box.missed .stat-value {
+    color: #EF4444;
+  }
+
+  .stat-percentage {
+    font-size: 0.75rem;
+    color: #666;
+  }
+
+  .patterns-section {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .pattern-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .pattern-label {
+    font-size: 0.875rem;
+    color: #666;
+    font-weight: 500;
+  }
+
+  .pattern-prayers {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .prayer-stat {
+    font-size: 0.875rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 999px;
+    font-weight: 500;
+  }
+
+  .prayer-stat.missed {
+    background: rgba(239, 68, 68, 0.1);
+    color: #EF4444;
+  }
+
+  .prayer-stat.late {
+    background: rgba(224, 148, 83, 0.1);
+    color: #E09453;
+  }
+
   @media (max-width: 640px) {
     .prayer-history-section {
       padding: 0.75rem;
@@ -301,6 +512,23 @@
     .legend-dot {
       width: 0.375rem;
       height: 0.375rem;
+    }
+
+    .summary-stats {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    .stat-value {
+      font-size: 1.25rem;
+    }
+
+    .pattern-item {
+      font-size: 0.75rem;
+    }
+
+    .prayer-stat {
+      font-size: 0.75rem;
+      padding: 0.25rem 0.5rem;
     }
   }
 </style> 
