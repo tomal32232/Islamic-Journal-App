@@ -178,64 +178,26 @@
   });
 </script>
 <div class="prayer-container">
-  <div class="daily-stats">
-    <h2>Today's Progress</h2>
-    <div class="stats-grid">
-      <div class="stat-card">
-        <span class="stat-number">{dailyStats.onTime}</span>
-        <span class="stat-label">On Time</span>
-      </div>
-      <div class="stat-card">
-        <span class="stat-number">{dailyStats.late}</span>
-        <span class="stat-label">Late</span>
-      </div>
-      <div class="stat-card">
-        <span class="stat-number">{dailyStats.pending}</span>
-        <span class="stat-label">Pending</span>
-      </div>
-    </div>
-  </div>
-
+  <h2>Praying Times</h2>
+  
   {#if $loadingStore}
     <div class="loading">Loading prayer times...</div>
   {:else if $errorStore}
     <div class="error">{$errorStore}</div>
   {:else}
-    <div class="prayer-list">
-      {#each $prayerTimesStore.filter(p => isToday(p.time)) as prayer, index}
-        <div class="prayer-card {prayer.isCurrent ? 'current' : ''}">
-          <div class="prayer-info">
+    <div class="prayer-times-grid">
+      {#each $prayerTimesStore.filter(p => isToday(p.time)) as prayer}
+        <div class="prayer-time-card {prayer.isCurrent ? 'current' : ''}">
+          <div class="icon-wrapper">
             <svelte:component 
               this={iconMap[prayer.icon]} 
               size={24} 
               weight={prayer.weight}
-              color="#216974"
+              color={prayer.isCurrent ? 'white' : '#216974'}
             />
-            <div class="prayer-details">
-              <span class="prayer-name">{prayer.name}</span>
-              <span class="prayer-time">{prayer.time}</span>
-            </div>
-            {#if prayer.isCurrent && currentPrayerCountdown}
-              <span class="countdown">{currentPrayerCountdown}</span>
-            {/if}
           </div>
-          
-          {#if prayer.isPast && !prayer.status && withinMarkingWindow(prayer.time)}
-            <div class="prayer-actions">
-              <button 
-                class="status-button ontime" 
-                on:click={() => markPrayerStatus(index, 'ontime')}
-              >
-                Prayed on time
-              </button>
-              <button 
-                class="status-button late" 
-                on:click={() => markPrayerStatus(index, 'late')}
-              >
-                Prayed late
-              </button>
-            </div>
-          {/if}
+          <span class="prayer-name">{prayer.name}</span>
+          <span class="prayer-time">{prayer.time}</span>
         </div>
       {/each}
     </div>
@@ -244,219 +206,121 @@
   <PrayerHistorySection />
 </div>
 
-<div class="mosque-section">
-  <h2>Nearby Mosques</h2>
-  {#if $mosqueLoadingStore}
-    <div class="loading">Loading nearby mosques...</div>
-  {:else if $nearbyMosquesStore.length > 0}
-    <div class="mosque-list">
-      {#each $nearbyMosquesStore as mosque}
-        <div class="mosque-card" 
-          on:click={() => window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mosque.name + ' ' + mosque.address)}`, '_blank')}
-        >
-          <div class="mosque-info">
-            <span class="mosque-name">{mosque.name}</span>
-            <span class="mosque-address">{mosque.address}</span>
-            <span class="mosque-distance">{mosque.distance}</span>
-          </div>
-        </div>
-      {/each}
-    </div>
-  {:else}
-    <div class="empty-state">No mosques found nearby</div>
-  {/if}
-</div>
-
 <style>
   .prayer-container {
-    padding: 1rem;
-    max-width: 600px;
+    padding: 0.5rem;
+    max-width: 1200px;
     margin: 0 auto;
   }
 
-  .daily-stats {
-    background: white;
-    padding: 1.5rem;
-    border-radius: 12px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    margin-bottom: 1.5rem;
-  }
-
   h2 {
-    font-size: 1.25rem;
-    color: #216974;
-    margin-bottom: 1rem;
+    font-size: 1.125rem;
+    color: #333;
+    margin-bottom: 0.75rem;
     font-weight: 500;
   }
 
-  .stats-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 1rem;
-  }
-
-  .stat-card {
-    background: #f8f8f8;
-    padding: 1rem;
-    border-radius: 8px;
-    text-align: center;
-  }
-
-  .stat-number {
-    display: block;
-    font-size: 1.5rem;
-    font-weight: 500;
-    color: #216974;
-    margin-bottom: 0.25rem;
-  }
-
-  .stat-label {
-    font-size: 0.875rem;
-    color: #666;
-  }
-
-  .prayer-list {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-  }
-
-  .prayer-card {
-    background: white;
-    padding: 1rem;
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-  }
-
-  .prayer-card.current {
-    border: 2px solid #216974;
-  }
-
-  .prayer-header {
+  .prayer-times-grid {
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    gap: 0.25rem;
+    margin-bottom: 1rem;
   }
 
-  .prayer-info {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-  }
-
-  .prayer-details {
+  .prayer-time-card {
+    background: white;
+    padding: 0.375rem;
+    border-radius: 8px;
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
+    align-items: center;
+    gap: 0.125rem;
+    text-align: center;
+    transition: all 0.2s ease;
+    border: 1px solid #eee;
+    width: calc(100% / 6 - 0.25rem);
+    min-width: unset;
+    max-width: unset;
   }
 
-  .prayer-name {
-    font-weight: 500;
-  }
-
-  .prayer-time {
-    font-size: 0.875rem;
-    color: #666;
-  }
-
-  .time-remaining {
-    font-size: 0.75rem;
-    color: #216974;
-    font-weight: 500;
-  }
-
-  .prayer-actions {
-    display: flex;
-    gap: 0.5rem;
-    margin-top: 0.75rem;
-  }
-
-  .status-button {
-    flex: 1;
-    padding: 0.5rem;
-    border: none;
-    border-radius: 4px;
-    font-size: 0.875rem;
-    cursor: pointer;
-    transition: all 0.2s;
-  }
-
-  .status-button.ontime {
+  .prayer-time-card.current {
     background: #216974;
     color: white;
   }
 
-  .status-button.late {
-    background: #E09453;
+  .icon-wrapper {
+    background: rgba(33, 105, 116, 0.1);
+    padding: 0.375rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .prayer-time-card.current .icon-wrapper {
+    background: rgba(255, 255, 255, 0.2);
+  }
+
+  .prayer-name {
+    font-size: 0.75rem;
+    color: #666;
+    font-weight: 500;
+  }
+
+  .prayer-time {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #216974;
+  }
+
+  .prayer-time-card.current .prayer-name,
+  .prayer-time-card.current .prayer-time {
     color: white;
   }
 
-  .status-badge {
-    margin-top: 0.75rem;
-    padding: 0.5rem;
-    border-radius: 4px;
-    font-size: 0.875rem;
+  .loading, .error {
     text-align: center;
-  }
-
-  .status-badge.ontime {
-    background: rgba(33, 105, 116, 0.1);
-    color: #216974;
-  }
-
-  .status-badge.late {
-    background: rgba(224, 148, 83, 0.1);
-    color: #E09453;
-  }
-
-  .status-badge.missed {
-    background: rgba(239, 68, 68, 0.1);
-    color: #EF4444;
-  }
-
-  .mosque-section {
-    margin-top: 2rem;
-  }
-
-  .mosque-list {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-  }
-
-  .mosque-card {
-    background: white;
     padding: 1rem;
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-  }
-
-  .mosque-info {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-  }
-
-  .mosque-name {
-    font-weight: 500;
-    color: #216974;
-  }
-
-  .mosque-address {
-    font-size: 0.875rem;
     color: #666;
+    background: #f8f8f8;
+    border-radius: 8px;
+    margin-bottom: 1rem;
   }
 
-  .mosque-distance {
-    font-size: 0.75rem;
-    color: #216974;
+  .error {
+    color: #EF4444;
+    background: rgba(239, 68, 68, 0.1);
   }
 
-  .countdown {
-    font-size: 1rem;
-    font-weight: 500;
-    color: #216974;
-    margin-left: auto;
+  @media (max-width: 640px) {
+    .prayer-container {
+      padding: 0.5rem;
+    }
+
+    h2 {
+      font-size: 1rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .prayer-time-card {
+      padding: 0.25rem;
+    }
+
+    .icon-wrapper {
+      padding: 0.25rem;
+    }
+
+    .prayer-name {
+      font-size: 0.625rem;
+    }
+
+    .prayer-time {
+      font-size: 0.625rem;
+    }
+
+    svelte:component {
+      size: 16;
+    }
   }
 </style>
 
