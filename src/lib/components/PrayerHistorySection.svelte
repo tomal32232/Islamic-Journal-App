@@ -182,23 +182,23 @@
 
     <div class="summary-section">
       <div class="summary-stats">
-        <div class="stat-box">
-          <span class="stat-label">Total Prayers</span>
+        <div class="stat-item">
           <span class="stat-value">{summary.total}</span>
+          <span class="stat-label">Total</span>
         </div>
-        <div class="stat-box ontime">
-          <span class="stat-label">On Time</span>
+        <div class="stat-item ontime">
           <span class="stat-value">{summary.ontime}</span>
+          <span class="stat-label">On Time</span>
           <span class="stat-percentage">({summary.ontimePercentage}%)</span>
         </div>
-        <div class="stat-box late">
-          <span class="stat-label">Late</span>
+        <div class="stat-item late">
           <span class="stat-value">{summary.late}</span>
+          <span class="stat-label">Late</span>
           <span class="stat-percentage">({summary.latePercentage}%)</span>
         </div>
-        <div class="stat-box missed">
-          <span class="stat-label">Missed</span>
+        <div class="stat-item missed">
           <span class="stat-value">{summary.missed}</span>
+          <span class="stat-label">Missed</span>
           <span class="stat-percentage">({summary.missedPercentage}%)</span>
         </div>
       </div>
@@ -385,61 +385,56 @@
   }
 
   .summary-section {
-    margin-top: 1.5rem;
-    padding-top: 1.5rem;
+    margin-top: 1rem;
+    padding-top: 1rem;
     border-top: 1px solid #eee;
   }
 
   .summary-stats {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-    gap: 1rem;
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
     margin-bottom: 1.5rem;
+    padding: 0.5rem;
+    background: #f8f8f8;
+    border-radius: 8px;
   }
 
-  .stat-box {
-    background: #f8f8f8;
-    padding: 1rem;
-    border-radius: 8px;
-    text-align: center;
+  .stat-item {
+    flex: 1;
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
+    align-items: center;
+    padding: 0.5rem;
+    border-radius: 6px;
+    background: white;
   }
 
-  .stat-box.ontime {
-    background: rgba(33, 105, 116, 0.1);
+  .stat-item.ontime {
+    color: #216974;
   }
 
-  .stat-box.late {
-    background: rgba(224, 148, 83, 0.1);
+  .stat-item.late {
+    color: #E09453;
   }
 
-  .stat-box.missed {
-    background: rgba(239, 68, 68, 0.1);
+  .stat-item.missed {
+    color: #EF4444;
   }
 
   .stat-label {
     font-size: 0.75rem;
     color: #666;
+    white-space: nowrap;
   }
 
   .stat-value {
-    font-size: 1.5rem;
+    font-size: 1.25rem;
     font-weight: 600;
-    color: #216974;
-  }
-
-  .stat-box.late .stat-value {
-    color: #E09453;
-  }
-
-  .stat-box.missed .stat-value {
-    color: #EF4444;
   }
 
   .stat-percentage {
-    font-size: 0.75rem;
+    font-size: 0.625rem;
     color: #666;
   }
 
@@ -515,11 +510,25 @@
     }
 
     .summary-stats {
-      grid-template-columns: repeat(2, 1fr);
+      padding: 0.25rem;
+      gap: 0.25rem;
+      margin-bottom: 1rem;
+    }
+
+    .stat-item {
+      padding: 0.25rem;
     }
 
     .stat-value {
-      font-size: 1.25rem;
+      font-size: 0.875rem;
+    }
+
+    .stat-label {
+      font-size: 0.625rem;
+    }
+
+    .stat-percentage {
+      font-size: 0.5rem;
     }
 
     .pattern-item {
