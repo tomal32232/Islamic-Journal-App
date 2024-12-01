@@ -10,6 +10,7 @@
   import { savePrayerStatus, getPrayerHistory, prayerHistoryStore, initializeMonthlyPrayers, updatePrayerStatuses } from '../stores/prayerHistoryStore';
   import { iconMap } from '../utils/icons';
   import { nearbyMosquesStore, mosqueLoadingStore, fetchNearbyMosques } from '../services/mosqueService';
+  import PrayerHistorySection from '../components/PrayerHistorySection.svelte';
 
   let timeInterval;
   let currentPrayer = null;
@@ -239,6 +240,8 @@
       {/each}
     </div>
   {/if}
+
+  <PrayerHistorySection />
 </div>
 
 <div class="mosque-section">
