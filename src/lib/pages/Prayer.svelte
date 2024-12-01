@@ -14,169 +14,53 @@
 
   let timeInterval;
   let currentPrayer = null;
-  let timeRemaining = '';
-  let dailyStats = {
-    onTime: 0,
-    late: 0,
-    pending: 0
-  };
+  let nextPrayer = null;
 
-  let countdownInterval;
-  let currentPrayerCountdown = '';
-
-  function updateDailyStats() {
-    const prayers = $prayerTimesStore;
-    dailyStats = prayers.reduce((stats, prayer) => {
-      if (prayer.status === 'ontime') stats.onTime++;
-      else if (prayer.status === 'late') stats.late++;
-      else stats.pending++;
-      return stats;
-    }, { onTime: 0, late: 0, pending: 0 });
-  }
-
-  function getTimeRemaining(prayerTime) {
-    const [time, period] = prayerTime.split(' ');
-    const [hours, minutes] = time.split(':');
+  function getNextPrayer(prayers) {
     const now = new Date();
-    const prayerDate = new Date();
-    
-    let hour = parseInt(hours);
-    if (period === 'PM' && hour !== 12) hour += 12;
-    if (period === 'AM' && hour === 12) hour = 0;
-    
-    prayerDate.setHours(hour, parseInt(minutes), 0);
-    
-    const diff = prayerDate - now;
-    if (diff < 0) return 'Time passed';
-    
-    const hrs = Math.floor(diff / (1000 * 60 * 60));
-    const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-    return `${hrs}h ${mins}m remaining`;
-  }
+    const currentTime = now.getHours() * 60 + now.getMinutes();
 
-  async function markPrayerStatus(index, status) {
-    const prayer = $prayerTimesStore[index];
-    await savePrayerStatus({
-      name: prayer.name,
-      time: prayer.time,
-      status
-    });
-    
-    $prayerTimesStore = $prayerTimesStore.map((p, i) => 
-      i === index ? { ...p, status } : p
-    );
-    
-    updateDailyStats();
-  }
-
-  function updatePrayerStatus() {
-    const now = new Date();
-    const prayers = $prayerTimesStore;
-    let foundCurrent = false;
-    
-    $prayerTimesStore = prayers.map(prayer => {
-      if (!foundCurrent && prayer.time) {
-        const prayerTime = convertPrayerTimeToDate(prayer.time);
-        if (prayerTime > now) {
-          foundCurrent = true;
-          return { ...prayer, isCurrent: true };
-        }
-      }
-      return { ...prayer, isCurrent: false };
-    });
-  }
-
-  function updateCountdown(prayer) {
-    if (!prayer?.time) return null;
-    
-    const [time, period] = prayer.time.split(' ');
-    const [hours, minutes] = time.split(':');
-    const now = new Date();
-    const prayerDate = new Date();
-    
-    let hour = parseInt(hours);
-    if (period === 'PM' && hour !== 12) hour += 12;
-    if (period === 'AM' && hour === 12) hour = 0;
-    
-    prayerDate.setHours(hour, parseInt(minutes), 0);
-    
-    const diff = prayerDate - now;
-    if (diff < 0) return null;
-    
-    const hrs = Math.floor(diff / (1000 * 60 * 60));
-    const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-    const secs = Math.floor((diff % (1000 * 60)) / 1000);
-    
-    return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  }
-
-  function isToday(prayerTime) {
-    const today = new Date().toLocaleDateString('en-CA');
-    const prayerDate = convertPrayerTimeToDate(prayerTime);
-    return prayerDate.toLocaleDateString('en-CA') === today;
-  }
-
-  function withinMarkingWindow(prayerTime) {
-    const prayerDate = convertPrayerTimeToDate(prayerTime);
-    const now = new Date();
-    const diff = now - prayerDate;
-    // Allow marking within 6 hours of prayer time
-    return diff < (6 * 60 * 60 * 1000);
-  }
-
-  function convertPrayerTimeToDate(prayerTime) {
-    const [time, period] = prayerTime.split(' ');
-    const [hours, minutes] = time.split(':');
-    const now = new Date();
-    const prayerDate = new Date(now);
-    
-    let hour = parseInt(hours);
-    if (period === 'PM' && hour !== 12) hour += 12;
-    if (period === 'AM' && hour === 12) hour = 0;
-    
-    prayerDate.setHours(hour, parseInt(minutes), 0, 0);
-    return prayerDate;
-  }
-
-  onMount(async () => {
-    try {
-      // Run these in parallel
-      const [coords] = await Promise.all([
-        getCurrentLocation(),
-        fetchPrayerTimes(),
-        getPrayerHistory()
-      ]);
-      
-      if (coords) {
-        fetchNearbyMosques(coords.latitude, coords.longitude);
-      }
-      
-      updatePrayerStatus();
-      updateDailyStats();
-      
-      // Set up intervals
-      timeInterval = setInterval(updatePrayerStatus, 60000);
-      countdownInterval = setInterval(() => {
-        const currentPrayer = $prayerTimesStore.find(p => p.isCurrent);
-        if (currentPrayer) {
-          currentPrayerCountdown = updateCountdown(currentPrayer);
-        }
-      }, 1000);
-
-      return () => {
-        clearInterval(timeInterval);
-        clearInterval(countdownInterval);
+    // Convert prayer times to minutes for comparison
+    const prayerMinutes = prayers.map(prayer => {
+      const [time, period] = prayer.time.split(' ');
+      const [hours, minutes] = time.split(':');
+      let hour = parseInt(hours);
+      if (period === 'PM' && hour !== 12) hour += 12;
+      if (period === 'AM' && hour === 12) hour = 0;
+      return {
+        ...prayer,
+        minutes: hour * 60 + parseInt(minutes)
       };
-    } catch (error) {
-      console.error('Error initializing prayer tab:', error);
+    });
+
+    // Find the next prayer
+    let next = prayerMinutes.find(prayer => prayer.minutes > currentTime);
+    
+    // If no next prayer today, get the first prayer (it will be tomorrow's)
+    if (!next) {
+      next = prayerMinutes[0];
     }
+
+    return next;
+  }
+
+  function updateNextPrayer() {
+    const prayers = $prayerTimesStore;
+    if (prayers.length > 0) {
+      nextPrayer = getNextPrayer(prayers);
+    }
+  }
+
+  onMount(() => {
+    timeInterval = setInterval(updateNextPrayer, 60000);
+    updateNextPrayer();
   });
 
   onDestroy(() => {
     if (timeInterval) clearInterval(timeInterval);
-    clearInterval(countdownInterval);
   });
 </script>
+
 <div class="prayer-container">
   <h2>Praying Times</h2>
   
@@ -186,14 +70,14 @@
     <div class="error">{$errorStore}</div>
   {:else}
     <div class="prayer-times-grid">
-      {#each $prayerTimesStore.filter(p => isToday(p.time)) as prayer}
-        <div class="prayer-time-card {prayer.isCurrent ? 'current' : ''}">
+      {#each $prayerTimesStore as prayer}
+        <div class="prayer-time-card {prayer.name === nextPrayer?.name ? 'current' : ''}">
           <div class="icon-wrapper">
             <svelte:component 
               this={iconMap[prayer.icon]} 
               size={24} 
               weight={prayer.weight}
-              color={prayer.isCurrent ? 'white' : '#216974'}
+              color={prayer.name === nextPrayer?.name ? '#E09453' : '#216974'}
             />
           </div>
           <span class="prayer-name">{prayer.name}</span>
@@ -244,8 +128,9 @@
   }
 
   .prayer-time-card.current {
-    background: #216974;
-    color: white;
+    border: 2px solid #E09453;
+    padding: calc(0.375rem - 1px);
+    background: rgba(224, 148, 83, 0.05);
   }
 
   .icon-wrapper {
@@ -258,7 +143,7 @@
   }
 
   .prayer-time-card.current .icon-wrapper {
-    background: rgba(255, 255, 255, 0.2);
+    background: rgba(224, 148, 83, 0.15);
   }
 
   .prayer-name {
@@ -273,9 +158,12 @@
     color: #216974;
   }
 
-  .prayer-time-card.current .prayer-name,
+  .prayer-time-card.current .prayer-name {
+    color: #E09453;
+  }
+
   .prayer-time-card.current .prayer-time {
-    color: white;
+    color: #E09453;
   }
 
   .loading, .error {
@@ -304,6 +192,10 @@
 
     .prayer-time-card {
       padding: 0.25rem;
+    }
+
+    .prayer-time-card.current {
+      padding: calc(0.25rem - 1px);
     }
 
     .icon-wrapper {
