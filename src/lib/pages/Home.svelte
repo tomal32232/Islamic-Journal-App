@@ -16,6 +16,8 @@
   import { weeklyStatsStore, getWeeklyStats } from '../stores/tasbihStore';
   import { quoteStore, getRandomQuote } from '../services/quoteService';
   import MoodSelector from '../components/MoodSelector.svelte';
+  import { moodHistoryStore, saveMood, getMoodHistory, getMoodForDate } from '../stores/moodStore';
+  import { get } from 'svelte/store';
   const dispatch = createEventDispatcher();
   
   let currentPage = 'home';
@@ -40,26 +42,19 @@
   // Get current week days
   function getCurrentWeek() {
     const today = new Date();
-    const sunday = new Date(today);
-    sunday.setDate(today.getDate() - today.getDay()); // Go back to last Sunday
-    
-    const week = [];
-    for (let i = 0; i < 7; i++) {
-      const current = new Date(sunday);
-      current.setDate(current.getDate() + i);
-      
-      week.push({
-        day: current.toLocaleDateString('en-US', { weekday: 'short' }).slice(0, 2),
-        date: current.getDate(),
-        isToday: current.getDate() === today.getDate() &&
-                 current.getMonth() === today.getMonth()
-      });
-    }
-    
-    return week;
+    return Array.from({ length: 7 }, (_, i) => {
+      const date = new Date(today);
+      date.setDate(date.getDate() - i);
+      return {
+        day: date.toLocaleDateString('en-US', { weekday: 'short' }),
+        date: date.getDate(),
+        fullDate: date.toLocaleDateString(),
+        isToday: i === 0
+      };
+    }).reverse();
   }
 
-  const weekDays = getCurrentWeek();
+  $: weekDays = getCurrentWeek();
 
   function capitalizeFirstLetter(string) {
     return string ? string.charAt(0).toUpperCase() + string.slice(1).toLowerCase() : '';
@@ -78,8 +73,51 @@
   let completedPrayersToday = 0;
   let todayTasbihCount = 0;
 
-  let showMoodSelector = true;
+  let showMoodSelector = false;
   let currentMood = null;
+  let weekMoods = {};
+
+  const moods = [
+    { 
+      icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M12 21C16.9706 21 21 16.9706 21 12C21 7.02944 16.9706 3 12 3C7.02944 3 3 7.02944 3 12C3 16.9706 7.02944 21 12 21Z"/>
+        <path d="M8 14C8 14 9.5 16 12 16C14.5 16 16 14 16 14"/>
+        <path d="M15 9H15.01"/>
+        <path d="M9 9H9.01"/>
+      </svg>`,
+      name: 'Grateful',
+      value: 'grateful'
+    },
+    {
+      icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z"/>
+        <path d="M8 12H16"/>
+        <path d="M12 8V16"/>
+      </svg>`,
+      name: 'Peaceful',
+      value: 'peaceful'
+    },
+    {
+      icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M12 21C16.9706 21 21 16.9706 21 12C21 7.02944 16.9706 3 12 3C7.02944 3 3 7.02944 3 12C3 16.9706 7.02944 21 12 21Z"/>
+        <path d="M8 16C8 16 9.5 14 12 14C14.5 14 16 16 16 16"/>
+        <path d="M12 7V11"/>
+        <path d="M12 12L12 12.01"/>
+      </svg>`,
+      name: 'Anxious',
+      value: 'anxious'
+    },
+    {
+      icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M12 21C16.9706 21 21 16.9706 21 12C21 7.02944 16.9706 3 12 3C7.02944 3 3 7.02944 3 12C3 16.9706 7.02944 21 12 21Z"/>
+        <path d="M16 16C16 16 14.5 14 12 14C9.5 14 8 16 8 16"/>
+        <path d="M15 9H15.01"/>
+        <path d="M9 9H9.01"/>
+      </svg>`,
+      name: 'Struggling',
+      value: 'struggling'
+    }
+  ];
 
   $: {
     const today = new Date().toISOString().split('T')[0];
@@ -180,11 +218,50 @@
   }
 
   async function handleMoodSelect(event) {
-    const mood = event.detail;
-    currentMood = mood;
-    showMoodSelector = false;
-    // Here you would save the mood to your database
-    // saveMoodToDatabase(mood);
+    const selectedMood = event.detail;
+    try {
+      await saveMood(selectedMood);
+      currentMood = selectedMood; // Use the complete mood object with icon
+      showMoodSelector = false;
+      await loadWeekMoods();
+    } catch (error) {
+      console.error('Error saving mood:', error);
+    }
+  }
+
+  async function loadWeekMoods() {
+    try {
+      await getMoodHistory(7);
+      const moods = get(moodHistoryStore);
+      weekMoods = moods.reduce((acc, mood) => {
+        acc[mood.date] = mood;
+        return acc;
+      }, {});
+
+      // Check if we have a mood for today
+      const today = new Date().toLocaleDateString();
+      const todayMood = weekMoods[today];
+      
+      if (todayMood) {
+        // If we have today's mood, set it and keep selector hidden
+        const matchingMood = moods.find(m => m.value === todayMood.mood);
+        if (matchingMood) {
+          currentMood = {
+            value: todayMood.mood,
+            name: todayMood.name,
+            icon: matchingMood.icon,
+            description: matchingMood.description
+          };
+          showMoodSelector = false;
+        }
+      } else {
+        // If no mood for today, show the selector
+        showMoodSelector = true;
+        currentMood = null;
+      }
+    } catch (error) {
+      console.error('Error loading moods:', error);
+    }
   }
 
   onMount(async () => {
@@ -193,6 +270,7 @@
       if (user) {
         await fetchPrayerTimes();
         await getPrayerHistory();
+        await loadWeekMoods(); // This will handle mood selector visibility
         updatePrayerStatus();
       }
     });
@@ -250,123 +328,136 @@
 <main class="home-container">
   <div class="content">
     {#if currentPage === 'home'}
-      <div class="quote-card">
-        <div class="greeting-section">
-          <div class="greeting-content">
-            <h1>{greeting}, {userName}!</h1>
-            {#if currentMood}
-              <span class="current-mood">{currentMood.emoji}</span>
-            {/if}
-          </div>
-          <div class="datetime">
-            <span class="time">{currentTime}</span>
-            <span class="date">{formattedDate}</span>
-            {#if $locationStore}
-              <span class="location">{$locationStore}</span>
-            {/if}
-          </div>
-        </div>
-        <div class="quote-section">
-          <blockquote>"{$quoteStore.text}"</blockquote>
-          <cite>{$quoteStore.source}</cite>
-        </div>
-      </div>
-
-      {#if showMoodSelector}
-        <MoodSelector on:select={handleMoodSelect} />
-      {/if}
-
-      <div class="calendar-strip">
-        {#each weekDays as { day, date, isToday }}
-          <div class="day-item {isToday ? 'active' : ''}">
-            <span class="day">{day}</span>
-            <span class="date-num">{date}</span>
-          </div>
-        {/each}
-      </div>
-
-      <div class="reading-stats">
-        <h3 class="section-title">Today's Activities</h3>
-        <div class="activities-row">
-          <div class="activity-card">
-            <div class="activity-icon prayer">
-              <svelte:component this={iconMap.Mosque} size={18} weight="fill" color="#216974" />
-            </div>
-            <div class="activity-info">
-              <span class="activity-value">{completedPrayersToday}/5</span>
-              <span class="activity-label">Prayer</span>
-            </div>
-          </div>
-
-          <div class="activity-card">
-            <div class="activity-icon quran">
-              <svelte:component this={iconMap.Book} size={18} weight="fill" color="#216974" />
-            </div>
-            <div class="activity-info">
-              <span class="activity-value">{formatReadingTime(todayReadingTime)}</span>
-              <span class="activity-label">Quran</span>
-            </div>
-          </div>
-
-          <div class="activity-card">
-            <div class="activity-icon tasbih">
-              <svelte:component this={iconMap.Timer} size={18} weight="fill" color="#216974" />
-            </div>
-            <div class="activity-info">
-              <span class="activity-value">{todayTasbihCount}</span>
-              <span class="activity-label">Tasbih</span>
-            </div>
-          </div>
-
-          <div class="activity-card">
-            <div class="activity-icon journal">
-              <svelte:component this={iconMap.Note} size={18} weight="fill" color="#216974" />
-            </div>
-            <div class="activity-info">
-              <span class="activity-value">1</span>
-              <span class="activity-label">Journal</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="upcoming-prayer">
-        <div class="prayer-card">
-          <h3 class="section-title">Next Prayer</h3>
-          {#if upcomingPrayer}
-            <div class="prayer-info">
-              <div class="prayer-header">
-                <div class="left-section">
-                  <div class="prayer-icon">
-                    <svelte:component 
-                      this={iconMap.Mosque} 
-                      size={18} 
-                      weight="fill" 
-                      color="#216974" 
-                    />
-                  </div>
-                  <div class="name-time">
-                    <span class="prayer-name">{upcomingPrayer.name}</span>
-                    <span class="prayer-time">{upcomingPrayer.time}</span>
-                  </div>
+      <div class="home-content">
+        <div class="quote-card">
+          <div class="greeting-section">
+            <div class="greeting-content">
+              <div class="greeting-text">
+                <div class="greeting-header">
+                  <h1>Good Morning, {userName}!</h1>
+                  {#if currentMood}
+                    <div class="mood-icon small" title={`${currentMood.name} (${currentMood.description})`}>
+                      {@html currentMood.icon}
+                    </div>
+                  {/if}
                 </div>
-                {#if upcomingCountdown}
-                  <span class="countdown">{upcomingCountdown}</span>
+              </div>
+              <div class="datetime">
+                <span class="time">{currentTime}</span>
+                <span class="date">{formattedDate}</span>
+                {#if $locationStore}
+                  <span class="location">{$locationStore}</span>
                 {/if}
               </div>
             </div>
-          {/if}
+            <div class="quote-section">
+              <blockquote>"{$quoteStore.text}"</blockquote>
+              <cite>{$quoteStore.source}</cite>
+            </div>
+          </div>
         </div>
-      </div>
 
-      <div class="weekly-streak">
-        <h3 class="section-title">Weekly Dhikr Streak</h3>
-        <WeeklyStreak />
-      </div>
+        {#if showMoodSelector}
+          <MoodSelector on:select={handleMoodSelect} />
+        {/if}
 
-      <div class="weekly-prayer-history">
-        <h3 class="section-title">Weekly Prayer History</h3>
-        <WeeklyPrayerHistory />
+        <div class="calendar-strip">
+          {#each weekDays as { day, date, fullDate, isToday }}
+            <div class="day-item {isToday ? 'active' : ''}">
+              <span class="day">{day}</span>
+              <span class="date-num">{date}</span>
+              {#if weekMoods[fullDate]}
+                <div class="mood-indicator" title={weekMoods[fullDate].name}>
+                  <div class="mood-dot {weekMoods[fullDate].mood}"></div>
+                </div>
+              {/if}
+            </div>
+          {/each}
+        </div>
+
+        <div class="reading-stats">
+          <h3 class="section-title">Today's Activities</h3>
+          <div class="activities-row">
+            <div class="activity-card">
+              <div class="activity-icon prayer">
+                <svelte:component this={iconMap.Mosque} size={18} weight="fill" color="#216974" />
+              </div>
+              <div class="activity-info">
+                <span class="activity-value">{completedPrayersToday}/5</span>
+                <span class="activity-label">Prayer</span>
+              </div>
+            </div>
+
+            <div class="activity-card">
+              <div class="activity-icon quran">
+                <svelte:component this={iconMap.Book} size={18} weight="fill" color="#216974" />
+              </div>
+              <div class="activity-info">
+                <span class="activity-value">{formatReadingTime(todayReadingTime)}</span>
+                <span class="activity-label">Quran</span>
+              </div>
+            </div>
+
+            <div class="activity-card">
+              <div class="activity-icon tasbih">
+                <svelte:component this={iconMap.Timer} size={18} weight="fill" color="#216974" />
+              </div>
+              <div class="activity-info">
+                <span class="activity-value">{todayTasbihCount}</span>
+                <span class="activity-label">Tasbih</span>
+              </div>
+            </div>
+
+            <div class="activity-card">
+              <div class="activity-icon journal">
+                <svelte:component this={iconMap.Note} size={18} weight="fill" color="#216974" />
+              </div>
+              <div class="activity-info">
+                <span class="activity-value">1</span>
+                <span class="activity-label">Journal</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="upcoming-prayer">
+          <div class="prayer-card">
+            <h3 class="section-title">Next Prayer</h3>
+            {#if upcomingPrayer}
+              <div class="prayer-info">
+                <div class="prayer-header">
+                  <div class="left-section">
+                    <div class="prayer-icon">
+                      <svelte:component 
+                        this={iconMap.Mosque} 
+                        size={18} 
+                        weight="fill" 
+                        color="#216974" 
+                      />
+                    </div>
+                    <div class="name-time">
+                      <span class="prayer-name">{upcomingPrayer.name}</span>
+                      <span class="prayer-time">{upcomingPrayer.time}</span>
+                    </div>
+                  </div>
+                  {#if upcomingCountdown}
+                    <span class="countdown">{upcomingCountdown}</span>
+                  {/if}
+                </div>
+              </div>
+            {/if}
+          </div>
+        </div>
+
+        <div class="weekly-streak">
+          <h3 class="section-title">Weekly Dhikr Streak</h3>
+          <WeeklyStreak />
+        </div>
+
+        <div class="weekly-prayer-history">
+          <h3 class="section-title">Weekly Prayer History</h3>
+          <WeeklyPrayerHistory />
+        </div>
       </div>
     {:else if currentPage === 'prayer'}
       <Prayer />
@@ -377,15 +468,15 @@
     {:else if currentPage === 'profile'}
       <Profile />
     {/if}
+    <BottomNav activeTab={currentPage} on:tabChange={handleTabChange} />
   </div>
-  <BottomNav activeTab={currentPage} on:tabChange={handleTabChange} />
 </main>
 
 <style>
   .home-container {
     padding: 0;
     padding-bottom: 60px;
-    background: #FFFFFF;
+    background: #F8FAFC;
     height: 100%;
     overflow-y: auto;
     overflow-x: hidden;
@@ -405,29 +496,29 @@
     margin-top: 20px;
   }
 
-  @media (min-width: 600px) {
-    .content {
-      max-width: 600px;
-      margin: 20px auto 0;
-      padding: 0 1rem;
-    }
+  .home-content {
+    max-width: 600px;
+    margin: 0 auto;
   }
 
   .quote-card {
     background: #216974;
     color: white;
-    padding: 0.5rem;
-    border-radius: 8px;
-    margin-bottom: 0.5rem;
+    padding: 1rem;
+    border-radius: 12px;
+    margin-bottom: 1rem;
   }
 
   .greeting-section {
     display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .greeting-content {
+    display: flex;
     justify-content: space-between;
-    align-items: center;
-    margin-bottom: 0.25rem;
-    padding-bottom: 0.25rem;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    align-items: flex-start;
   }
 
   .greeting-section h1 {
@@ -828,13 +919,77 @@
   }
 
   .current-mood {
-    font-size: 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    color: #4A5568;
+    margin-top: 0.25rem;
+  }
+
+  .mood-icon.small {
+    width: 1.25rem;
+    height: 1.25rem;
+    color: #4A5568;
+  }
+
+  .mood-description {
+    color: #718096;
+    font-size: 0.75rem;
   }
 
   h1 {
     margin: 0;
     font-size: 1.125rem;
     font-weight: 500;
+  }
+
+  .mood-indicator {
+    margin-top: 0.25rem;
+    display: flex;
+    justify-content: center;
+  }
+
+  .mood-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+  }
+
+  .mood-dot.grateful {
+    background-color: #4CAF50;
+  }
+
+  .mood-dot.peaceful {
+    background-color: #2196F3;
+  }
+
+  .mood-dot.anxious {
+    background-color: #FFC107;
+  }
+
+  .mood-dot.struggling {
+    background-color: #E91E63;
+  }
+
+  .greeting-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .mood-icon.small {
+    width: 1.5rem;
+    height: 1.5rem;
+    color: #4A5568;
+    cursor: help;
+  }
+
+  h1 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 500;
+    color: #2D3748;
   }
 </style>
 

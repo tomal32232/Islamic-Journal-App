@@ -51,7 +51,12 @@
   export let showSelector = true;
 
   function selectMood(mood) {
-    dispatch('select', mood);
+    dispatch('select', {
+      value: mood.value,
+      name: mood.name,
+      description: mood.description,
+      icon: mood.icon
+    });
     showSelector = false;
   }
 </script>
