@@ -11,10 +11,12 @@
   import { iconMap } from '../utils/icons';
   import { nearbyMosquesStore, mosqueLoadingStore, fetchNearbyMosques } from '../services/mosqueService';
   import PrayerHistorySection from '../components/PrayerHistorySection.svelte';
+  import QuranReading from '../components/QuranReading.svelte';
 
   let timeInterval;
   let currentPrayer = null;
   let nextPrayer = null;
+  let activeTab = 'prayer'; // 'prayer' or 'quran'
 
   function getNextPrayer(prayers) {
     const now = new Date();
@@ -62,32 +64,53 @@
 </script>
 
 <div class="prayer-container">
-  <h2>Praying Times</h2>
-  
-  {#if $loadingStore}
-    <div class="loading">Loading prayer times...</div>
-  {:else if $errorStore}
-    <div class="error">{$errorStore}</div>
-  {:else}
-    <div class="prayer-times-grid">
-      {#each $prayerTimesStore as prayer}
-        <div class="prayer-time-card {prayer.name === nextPrayer?.name ? 'current' : ''}">
-          <div class="icon-wrapper">
-            <svelte:component 
-              this={iconMap[prayer.icon]} 
-              size={24} 
-              weight={prayer.weight}
-              color={prayer.name === nextPrayer?.name ? '#E09453' : '#216974'}
-            />
-          </div>
-          <span class="prayer-name">{prayer.name}</span>
-          <span class="prayer-time">{prayer.time}</span>
-        </div>
-      {/each}
-    </div>
-  {/if}
+  <div class="tabs">
+    <button 
+      class="tab-button {activeTab === 'prayer' ? 'active' : ''}"
+      on:click={() => activeTab = 'prayer'}
+    >
+      Prayer Times
+    </button>
+    <button 
+      class="tab-button {activeTab === 'quran' ? 'active' : ''}"
+      on:click={() => activeTab = 'quran'}
+    >
+      Quran Reading
+    </button>
+  </div>
 
-  <PrayerHistorySection />
+  {#if activeTab === 'prayer'}
+    <div class="prayer-times-section">
+      <h2>Prayer Times</h2>
+      
+      {#if $loadingStore}
+        <div class="loading">Loading prayer times...</div>
+      {:else if $errorStore}
+        <div class="error">{$errorStore}</div>
+      {:else}
+        <div class="prayer-times-grid">
+          {#each $prayerTimesStore as prayer}
+            <div class="prayer-time-card {prayer.name === nextPrayer?.name ? 'current' : ''}">
+              <div class="icon-wrapper">
+                <svelte:component 
+                  this={iconMap[prayer.icon]} 
+                  size={24} 
+                  weight={prayer.weight}
+                  color={prayer.name === nextPrayer?.name ? '#E09453' : '#216974'}
+                />
+              </div>
+              <span class="prayer-name">{prayer.name}</span>
+              <span class="prayer-time">{prayer.time}</span>
+            </div>
+          {/each}
+        </div>
+      {/if}
+
+      <PrayerHistorySection />
+    </div>
+  {:else}
+    <QuranReading />
+  {/if}
 </div>
 
 <style>
@@ -95,6 +118,31 @@
     padding: 0.5rem;
     max-width: 1200px;
     margin: 0 auto;
+  }
+
+  .tabs {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 0.5rem;
+  }
+
+  .tab-button {
+    background: none;
+    border: none;
+    padding: 0.5rem 1rem;
+    color: #666;
+    font-size: 1rem;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+  }
+
+  .tab-button.active {
+    color: #216974;
+    border-bottom-color: #216974;
+    font-weight: 500;
   }
 
   h2 {
@@ -183,6 +231,15 @@
   @media (max-width: 640px) {
     .prayer-container {
       padding: 0.5rem;
+    }
+
+    .tabs {
+      margin-bottom: 1rem;
+    }
+
+    .tab-button {
+      font-size: 0.875rem;
+      padding: 0.375rem 0.75rem;
     }
 
     h2 {
