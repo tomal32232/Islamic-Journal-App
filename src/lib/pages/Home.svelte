@@ -309,19 +309,19 @@
         </div>
       </div>
 
-      <section class="upcoming-prayer">
+      <div class="upcoming-prayer">
         <div class="prayer-card">
-          <h2>Next Prayer</h2>
+          <h3 class="section-title">Next Prayer</h3>
           {#if upcomingPrayer}
             <div class="prayer-info">
               <div class="prayer-header">
                 <div class="left-section">
                   <div class="prayer-icon">
                     <svelte:component 
-                      this={iconMap[upcomingPrayer.icon]} 
-                      size={24} 
-                      weight={upcomingPrayer.weight}
-                      color="#216974"
+                      this={iconMap.Mosque} 
+                      size={18} 
+                      weight="fill" 
+                      color="#216974" 
                     />
                   </div>
                   <div class="name-time">
@@ -334,31 +334,15 @@
                 {/if}
               </div>
             </div>
-            {#if pendingPrayers.length > 0}
-              <div class="pending-notice">
-                You have {pendingPrayers.length} unmarked {pendingPrayers.length === 1 ? 'prayer' : 'prayers'}. 
-                <button class="link-button" on:click={() => dispatch('showNotifications')}>
-                  Mark them now
-                </button>
-              </div>
-            {/if}
-          {:else}
-            <div class="no-prayers-message">
-              <p>No more prayers scheduled for today</p>
-              {#if pendingPrayers.length > 0}
-                <p class="pending-notice">
-                  You have {pendingPrayers.length} unmarked {pendingPrayers.length === 1 ? 'prayer' : 'prayers'}. 
-                  <button class="link-button" on:click={() => dispatch('showNotifications')}>
-                    Mark them now
-                  </button>
-                </p>
-              {/if}
-            </div>
           {/if}
         </div>
-      </section>
+      </div>
 
-      <WeeklyStreak />
+      <div class="weekly-streak">
+        <h3 class="section-title">Weekly Dhikr Streak</h3>
+        <WeeklyStreak />
+      </div>
+
       <WeeklyPrayerHistory />
     {:else if currentPage === 'prayer'}
       <Prayer />
@@ -506,8 +490,15 @@
   .prayer-card {
     background: white;
     padding: 0.375rem 0.5rem;
-    border-radius: 8px;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    border-radius: 12px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    border: 1px solid transparent;
+    background-image: linear-gradient(white, white), 
+                     linear-gradient(to bottom, 
+                       rgba(0, 0, 0, 0.01) 0%,
+                       rgba(0, 0, 0, 0.1) 100%);
+    background-origin: border-box;
+    background-clip: padding-box, border-box;
   }
 
   .prayer-card h2 {
@@ -751,13 +742,21 @@
     display: flex;
     gap: 0.375rem;
     justify-content: space-between;
+    margin-bottom: 0.5rem;
   }
 
   .activity-card {
     background: white;
     padding: 0.375rem;
-    border-radius: 6px;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    border-radius: 12px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    border: 1px solid transparent;
+    background-image: linear-gradient(white, white), 
+                     linear-gradient(to bottom, 
+                       rgba(0, 0, 0, 0.01) 0%,
+                       rgba(0, 0, 0, 0.1) 100%);
+    background-origin: border-box;
+    background-clip: padding-box, border-box;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -792,6 +791,10 @@
   .activity-label {
     font-size: 0.625rem;
     color: #666;
+  }
+
+  .prayer-card .section-title {
+    margin-bottom: 0.5rem;
   }
 </style>
 
