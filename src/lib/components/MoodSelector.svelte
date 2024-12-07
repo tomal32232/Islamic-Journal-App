@@ -3,10 +3,10 @@
   const dispatch = createEventDispatcher();
 
   const moods = [
-    { emoji: '😊', name: 'Happy', value: 'happy' },
-    { emoji: '😌', name: 'Calm', value: 'calm' },
-    { emoji: '😔', name: 'Sad', value: 'sad' },
-    { emoji: '😫', name: 'Stressed', value: 'stressed' }
+    { emoji: '🤲', name: 'Grateful', value: 'grateful' },
+    { emoji: '☪️', name: 'Peaceful', value: 'peaceful' },
+    { emoji: '📿', name: 'Reflective', value: 'reflective' },
+    { emoji: '🕌', name: 'Seeking Guidance', value: 'seeking' }
   ];
 
   export let showSelector = true;
