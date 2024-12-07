@@ -12,6 +12,7 @@
   import { nearbyMosquesStore, mosqueLoadingStore, fetchNearbyMosques } from '../services/mosqueService';
   import PrayerHistorySection from '../components/PrayerHistorySection.svelte';
   import QuranReading from '../components/QuranReading.svelte';
+  import { Mosque, Book } from 'phosphor-svelte';
 
   let timeInterval;
   let currentPrayer = null;
@@ -69,13 +70,15 @@
       class="tab-button {activeTab === 'prayer' ? 'active' : ''}"
       on:click={() => activeTab = 'prayer'}
     >
-      Prayer Times
+      <Mosque weight={activeTab === 'prayer' ? 'fill' : 'regular'} size={20} />
+      <span>Prayers</span>
     </button>
     <button 
       class="tab-button {activeTab === 'quran' ? 'active' : ''}"
       on:click={() => activeTab = 'quran'}
     >
-      Quran Reading
+      <Book weight={activeTab === 'quran' ? 'fill' : 'regular'} size={20} />
+      <span>Quran</span>
     </button>
   </div>
 
@@ -126,22 +129,33 @@
     margin-bottom: 1.5rem;
     border-bottom: 1px solid #eee;
     padding-bottom: 0.5rem;
+    justify-content: center;
   }
 
   .tab-button {
     background: none;
     border: none;
-    padding: 0.5rem 1rem;
+    padding: 0.75rem 2rem;
     color: #666;
     font-size: 1rem;
     cursor: pointer;
-    border-bottom: 2px solid transparent;
+    border-radius: 8px;
     transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    border: 1px solid transparent;
+  }
+
+  .tab-button:hover {
+    background: rgba(33, 105, 116, 0.05);
+    border-color: #eee;
   }
 
   .tab-button.active {
     color: #216974;
-    border-bottom-color: #216974;
+    background: rgba(33, 105, 116, 0.1);
+    border-color: #216974;
     font-weight: 500;
   }
 
