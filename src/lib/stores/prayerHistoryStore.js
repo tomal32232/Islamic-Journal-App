@@ -172,7 +172,7 @@ export async function savePrayerStatus(prayerData) {
   }
 
   console.log('Saving prayer status:', prayerData);
-  const today = new Date().toISOString().split('T')[0];
+  const today = new Date().toLocaleDateString('en-CA');
   const prayerId = `${today}-${prayerData.name.toLowerCase()}`;
   console.log('Generated prayerId:', prayerId);
 
