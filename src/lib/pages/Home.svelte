@@ -14,6 +14,7 @@
   import Journal from './Journal.svelte';
   import { getTodayReadingTime, formatReadingTime } from '../services/readingTimeService';
   import { weeklyStatsStore, getWeeklyStats } from '../stores/tasbihStore';
+  import { quoteStore, getRandomQuote } from '../services/quoteService';
   const dispatch = createEventDispatcher();
   
   let currentPage = 'home';
@@ -184,13 +185,14 @@
       }
     });
     
+    await getRandomQuote();
+    await getWeeklyStats();
+    
     const prayerInterval = setInterval(updatePrayerStatus, 60000);
     const countdownInterval = setInterval(updateCountdown, 1000);
     const notificationInterval = setInterval(checkPrayerNotifications, 60000);
     
     todayReadingTime = await getTodayReadingTime();
-    
-    await getWeeklyStats();
     
     return () => {
       clearInterval(prayerInterval);
@@ -248,8 +250,8 @@
           </div>
         </div>
         <div class="quote-section">
-          <blockquote>"Indeed, with hardship comes ease."</blockquote>
-          <cite>Surah Ash-Sharh [94:5-6]</cite>
+          <blockquote>"{$quoteStore.text}"</blockquote>
+          <cite>{$quoteStore.source}</cite>
         </div>
       </div>
 
