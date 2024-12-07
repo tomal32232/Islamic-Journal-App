@@ -315,38 +315,50 @@
 
 <style>
   .home-container {
-    padding: 1rem;
-    padding-top: calc(1rem + 20px);
-    padding-bottom: 88px;
+    padding: 0;
+    padding-bottom: 60px;
     background: #FFFFFF;
     height: 100%;
     overflow-y: auto;
+    overflow-x: hidden;
     position: fixed;
     top: 0;
     left: 0;
     right: 0;
     bottom: 0;
+    width: 100%;
+    box-sizing: border-box;
   }
 
   .content {
-    max-width: 600px;
-    margin: 0 auto;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0 10px;
+    margin-top: 20px;
+  }
+
+  @media (min-width: 600px) {
+    .content {
+      max-width: 600px;
+      margin: 20px auto 0;
+      padding: 0 1rem;
+    }
   }
 
   .quote-card {
     background: #216974;
     color: white;
-    padding: 1rem;
-    border-radius: 12px;
-    margin-bottom: 1rem;
+    padding: 0.5rem;
+    border-radius: 8px;
+    margin-bottom: 0.5rem;
   }
 
   .greeting-section {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 0.75rem;
-    padding-bottom: 0.75rem;
+    margin-bottom: 0.25rem;
+    padding-bottom: 0.25rem;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   }
 
@@ -391,16 +403,16 @@
   .calendar-strip {
     display: flex;
     justify-content: space-between;
-    margin: 0 -0.5rem 1.5rem;
-    padding: 0 1rem;
+    margin: 0;
+    padding: 0.25rem 0;
   }
 
   .day-item {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.25rem;
-    padding: 0.5rem;
+    gap: 0.125rem;
+    padding: 0.25rem;
     min-width: 2rem;
   }
 
@@ -428,36 +440,36 @@
   }
 
   .upcoming-prayer {
-    margin-bottom: 1rem;
+    margin-bottom: 0.5rem;
   }
 
   .prayer-card {
     background: white;
-    padding: 1rem;
+    padding: 0.5rem;
     border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
   }
 
   .prayer-card h2 {
     font-size: 1rem;
     color: #216974;
-    margin-bottom: 1rem;
+    margin-bottom: 0.5rem;
   }
 
   .prayer-header {
     display: flex;
     align-items: center;
-    gap: 1rem;
+    gap: 0.5rem;
   }
 
   .prayer-icon {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 40px;
-    height: 40px;
+    width: 32px;
+    height: 32px;
     background: rgba(33, 105, 116, 0.1);
-    border-radius: 8px;
+    border-radius: 6px;
   }
 
   .prayer-details {
@@ -491,8 +503,8 @@
   }
 
   .pending-notice {
-    margin-top: 0.75rem;
-    padding-top: 0.75rem;
+    margin-top: 0.375rem;
+    padding-top: 0.375rem;
     border-top: 1px solid #eee;
     font-size: 0.875rem;
     color: #666;
@@ -642,21 +654,19 @@
   }
 
   .reading-stats {
-    margin-top: 2rem;
+    margin-top: 0.5rem;
   }
 
   .stats-card {
     background: white;
-    padding: 1.5rem;
-    border-radius: 12px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    padding: 0.5rem;
+    border-radius: 8px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
   }
 
   .stats-card h3 {
-    color: #216974;
-    margin: 0 0 0.5rem 0;
-    font-size: 1.125rem;
-    font-weight: 500;
+    margin: 0 0 0.25rem 0;
+    font-size: 1rem;
   }
 
   .reading-time {
