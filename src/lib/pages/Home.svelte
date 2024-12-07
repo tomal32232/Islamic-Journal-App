@@ -255,23 +255,23 @@
           {#if upcomingPrayer}
             <div class="prayer-info">
               <div class="prayer-header">
-                <div class="prayer-icon">
-                  <svelte:component 
-                    this={iconMap[upcomingPrayer.icon]} 
-                    size={24} 
-                    weight={upcomingPrayer.weight}
-                    color="#216974"
-                  />
-                </div>
-                <div class="prayer-details">
+                <div class="left-section">
+                  <div class="prayer-icon">
+                    <svelte:component 
+                      this={iconMap[upcomingPrayer.icon]} 
+                      size={24} 
+                      weight={upcomingPrayer.weight}
+                      color="#216974"
+                    />
+                  </div>
                   <div class="name-time">
                     <span class="prayer-name">{upcomingPrayer.name}</span>
                     <span class="prayer-time">{upcomingPrayer.time}</span>
                   </div>
-                  {#if upcomingCountdown}
-                    <span class="countdown">{upcomingCountdown}</span>
-                  {/if}
                 </div>
+                {#if upcomingCountdown}
+                  <span class="countdown">{upcomingCountdown}</span>
+                {/if}
               </div>
             </div>
             {#if pendingPrayers.length > 0}
@@ -445,18 +445,26 @@
 
   .prayer-card {
     background: white;
-    padding: 0.5rem;
+    padding: 0.375rem 0.5rem;
     border-radius: 8px;
     box-shadow: 0 1px 2px rgba(0,0,0,0.1);
   }
 
   .prayer-card h2 {
-    font-size: 1rem;
+    font-size: 0.875rem;
     color: #216974;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.375rem;
+    font-weight: 500;
   }
 
   .prayer-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+  }
+
+  .left-section {
     display: flex;
     align-items: center;
     gap: 0.5rem;
@@ -466,47 +474,43 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
+    width: 28px;
+    height: 28px;
     background: rgba(33, 105, 116, 0.1);
     border-radius: 6px;
-  }
-
-  .prayer-details {
-    flex: 1;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+    flex-shrink: 0;
   }
 
   .name-time {
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
+    gap: 0rem;
   }
 
   .prayer-name {
     font-weight: 500;
     color: #216974;
-    font-size: 1rem;
+    font-size: 0.875rem;
+    line-height: 1.2;
   }
 
   .prayer-time {
-    font-size: 0.875rem;
+    font-size: 0.75rem;
     color: #666;
+    line-height: 1.2;
   }
 
   .countdown {
-    font-size: 1.125rem;
+    font-size: 0.875rem;
     font-weight: 500;
     color: #E09453;
   }
 
   .pending-notice {
-    margin-top: 0.375rem;
-    padding-top: 0.375rem;
+    margin-top: 0.25rem;
+    padding-top: 0.25rem;
     border-top: 1px solid #eee;
-    font-size: 0.875rem;
+    font-size: 0.75rem;
     color: #666;
   }
 
