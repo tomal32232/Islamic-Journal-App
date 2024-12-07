@@ -203,41 +203,50 @@
 
 <style>
   .tasbih-container {
-    padding: 1rem;
-    padding-bottom: 88px;
-    max-width: 600px;
-    margin: 0 auto;
+    padding: 0 10px;
+    padding-bottom: 60px;
+    width: 100%;
+    box-sizing: border-box;
+    margin-top: 20px;
+  }
+
+  @media (min-width: 600px) {
+    .tasbih-container {
+      max-width: 600px;
+      margin: 20px auto 0;
+      padding: 0 1rem;
+    }
   }
 
   .setup-card {
     background: white;
-    padding: 1.5rem;
-    border-radius: 12px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    padding: 0.75rem;
+    border-radius: 8px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
   }
 
   h2 {
-    font-size: 1.25rem;
+    font-size: 1.125rem;
     color: #216974;
-    margin-bottom: 1rem;
+    margin-bottom: 0.75rem;
     font-weight: 500;
   }
 
   h3 {
-    font-size: 1.25rem;
+    font-size: 1rem;
     color: #216974;
-    margin-bottom: 1rem;
+    margin-bottom: 0.75rem;
     font-weight: 500;
   }
 
   .dhikr-selector, .target-selector {
-    margin-bottom: 1.5rem;
+    margin-bottom: 0.75rem;
   }
 
   .dhikr-options {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 0.75rem;
+    gap: 0.5rem;
   }
 
   .dhikr-button {
