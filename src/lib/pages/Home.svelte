@@ -219,9 +219,19 @@
 
   async function handleMoodSelect(event) {
     const selectedMood = event.detail;
+    console.log('Selected mood:', selectedMood);
     try {
       await saveMood(selectedMood);
-      currentMood = selectedMood; // Use the complete mood object with icon
+      // Use the local mood template to ensure we have the icon
+      const matchingMood = moods.find(m => m.value === selectedMood.value);
+      if (matchingMood) {
+        currentMood = {
+          value: selectedMood.value,
+          name: matchingMood.name,
+          icon: matchingMood.icon,
+          description: matchingMood.description
+        };
+      }
       showMoodSelector = false;
       await loadWeekMoods();
     } catch (error) {
@@ -232,8 +242,9 @@
   async function loadWeekMoods() {
     try {
       await getMoodHistory(7);
-      const moods = get(moodHistoryStore);
-      weekMoods = moods.reduce((acc, mood) => {
+      const moodsFromDb = get(moodHistoryStore);
+      console.log('Loaded moods from database:', moodsFromDb);
+      weekMoods = moodsFromDb.reduce((acc, mood) => {
         acc[mood.date] = mood;
         return acc;
       }, {});
@@ -241,17 +252,20 @@
       // Check if we have a mood for today
       const today = new Date().toLocaleDateString();
       const todayMood = weekMoods[today];
+      console.log('Today\'s mood from database:', todayMood);
       
       if (todayMood) {
-        // If we have today's mood, set it and keep selector hidden
+        // Find the matching mood from our local moods array to get the icon
         const matchingMood = moods.find(m => m.value === todayMood.mood);
+        console.log('Local mood template:', matchingMood);
         if (matchingMood) {
           currentMood = {
             value: todayMood.mood,
-            name: todayMood.name,
+            name: matchingMood.name,
             icon: matchingMood.icon,
             description: matchingMood.description
           };
+          console.log('Set current mood to:', currentMood);
           showMoodSelector = false;
         }
       } else {
@@ -268,6 +282,7 @@
     auth.onAuthStateChanged(async (user) => {
       userName = capitalizeFirstLetter(user?.displayName?.split(' ')[0]) || 'Guest';
       if (user) {
+        console.log('User authenticated:', user.uid);
         await fetchPrayerTimes();
         await getPrayerHistory();
         await loadWeekMoods(); // This will handle mood selector visibility
@@ -333,14 +348,12 @@
           <div class="greeting-section">
             <div class="greeting-content">
               <div class="greeting-text">
-                <div class="greeting-header">
-                  <h1>Good Morning, {userName}!</h1>
-                  {#if currentMood}
-                    <div class="mood-icon small" title={`${currentMood.name} (${currentMood.description})`}>
-                      {@html currentMood.icon}
-                    </div>
-                  {/if}
-                </div>
+                <h1>Good Morning, {userName}!</h1>
+                {#if currentMood}
+                  <div class="mood-icon small">
+                    {@html currentMood.icon}
+                  </div>
+                {/if}
               </div>
               <div class="datetime">
                 <span class="time">{currentTime}</span>
@@ -990,6 +1003,25 @@
     font-size: 1.25rem;
     font-weight: 500;
     color: #2D3748;
+  }
+
+  .greeting-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .greeting-text h1 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 500;
+    color: white;
+  }
+
+  .mood-icon.small {
+    width: 1.25rem;
+    height: 1.25rem;
+    color: white;
   }
 </style>
 

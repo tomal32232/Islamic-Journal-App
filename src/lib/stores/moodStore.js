@@ -13,12 +13,13 @@ export async function saveMood(mood) {
     const moodData = {
       userId: user.uid,
       mood: mood.value,
-      name: mood.name,
       timestamp: new Date().toISOString(),
       date: new Date().toLocaleDateString()
     };
 
+    console.log('Saving mood data:', moodData);
     const docRef = await addDoc(collection(db, 'moods'), moodData);
+    console.log('Mood saved with ID:', docRef.id);
     await getMoodHistory();
     return docRef;
   } catch (error) {
@@ -49,6 +50,7 @@ export async function getMoodHistory(days = 30) {
       ...doc.data()
     }));
 
+    console.log('Retrieved moods from database:', moods);
     moodHistoryStore.set(moods);
     return moods;
   } catch (error) {
