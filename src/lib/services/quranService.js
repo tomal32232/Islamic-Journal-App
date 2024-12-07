@@ -9,7 +9,8 @@ export const quranStore = writable({
   error: null,
   audioPlaying: false,
   currentAudio: null,
-  currentReciter: 'ar.alafasy' // Default reciter (Mishary Rashid Alafasy)
+  currentReciter: 'ar.alafasy', // Default reciter (Mishary Rashid Alafasy)
+  autoPlay: true // Add autoPlay flag
 });
 
 const BASE_URL = 'https://api.alquran.cloud/v1';
@@ -98,6 +99,7 @@ export async function fetchSurahDetails(surahNumber) {
 
 // Audio control functions
 export function playAudio(audioUrl, verseNumber) {
+  const state = get(quranStore);
   quranStore.update(s => {
     // Stop current audio if playing
     if (s.currentAudio) {
@@ -108,11 +110,30 @@ export function playAudio(audioUrl, verseNumber) {
     const audio = new Audio(audioUrl);
     
     audio.onended = () => {
-      quranStore.update(state => ({
-        ...state,
-        audioPlaying: false,
-        currentVerse: null
-      }));
+      const currentState = get(quranStore);
+      if (currentState.autoPlay && currentState.currentSurahDetails) {
+        // Find the next verse
+        const currentVerseIndex = currentState.currentSurahDetails.verses.findIndex(v => v.number === verseNumber);
+        const nextVerse = currentState.currentSurahDetails.verses[currentVerseIndex + 1];
+        
+        if (nextVerse) {
+          // Play next verse
+          playAudio(nextVerse.audio, nextVerse.number);
+        } else {
+          // Reset if it was the last verse
+          quranStore.update(state => ({
+            ...state,
+            audioPlaying: false,
+            currentVerse: null
+          }));
+        }
+      } else {
+        quranStore.update(state => ({
+          ...state,
+          audioPlaying: false,
+          currentVerse: null
+        }));
+      }
     };
 
     audio.onerror = (e) => {
@@ -242,4 +263,12 @@ export function removeBookmark(surahNumber, verseNumber) {
 // Load bookmarks
 export function loadBookmarks() {
   return JSON.parse(localStorage.getItem('quranBookmarks') || '[]');
+}
+
+// Toggle auto-play feature
+export function toggleAutoPlay() {
+  quranStore.update(s => ({
+    ...s,
+    autoPlay: !s.autoPlay
+  }));
 } 
