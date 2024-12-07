@@ -104,7 +104,6 @@
 </script>
 
 <div class="prayer-history">
-  <h3>Weekly Prayer History</h3>
   <div class="history-grid">
     <div class="header-row">
       <div class="prayer-label"></div>

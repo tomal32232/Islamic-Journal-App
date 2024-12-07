@@ -343,7 +343,10 @@
         <WeeklyStreak />
       </div>
 
-      <WeeklyPrayerHistory />
+      <div class="weekly-prayer-history">
+        <h3 class="section-title">Weekly Prayer History</h3>
+        <WeeklyPrayerHistory />
+      </div>
     {:else if currentPage === 'prayer'}
       <Prayer />
     {:else if currentPage === 'tasbih'}
