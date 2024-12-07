@@ -90,10 +90,9 @@
 </script>
 
 <div class="quran-container">
-  <div class="top-section">
-    <div class="quran-header">
-      <h2>Quran Reading</h2>
-      <div class="controls-section">
+  <div class="header-section">
+    <div class="controls-section">
+      <div class="select-wrapper">
         <select 
           class="surah-select" 
           value={selectedSurah} 
@@ -107,8 +106,10 @@
             </option>
           {/each}
         </select>
+      </div>
 
-        <div class="reciter-controls">
+      <div class="reciter-controls">
+        <div class="select-wrapper">
           <select 
             class="reciter-select" 
             value={selectedReciter} 
@@ -119,14 +120,14 @@
               <option value={reciter.id}>{reciter.name}</option>
             {/each}
           </select>
-          <button 
-            class="auto-play-toggle {autoPlay ? 'active' : ''}"
-            on:click={handleAutoPlayToggle}
-            title="Auto-play next verse"
-          >
-            <Repeat size={20} />
-          </button>
         </div>
+        <button 
+          class="auto-play-toggle {autoPlay ? 'active' : ''}"
+          on:click={handleAutoPlayToggle}
+          title="Auto-play next verse"
+        >
+          <Repeat size={20} />
+        </button>
       </div>
     </div>
   </div>
@@ -138,7 +139,7 @@
       <div class="error">{error}</div>
     {:else if currentSurahDetails}
       <div class="surah-content">
-        <div class="surah-header">
+        <div class="sticky-header">
           <h3>{currentSurahDetails.englishName} ({currentSurahDetails.name})</h3>
           {#if currentVerse}
             <div class="current-verse-indicator">
@@ -227,63 +228,98 @@
 
 <style>
   .quran-container {
-    padding: 0.5rem;
+    padding: 1rem;
     max-width: 800px;
     margin: 0 auto;
   }
 
-  .top-section {
-    position: sticky;
-    top: 0;
-    z-index: 10;
+  .header-section {
     background: #fff;
-    padding: 0.5rem;
-    border-bottom: 1px solid #eee;
+    padding: 1rem;
+    border-radius: 12px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     margin-bottom: 1rem;
   }
 
-  .quran-header {
+  .controls-section {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: 0.75rem;
   }
 
-  h2 {
-    font-size: 1.25rem;
-    color: #216974;
-    margin: 0;
-    font-weight: 500;
+  .sticky-header {
+    position: sticky;
+    top: 48px; /* Height of the tabs + padding */
+    z-index: 10;
+    background: white;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #eee;
+    margin: -1rem -1rem 1rem -1rem;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    background: rgba(255, 255, 255, 0.95);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
   }
 
-  .controls-section {
-    display: grid;
-    grid-template-columns: 1.5fr 1fr;
-    gap: 0.5rem;
-    align-items: start;
+  .select-wrapper {
+    position: relative;
+    flex: 1;
+  }
+
+  .select-wrapper::after {
+    content: '';
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 0;
+    height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 5px solid #216974;
+    pointer-events: none;
   }
 
   .reciter-controls {
     display: flex;
-    gap: 0.5rem;
+    gap: 0.75rem;
   }
 
   .surah-select,
   .reciter-select {
-    padding: 0.5rem;
-    border: 1px solid #eee;
-    border-radius: 6px;
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
     font-size: 0.875rem;
     color: #216974;
     background: white;
-    height: 36px;
+    appearance: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .surah-select:hover,
+  .reciter-select:hover {
+    border-color: #216974;
+  }
+
+  .surah-select:focus,
+  .reciter-select:focus {
+    outline: none;
+    border-color: #216974;
+    box-shadow: 0 0 0 2px rgba(33, 105, 116, 0.1);
   }
 
   .auto-play-toggle {
-    background: none;
-    border: 1px solid #eee;
-    border-radius: 6px;
-    width: 36px;
-    height: 36px;
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    width: 42px;
+    height: 42px;
     padding: 0;
     color: #666;
     cursor: pointer;
@@ -305,6 +341,50 @@
     color: white;
   }
 
+  h3 {
+    font-size: 1.125rem;
+    color: #216974;
+    margin: 0;
+    font-weight: 500;
+  }
+
+  @media (min-width: 640px) {
+    .controls-section {
+      flex-direction: row;
+      align-items: center;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .quran-container {
+      padding: 0.5rem;
+    }
+
+    .header-section {
+      padding: 0.75rem;
+    }
+
+    .surah-select,
+    .reciter-select {
+      padding: 0.625rem 0.875rem;
+      font-size: 0.8125rem;
+    }
+
+    .auto-play-toggle {
+      width: 38px;
+      height: 38px;
+    }
+
+    .sticky-header {
+      padding: 0.5rem 0.75rem;
+      top: 44px; /* Adjusted for smaller tabs on mobile */
+    }
+
+    h3 {
+      font-size: 1rem;
+    }
+  }
+
   .reading-section {
     display: flex;
     flex-direction: column;
@@ -316,27 +396,6 @@
     padding: 1rem;
     border-radius: 12px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-  }
-
-  .surah-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1rem;
-    padding-bottom: 0.5rem;
-    border-bottom: 1px solid #eee;
-  }
-
-  h3 {
-    font-size: 1rem;
-    color: #216974;
-    margin: 0;
-    font-weight: 500;
-  }
-
-  .current-verse-indicator {
-    font-size: 0.875rem;
-    color: #E09453;
   }
 
   .verses-container {
@@ -494,41 +553,5 @@
     background: #f8f8f8;
     border-radius: 6px;
     font-size: 0.875rem;
-  }
-
-  @media (max-width: 640px) {
-    .quran-container {
-      padding: 0.25rem;
-    }
-
-    .top-section {
-      padding: 0.25rem;
-    }
-
-    .controls-section {
-      grid-template-columns: 1fr;
-      gap: 0.25rem;
-    }
-
-    .reciter-controls {
-      flex-direction: row;
-    }
-
-    .surah-select,
-    .reciter-select {
-      font-size: 0.8125rem;
-    }
-
-    .verses-container {
-      max-height: calc(100vh - 200px);
-    }
-
-    .verse-text.arabic {
-      font-size: 1.125rem;
-    }
-
-    .verse-text.translation {
-      font-size: 0.8125rem;
-    }
   }
 </style> 
