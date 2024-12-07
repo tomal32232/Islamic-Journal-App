@@ -13,6 +13,7 @@
   import { createEventDispatcher } from 'svelte';
   import Journal from './Journal.svelte';
   import { getTodayReadingTime, formatReadingTime } from '../services/readingTimeService';
+  import { weeklyStatsStore, getWeeklyStats } from '../stores/tasbihStore';
   const dispatch = createEventDispatcher();
   
   let currentPage = 'home';
@@ -71,6 +72,23 @@
   let countdownEnded = false;
 
   let todayReadingTime = 0;
+
+  let completedPrayersToday = 0;
+  let todayTasbihCount = 0;
+
+  $: {
+    const today = new Date().toISOString().split('T')[0];
+    if ($prayerHistoryStore?.history) {
+      const todayPrayers = $prayerHistoryStore.history.filter(p => 
+        p.date === today && (p.status === 'ontime' || p.status === 'late')
+      );
+      completedPrayersToday = todayPrayers.length;
+    }
+
+    if ($weeklyStatsStore?.dailyCount?.[today]) {
+      todayTasbihCount = $weeklyStatsStore.dailyCount[today];
+    }
+  }
 
   async function updateCountdown() {
     if (!upcomingPrayer) return;
@@ -172,6 +190,8 @@
     
     todayReadingTime = await getTodayReadingTime();
     
+    await getWeeklyStats();
+    
     return () => {
       clearInterval(prayerInterval);
       clearInterval(countdownInterval);
@@ -250,7 +270,7 @@
               <svelte:component this={iconMap.Mosque} size={18} weight="fill" color="#216974" />
             </div>
             <div class="activity-info">
-              <span class="activity-value">3/5</span>
+              <span class="activity-value">{completedPrayersToday}/5</span>
               <span class="activity-label">Prayer</span>
             </div>
           </div>
@@ -270,7 +290,7 @@
               <svelte:component this={iconMap.Timer} size={18} weight="fill" color="#216974" />
             </div>
             <div class="activity-info">
-              <span class="activity-value">108</span>
+              <span class="activity-value">{todayTasbihCount}</span>
               <span class="activity-label">Tasbih</span>
             </div>
           </div>
