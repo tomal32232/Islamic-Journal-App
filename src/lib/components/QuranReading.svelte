@@ -21,6 +21,24 @@
 
   function handleVerseClick(verseNumber) {
     saveReadingProgress(selectedSurah, verseNumber);
+    
+    setTimeout(() => {
+      const verseElement = document.getElementById(`verse-${verseNumber}`);
+      if (verseElement) {
+        const containerHeight = versesContainer.offsetHeight;
+        const verseTop = verseElement.offsetTop;
+        const verseHeight = verseElement.offsetHeight;
+        
+        // Use the same offset for consistency
+        const offset = 80;
+        const scrollPosition = verseTop - (containerHeight / 2) + (verseHeight / 2) + offset;
+        
+        versesContainer.scrollTo({
+          top: scrollPosition,
+          behavior: 'smooth'
+        });
+      }
+    }, 100);
   }
 
   function toggleBookmark(verseNumber) {
@@ -74,17 +92,20 @@
   $: if (currentVerse && versesContainer) {
     const verseElement = document.getElementById(`verse-${currentVerse}`);
     if (verseElement) {
-      const containerHeight = versesContainer.offsetHeight;
-      const verseTop = verseElement.offsetTop;
-      const verseHeight = verseElement.offsetHeight;
-      
-      // Calculate scroll position to center the verse
-      const scrollPosition = verseTop - (containerHeight / 2) + (verseHeight / 2);
-      
-      versesContainer.scrollTo({
-        top: scrollPosition,
-        behavior: 'smooth'
-      });
+      setTimeout(() => {
+        const containerHeight = versesContainer.offsetHeight;
+        const verseTop = verseElement.offsetTop;
+        const verseHeight = verseElement.offsetHeight;
+        
+        // Adjust the offset to move the verse down
+        const offset = 40; // Increase this value to move down, decrease to move up
+        const scrollPosition = verseTop - (containerHeight / 2) + (verseHeight / 2) + offset;
+        
+        versesContainer.scrollTo({
+          top: scrollPosition,
+          behavior: 'smooth'
+        });
+      }, 100);
     }
   }
 </script>
@@ -402,9 +423,11 @@
     display: flex;
     flex-direction: column;
     gap: 1rem;
-    max-height: calc(100vh - 180px);
+    height: calc(100vh - 280px);
     overflow-y: auto;
-    padding: 0.5rem;
+    padding: 1rem;
+    padding-top: calc(50vh - 140px);
+    padding-bottom: calc(50vh - 140px);
     scroll-behavior: smooth;
   }
 
