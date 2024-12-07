@@ -1,13 +1,14 @@
 <script>
   import { onMount } from 'svelte';
-  import { quranStore, fetchSurahList, fetchSurahDetails, saveReadingProgress, loadReadingProgress, saveBookmark, removeBookmark, loadBookmarks } from '../services/quranService';
-  import { BookmarkSimple } from 'phosphor-svelte';
+  import { quranStore, fetchSurahList, fetchSurahDetails, saveReadingProgress, loadReadingProgress, saveBookmark, removeBookmark, loadBookmarks, playAudio, pauseAudio, setReciter, RECITERS } from '../services/quranService';
+  import { BookmarkSimple, Play, Pause, SpeakerHigh } from 'phosphor-svelte';
   
   let selectedSurah = null;
   let bookmarkedVerses = [];
+  let selectedReciter = RECITERS[0].id;
   
   // Subscribe to quranStore
-  $: ({ currentSurah, currentVerse, surahList, currentSurahDetails, loading, error } = $quranStore);
+  $: ({ currentSurah, currentVerse, surahList, currentSurahDetails, loading, error, audioPlaying } = $quranStore);
 
   async function handleSurahSelect(event) {
     const surahNumber = parseInt(event.target.value);
@@ -36,6 +37,19 @@
     return bookmarkedVerses.some(b => b.surah === selectedSurah && b.verse === verseNumber);
   }
 
+  function handleReciterChange(event) {
+    selectedReciter = event.target.value;
+    setReciter(selectedReciter);
+  }
+
+  function toggleAudio(audioUrl, verseNumber) {
+    if (audioPlaying && currentVerse === verseNumber) {
+      pauseAudio();
+    } else {
+      playAudio(audioUrl, verseNumber);
+    }
+  }
+
   onMount(async () => {
     // Load surah list
     await fetchSurahList();
@@ -55,25 +69,41 @@
 <div class="quran-container">
   <div class="quran-header">
     <h2>Quran Reading</h2>
-    <p class="subtitle">Read, reflect, and track your progress</p>
+    <p class="subtitle">Read, reflect, and listen to the Holy Quran</p>
   </div>
 
   <div class="reading-section">
-    <div class="surah-selector">
-      <h3>Select Surah</h3>
-      <select 
-        class="surah-select" 
-        value={selectedSurah} 
-        on:change={handleSurahSelect}
-        disabled={loading}
-      >
-        <option value="">Select a Surah</option>
-        {#each surahList as surah}
-          <option value={surah.number}>
-            {surah.number}. {surah.englishName} ({surah.name})
-          </option>
-        {/each}
-      </select>
+    <div class="controls-section">
+      <div class="surah-selector">
+        <h3>Select Surah</h3>
+        <select 
+          class="surah-select" 
+          value={selectedSurah} 
+          on:change={handleSurahSelect}
+          disabled={loading}
+        >
+          <option value="">Select a Surah</option>
+          {#each surahList as surah}
+            <option value={surah.number}>
+              {surah.number}. {surah.englishName} ({surah.name})
+            </option>
+          {/each}
+        </select>
+      </div>
+
+      <div class="reciter-selector">
+        <h3>Select Reciter</h3>
+        <select 
+          class="reciter-select" 
+          value={selectedReciter} 
+          on:change={handleReciterChange}
+          disabled={loading}
+        >
+          {#each RECITERS as reciter}
+            <option value={reciter.id}>{reciter.name}</option>
+          {/each}
+        </select>
+      </div>
     </div>
 
     {#if loading}
@@ -99,15 +129,27 @@
             >
               <div class="verse-header">
                 <span class="verse-number">Verse {verse.number}</span>
-                <button 
-                  class="bookmark-button {isVerseBookmarked(verse.number) ? 'active' : ''}"
-                  on:click|stopPropagation={() => toggleBookmark(verse.number)}
-                >
-                  <BookmarkSimple 
-                    size={20} 
-                    weight={isVerseBookmarked(verse.number) ? "fill" : "regular"}
-                  />
-                </button>
+                <div class="verse-actions">
+                  <button 
+                    class="audio-button"
+                    on:click|stopPropagation={() => toggleAudio(verse.audio, verse.number)}
+                  >
+                    {#if audioPlaying && verse.number === currentVerse}
+                      <Pause size={20} />
+                    {:else}
+                      <Play size={20} />
+                    {/if}
+                  </button>
+                  <button 
+                    class="bookmark-button {isVerseBookmarked(verse.number) ? 'active' : ''}"
+                    on:click|stopPropagation={() => toggleBookmark(verse.number)}
+                  >
+                    <BookmarkSimple 
+                      size={20} 
+                      weight={isVerseBookmarked(verse.number) ? "fill" : "regular"}
+                    />
+                  </button>
+                </div>
               </div>
               <div class="verse-text arabic">{verse.arabic}</div>
               <div class="verse-text translation">{verse.translation}</div>
@@ -186,6 +228,12 @@
     gap: 2rem;
   }
 
+  .controls-section {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+
   h3 {
     font-size: 1.125rem;
     color: #216974;
@@ -193,14 +241,16 @@
     font-weight: 500;
   }
 
-  .surah-selector {
+  .surah-selector,
+  .reciter-selector {
     background: white;
     padding: 1.5rem;
     border-radius: 12px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
   }
 
-  .surah-select {
+  .surah-select,
+  .reciter-select {
     width: 100%;
     padding: 0.75rem;
     border: 1px solid #eee;
@@ -264,6 +314,12 @@
     color: #666;
   }
 
+  .verse-actions {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .audio-button,
   .bookmark-button {
     background: none;
     border: none;
@@ -271,6 +327,13 @@
     cursor: pointer;
     color: #666;
     transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .audio-button:hover {
+    color: #216974;
   }
 
   .bookmark-button.active {
@@ -367,6 +430,10 @@
       padding: 0.5rem;
     }
 
+    .controls-section {
+      grid-template-columns: 1fr;
+    }
+
     h2 {
       font-size: 1.25rem;
     }
@@ -376,6 +443,7 @@
     }
 
     .surah-selector,
+    .reciter-selector,
     .surah-content,
     .bookmarks-section {
       padding: 1rem;

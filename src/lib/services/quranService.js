@@ -1,4 +1,4 @@
-import { writable } from 'svelte/store';
+import { writable, get } from 'svelte/store';
 
 export const quranStore = writable({
   currentSurah: null,
@@ -6,21 +6,32 @@ export const quranStore = writable({
   surahList: [],
   currentSurahDetails: null,
   loading: false,
-  error: null
+  error: null,
+  audioPlaying: false,
+  currentAudio: null,
+  currentReciter: 'ar.alafasy' // Default reciter (Mishary Rashid Alafasy)
 });
 
 const BASE_URL = 'https://api.alquran.cloud/v1';
 
+// List of available reciters
+export const RECITERS = [
+  { id: 'ar.alafasy', name: 'Mishary Rashid Alafasy' },
+  { id: 'ar.abdurrahmaansudais', name: 'Abdul Rahman Al-Sudais' },
+  { id: 'ar.hudhaify', name: 'Ali Al-Hudhaify' },
+  { id: 'ar.minshawi', name: 'Mohamed Siddiq El-Minshawi' },
+  { id: 'ar.muhammadayyoub', name: 'Muhammad Ayyoub' }
+];
+
 export async function fetchSurahList() {
-  const store = quranStore;
-  store.update(s => ({ ...s, loading: true, error: null }));
+  quranStore.update(s => ({ ...s, loading: true, error: null }));
 
   try {
     const response = await fetch(`${BASE_URL}/surah`);
     const data = await response.json();
     
     if (data.code === 200) {
-      store.update(s => ({
+      quranStore.update(s => ({
         ...s,
         surahList: data.data,
         loading: false
@@ -29,7 +40,7 @@ export async function fetchSurahList() {
       throw new Error('Failed to fetch surah list');
     }
   } catch (error) {
-    store.update(s => ({
+    quranStore.update(s => ({
       ...s,
       loading: false,
       error: 'Failed to load Surah list. Please try again.'
@@ -38,28 +49,31 @@ export async function fetchSurahList() {
 }
 
 export async function fetchSurahDetails(surahNumber) {
-  const store = quranStore;
-  store.update(s => ({ ...s, loading: true, error: null }));
+  const currentState = get(quranStore);
+  quranStore.update(s => ({ ...s, loading: true, error: null }));
 
   try {
     // Fetch both Arabic and English translations
-    const [arabicResponse, translationResponse] = await Promise.all([
+    const [arabicResponse, translationResponse, audioResponse] = await Promise.all([
       fetch(`${BASE_URL}/surah/${surahNumber}`),
-      fetch(`${BASE_URL}/surah/${surahNumber}/en.asad`)
+      fetch(`${BASE_URL}/surah/${surahNumber}/en.asad`),
+      fetch(`${BASE_URL}/surah/${surahNumber}/${currentState.currentReciter}`)
     ]);
 
     const arabicData = await arabicResponse.json();
     const translationData = await translationResponse.json();
+    const audioData = await audioResponse.json();
 
-    if (arabicData.code === 200 && translationData.code === 200) {
-      // Combine Arabic and English translations
+    if (arabicData.code === 200 && translationData.code === 200 && audioData.code === 200) {
+      // Combine Arabic, English translations, and audio
       const verses = arabicData.data.ayahs.map((ayah, index) => ({
         number: ayah.numberInSurah,
         arabic: ayah.text,
-        translation: translationData.data.ayahs[index].text
+        translation: translationData.data.ayahs[index].text,
+        audio: audioData.data.ayahs[index].audio
       }));
 
-      store.update(s => ({
+      quranStore.update(s => ({
         ...s,
         currentSurahDetails: {
           number: arabicData.data.number,
@@ -73,11 +87,95 @@ export async function fetchSurahDetails(surahNumber) {
       throw new Error('Failed to fetch surah details');
     }
   } catch (error) {
-    store.update(s => ({
+    console.error('Error fetching surah details:', error);
+    quranStore.update(s => ({
       ...s,
       loading: false,
       error: 'Failed to load Surah details. Please try again.'
     }));
+  }
+}
+
+// Audio control functions
+export function playAudio(audioUrl, verseNumber) {
+  quranStore.update(s => {
+    // Stop current audio if playing
+    if (s.currentAudio) {
+      s.currentAudio.pause();
+      s.currentAudio.currentTime = 0;
+    }
+
+    const audio = new Audio(audioUrl);
+    
+    audio.onended = () => {
+      quranStore.update(state => ({
+        ...state,
+        audioPlaying: false,
+        currentVerse: null
+      }));
+    };
+
+    audio.onerror = (e) => {
+      console.error('Audio playback error:', e);
+      quranStore.update(state => ({
+        ...state,
+        audioPlaying: false,
+        error: 'Failed to play audio. Please try again.'
+      }));
+    };
+
+    // Start playing
+    audio.play().catch(error => {
+      console.error('Audio play error:', error);
+      quranStore.update(state => ({
+        ...state,
+        audioPlaying: false,
+        error: 'Failed to play audio. Please try again.'
+      }));
+    });
+
+    return {
+      ...s,
+      currentAudio: audio,
+      audioPlaying: true,
+      currentVerse: verseNumber
+    };
+  });
+}
+
+export function pauseAudio() {
+  quranStore.update(s => {
+    if (s.currentAudio) {
+      s.currentAudio.pause();
+      s.currentAudio.currentTime = 0;
+    }
+    return {
+      ...s,
+      audioPlaying: false,
+      currentVerse: null
+    };
+  });
+}
+
+export function setReciter(reciterId) {
+  quranStore.update(s => {
+    // Stop current audio if playing
+    if (s.currentAudio) {
+      s.currentAudio.pause();
+      s.currentAudio.currentTime = 0;
+    }
+    return {
+      ...s,
+      currentReciter: reciterId,
+      audioPlaying: false,
+      currentVerse: null
+    };
+  });
+  
+  // If a surah is currently loaded, reload it with the new reciter
+  const currentState = get(quranStore);
+  if (currentState.currentSurahDetails) {
+    fetchSurahDetails(currentState.currentSurahDetails.number);
   }
 }
 
