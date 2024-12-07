@@ -243,9 +243,47 @@
       </div>
 
       <div class="reading-stats">
-        <div class="stats-card">
-          <h3>Today's Quran Reading</h3>
-          <p class="reading-time">{formatReadingTime(todayReadingTime)}</p>
+        <h3 class="section-title">Today's Activities</h3>
+        <div class="activities-row">
+          <div class="activity-card">
+            <div class="activity-icon prayer">
+              <svelte:component this={iconMap.Mosque} size={18} weight="fill" color="#216974" />
+            </div>
+            <div class="activity-info">
+              <span class="activity-value">3/5</span>
+              <span class="activity-label">Prayer</span>
+            </div>
+          </div>
+
+          <div class="activity-card">
+            <div class="activity-icon quran">
+              <svelte:component this={iconMap.Book} size={18} weight="fill" color="#216974" />
+            </div>
+            <div class="activity-info">
+              <span class="activity-value">{formatReadingTime(todayReadingTime)}</span>
+              <span class="activity-label">Quran</span>
+            </div>
+          </div>
+
+          <div class="activity-card">
+            <div class="activity-icon tasbih">
+              <svelte:component this={iconMap.Timer} size={18} weight="fill" color="#216974" />
+            </div>
+            <div class="activity-info">
+              <span class="activity-value">108</span>
+              <span class="activity-label">Tasbih</span>
+            </div>
+          </div>
+
+          <div class="activity-card">
+            <div class="activity-icon journal">
+              <svelte:component this={iconMap.Note} size={18} weight="fill" color="#216974" />
+            </div>
+            <div class="activity-info">
+              <span class="activity-value">1</span>
+              <span class="activity-label">Journal</span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -678,6 +716,60 @@
     color: #E09453;
     font-weight: 500;
     margin: 0;
+  }
+
+  .section-title {
+    font-size: 0.875rem;
+    color: #666;
+    margin-bottom: 0.375rem;
+    font-weight: normal;
+  }
+
+  .activities-row {
+    display: flex;
+    gap: 0.375rem;
+    justify-content: space-between;
+  }
+
+  .activity-card {
+    background: white;
+    padding: 0.375rem;
+    border-radius: 6px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    flex: 1;
+  }
+
+  .activity-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(33, 105, 116, 0.1);
+    flex-shrink: 0;
+  }
+
+  .activity-info {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.125rem;
+  }
+
+  .activity-value {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: #216974;
+  }
+
+  .activity-label {
+    font-size: 0.625rem;
+    color: #666;
   }
 </style>
 
