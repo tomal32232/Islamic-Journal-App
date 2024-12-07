@@ -12,6 +12,7 @@
   import WeeklyPrayerHistory from '../components/WeeklyPrayerHistory.svelte';
   import { createEventDispatcher } from 'svelte';
   import Journal from './Journal.svelte';
+  import { getTodayReadingTime, formatReadingTime } from '../services/readingTimeService';
   const dispatch = createEventDispatcher();
   
   let currentPage = 'home';
@@ -68,6 +69,8 @@
 
   let upcomingCountdown = '';
   let countdownEnded = false;
+
+  let todayReadingTime = 0;
 
   async function updateCountdown() {
     if (!upcomingPrayer) return;
@@ -167,6 +170,8 @@
     const countdownInterval = setInterval(updateCountdown, 1000);
     const notificationInterval = setInterval(checkPrayerNotifications, 60000);
     
+    todayReadingTime = await getTodayReadingTime();
+    
     return () => {
       clearInterval(prayerInterval);
       clearInterval(countdownInterval);
@@ -235,6 +240,13 @@
             <span class="date-num">{date}</span>
           </div>
         {/each}
+      </div>
+
+      <div class="reading-stats">
+        <div class="stats-card">
+          <h3>Today's Quran Reading</h3>
+          <p class="reading-time">{formatReadingTime(todayReadingTime)}</p>
+        </div>
       </div>
 
       <section class="upcoming-prayer">
@@ -621,6 +633,31 @@
     text-align: center;
     color: #666;
     margin: 1rem 0;
+  }
+
+  .reading-stats {
+    margin-top: 2rem;
+  }
+
+  .stats-card {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 12px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+
+  .stats-card h3 {
+    color: #216974;
+    margin: 0 0 0.5rem 0;
+    font-size: 1.125rem;
+    font-weight: 500;
+  }
+
+  .reading-time {
+    font-size: 1.5rem;
+    color: #E09453;
+    font-weight: 500;
+    margin: 0;
   }
 </style>
 

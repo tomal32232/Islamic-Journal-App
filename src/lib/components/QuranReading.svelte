@@ -1,12 +1,15 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
+  import { get } from 'svelte/store';
   import { quranStore, fetchSurahList, fetchSurahDetails, saveReadingProgress, loadReadingProgress, saveBookmark, removeBookmark, loadBookmarks, playAudio, pauseAudio, setReciter, RECITERS, toggleAutoPlay } from '../services/quranService';
+  import { startReadingSession, endReadingSession } from '../services/readingTimeService';
   import { BookmarkSimple, Play, Pause, SpeakerHigh, Repeat } from 'phosphor-svelte';
   
   let selectedSurah = null;
   let bookmarkedVerses = [];
   let selectedReciter = RECITERS[0].id;
   let versesContainer;
+  let currentSessionId = null;
   
   // Subscribe to quranStore
   $: ({ currentSurah, currentVerse, surahList, currentSurahDetails, loading, error, audioPlaying, autoPlay } = $quranStore);
@@ -14,8 +17,23 @@
   async function handleSurahSelect(event) {
     const surahNumber = parseInt(event.target.value);
     if (surahNumber) {
+      // End previous reading session if exists
+      if (currentSessionId) {
+        await endReadingSession(currentSessionId);
+        currentSessionId = null;
+      }
+
       await fetchSurahDetails(surahNumber);
       selectedSurah = surahNumber;
+
+      // Get the current state after fetching details
+      const state = get(quranStore);
+      if (state.currentSurahDetails) {
+        currentSessionId = await startReadingSession(
+          surahNumber,
+          state.currentSurahDetails.englishName
+        );
+      }
     }
   }
 
@@ -82,10 +100,26 @@
     if (progress) {
       selectedSurah = progress.surah;
       await fetchSurahDetails(progress.surah);
+      
+      // Get the current state after fetching details
+      const state = get(quranStore);
+      if (state.currentSurahDetails) {
+        currentSessionId = await startReadingSession(
+          progress.surah,
+          state.currentSurahDetails.englishName
+        );
+      }
     }
     
     // Load bookmarks
     bookmarkedVerses = loadBookmarks();
+  });
+
+  // End reading session when component is destroyed
+  onDestroy(async () => {
+    if (currentSessionId) {
+      await endReadingSession(currentSessionId);
+    }
   });
 
   // Watch for changes in currentVerse and scroll to it
