@@ -15,6 +15,7 @@
   import { getTodayReadingTime, formatReadingTime } from '../services/readingTimeService';
   import { weeklyStatsStore, getWeeklyStats } from '../stores/tasbihStore';
   import { quoteStore, getRandomQuote } from '../services/quoteService';
+  import MoodSelector from '../components/MoodSelector.svelte';
   const dispatch = createEventDispatcher();
   
   let currentPage = 'home';
@@ -76,6 +77,9 @@
 
   let completedPrayersToday = 0;
   let todayTasbihCount = 0;
+
+  let showMoodSelector = true;
+  let currentMood = null;
 
   $: {
     const today = new Date().toISOString().split('T')[0];
@@ -175,6 +179,14 @@
     });
   }
 
+  async function handleMoodSelect(event) {
+    const mood = event.detail;
+    currentMood = mood;
+    showMoodSelector = false;
+    // Here you would save the mood to your database
+    // saveMoodToDatabase(mood);
+  }
+
   onMount(async () => {
     auth.onAuthStateChanged(async (user) => {
       userName = capitalizeFirstLetter(user?.displayName?.split(' ')[0]) || 'Guest';
@@ -240,7 +252,12 @@
     {#if currentPage === 'home'}
       <div class="quote-card">
         <div class="greeting-section">
-          <h1>{greeting}, {userName}!</h1>
+          <div class="greeting-content">
+            <h1>{greeting}, {userName}!</h1>
+            {#if currentMood}
+              <span class="current-mood">{currentMood.emoji}</span>
+            {/if}
+          </div>
           <div class="datetime">
             <span class="time">{currentTime}</span>
             <span class="date">{formattedDate}</span>
@@ -254,6 +271,10 @@
           <cite>{$quoteStore.source}</cite>
         </div>
       </div>
+
+      {#if showMoodSelector}
+        <MoodSelector on:select={handleMoodSelect} />
+      {/if}
 
       <div class="calendar-strip">
         {#each weekDays as { day, date, isToday }}
@@ -798,6 +819,22 @@
 
   .prayer-card .section-title {
     margin-bottom: 0.5rem;
+  }
+
+  .greeting-content {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .current-mood {
+    font-size: 1.25rem;
+  }
+
+  h1 {
+    margin: 0;
+    font-size: 1.125rem;
+    font-weight: 500;
   }
 </style>
 
