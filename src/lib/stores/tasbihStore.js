@@ -39,14 +39,14 @@ export async function getWeeklyStats() {
   if (!user) return;
 
   const today = new Date();
-  const sunday = new Date(today);
-  sunday.setDate(today.getDate() - today.getDay()); // Go back to last Sunday
-  sunday.setHours(0, 0, 0, 0);
+  const startDate = new Date(today);
+  startDate.setDate(today.getDate() - 6); // Go back 6 days to get last 7 days including today
+  startDate.setHours(0, 0, 0, 0);
 
   const sessionsQuery = query(
     collection(db, 'tasbih_sessions'),
     where('userId', '==', user.uid),
-    where('timestamp', '>=', Timestamp.fromDate(sunday))
+    where('timestamp', '>=', Timestamp.fromDate(startDate))
   );
 
   const querySnapshot = await getDocs(sessionsQuery);
@@ -57,9 +57,9 @@ export async function getWeeklyStats() {
 
   // Process daily counts
   const dailyCounts = [];
-  for (let i = 0; i < 7; i++) {
-    const date = new Date(sunday);
-    date.setDate(date.getDate() + i);
+  for (let i = 6; i >= 0; i--) { // Count backwards from 6 to 0 to get last 7 days
+    const date = new Date(today);
+    date.setDate(today.getDate() - i);
     const dayStr = date.toLocaleDateString('en-US', { weekday: 'short' });
     const dateStr = date.getDate();
     
@@ -75,8 +75,7 @@ export async function getWeeklyStats() {
       day: dayStr,
       date: dateStr,
       count: dayCount,
-      isToday: today.getDate() === date.getDate() &&
-               today.getMonth() === date.getMonth()
+      isToday: i === 0
     });
   }
 
