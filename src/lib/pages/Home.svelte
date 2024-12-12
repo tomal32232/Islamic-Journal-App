@@ -31,6 +31,24 @@
 
   function handleTabChange(event) {
     currentPage = event.detail;
+    if (currentPage === 'home') {
+      updateStats();
+    }
+  }
+
+  async function updateStats() {
+    todayReadingTime = await getTodayReadingTime();
+    const today = new Date().toISOString().split('T')[0];
+    if ($prayerHistoryStore?.history) {
+      const todayPrayers = $prayerHistoryStore.history.filter(p => 
+        p.date === today && (p.status === 'ontime' || p.status === 'late')
+      );
+      completedPrayersToday = todayPrayers.length;
+    }
+
+    if ($weeklyStatsStore?.dailyCount?.[today]) {
+      todayTasbihCount = $weeklyStatsStore.dailyCount[today];
+    }
   }
 
   function markAsDone(index) {
