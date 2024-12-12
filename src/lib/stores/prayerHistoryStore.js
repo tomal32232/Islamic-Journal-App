@@ -173,7 +173,8 @@ export async function savePrayerStatus(prayerData) {
 
   console.log('Saving prayer status:', prayerData);
   const today = new Date().toLocaleDateString('en-CA');
-  const prayerId = `${today}-${prayerData.name.toLowerCase()}`;
+  const prayerDate = prayerData.date || today; // Use provided date or default to today
+  const prayerId = `${prayerDate}-${prayerData.name.toLowerCase()}`;
   console.log('Generated prayerId:', prayerId);
 
   // Query to find existing prayer document

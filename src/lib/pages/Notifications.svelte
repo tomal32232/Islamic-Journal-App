@@ -40,7 +40,8 @@
       await savePrayerStatus({
         name: prayer.prayerName,
         time: prayer.time,
-        status
+        status,
+        date: prayer.date
       });
       console.log('Prayer status saved successfully');
       
