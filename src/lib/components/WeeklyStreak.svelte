@@ -25,7 +25,6 @@
 
 <div class="streak-card">
   <div class="streak-header">
-    <h2>Weekly Dhikr Streak</h2>
     <div class="streak-stats">
       <span class="streak-count">{stats.currentStreak}/{stats.totalDays} Days</span>
       <span class="streak-subtitle">{stats.totalDays - stats.currentStreak} Days Missed</span>
