@@ -14,6 +14,7 @@ import { prayerTimesStore } from './prayerTimes';
 
 export const prayerHistoryStore = writable({
   pendingByDate: {},
+  missedByDate: {},
   history: []
 });
 
@@ -170,8 +171,11 @@ export async function savePrayerStatus(prayerData) {
     return;
   }
 
-  const today = new Date().toISOString().split('T')[0];
-  const prayerId = `${today}-${prayerData.name.toLowerCase()}`;
+  console.log('Saving prayer status:', prayerData);
+  const today = new Date().toLocaleDateString('en-CA');
+  const prayerDate = prayerData.date || today; // Use provided date or default to today
+  const prayerId = `${prayerDate}-${prayerData.name.toLowerCase()}`;
+  console.log('Generated prayerId:', prayerId);
 
   // Query to find existing prayer document
   const prayerQuery = query(
@@ -181,30 +185,60 @@ export async function savePrayerStatus(prayerData) {
   );
 
   const querySnapshot = await getDocs(prayerQuery);
+  console.log('Found existing prayer:', !querySnapshot.empty);
   
-  if (!querySnapshot.empty) {
-    // Update existing prayer document
-    const docRef = querySnapshot.docs[0].ref;
-    await setDoc(docRef, {
-      ...querySnapshot.docs[0].data(),
-      status: prayerData.status,
-      timestamp: Timestamp.now()
-    }, { merge: true });
-  } else {
-    // If not found (shouldn't happen normally), create new
-    const prayerRef = doc(collection(db, 'prayer_history'));
-    await setDoc(prayerRef, {
-      userId: user.uid,
-      prayerId,
-      prayerName: prayerData.name,
-      time: prayerData.time,
-      status: prayerData.status,
-      date: today,
-      timestamp: Timestamp.now()
-    });
-  }
+  try {
+    if (!querySnapshot.empty) {
+      // Update existing prayer document
+      const docRef = querySnapshot.docs[0].ref;
+      const updateData = {
+        ...querySnapshot.docs[0].data(),
+        status: prayerData.status,
+        timestamp: Timestamp.now()
+      };
+      console.log('Updating prayer with data:', updateData);
+      await setDoc(docRef, updateData, { merge: true });
+      
+      // Immediately update the store to reflect changes
+      const currentStore = get(prayerHistoryStore);
+      const updatedPendingByDate = { ...currentStore.pendingByDate };
+      
+      // Remove the prayer from pending if it exists
+      Object.keys(updatedPendingByDate).forEach(date => {
+        updatedPendingByDate[date].prayers = updatedPendingByDate[date].prayers.filter(
+          p => p.prayerId !== prayerId
+        );
+        // Remove the date entry if no prayers left
+        if (updatedPendingByDate[date].prayers.length === 0) {
+          delete updatedPendingByDate[date];
+        }
+      });
+      
+      prayerHistoryStore.set({
+        ...currentStore,
+        pendingByDate: updatedPendingByDate
+      });
+    } else {
+      // If not found (shouldn't happen normally), create new
+      console.log('Creating new prayer record');
+      const prayerRef = doc(collection(db, 'prayer_history'));
+      await setDoc(prayerRef, {
+        userId: user.uid,
+        prayerId,
+        prayerName: prayerData.name,
+        time: prayerData.time,
+        status: prayerData.status,
+        date: today,
+        timestamp: Timestamp.now()
+      });
+    }
 
-  await getPrayerHistory();
+    console.log('Prayer status saved, updating history');
+    await getPrayerHistory();
+  } catch (error) {
+    console.error('Error saving prayer status:', error);
+    throw error;
+  }
 }
 
 export function convertPrayerTimeToDate(timeStr) {
@@ -245,36 +279,36 @@ export async function getPrayerHistory() {
     const prayerDateTime = getPrayerDateTime(prayer.date, prayer.time);
     const now = new Date();
 
-    if (prayer.status === 'pending') {
-      // Only show today's passed prayers in pending
-      if (prayer.date === today && prayerDateTime < now) {
-        if (!pendingByDate[prayer.date]) {
-          pendingByDate[prayer.date] = {
-            isToday: true,
-            prayers: []
-          };
-        }
-        pendingByDate[prayer.date].prayers.push(prayer);
+    // Only add to pending if status is 'pending' and prayer time has passed
+    if (prayer.status === 'pending' && prayerDateTime < now) {
+      const date = prayer.date;
+      if (!pendingByDate[date]) {
+        pendingByDate[date] = {
+          isToday: date === today,
+          prayers: []
+        };
       }
-    } else if (prayer.status === 'missed') {
-      // Show all missed prayers from past dates
-      if (prayer.date < today) {
-        if (!missedByDate[prayer.date]) {
-          missedByDate[prayer.date] = {
-            prayers: []
-          };
-        }
-        missedByDate[prayer.date].prayers.push(prayer);
+      pendingByDate[date].prayers.push(prayer);
+    }
+
+    // Add to missed if status is 'missed'
+    if (prayer.status === 'missed') {
+      const date = prayer.date;
+      if (!missedByDate[date]) {
+        missedByDate[date] = {
+          prayers: []
+        };
       }
+      missedByDate[date].prayers.push(prayer);
     }
   });
 
-  // Sort prayers within each date group
+  // Sort prayers within each date
   Object.values(pendingByDate).forEach(dateGroup => {
     dateGroup.prayers.sort((a, b) => {
       const timeA = getPrayerDateTime(a.date, a.time);
       const timeB = getPrayerDateTime(b.date, b.time);
-      return timeA - timeB;
+      return timeA.getTime() - timeB.getTime();
     });
   });
 
@@ -282,10 +316,11 @@ export async function getPrayerHistory() {
     dateGroup.prayers.sort((a, b) => {
       const timeA = getPrayerDateTime(a.date, a.time);
       const timeB = getPrayerDateTime(b.date, b.time);
-      return timeB - timeA; // Reverse chronological for missed prayers
+      return timeB.getTime() - timeA.getTime(); // Reverse chronological for missed prayers
     });
   });
 
+  console.log('Updated prayer history:', { history, pendingByDate, missedByDate });
   prayerHistoryStore.set({ history, pendingByDate, missedByDate });
   return { history, pendingByDate, missedByDate };
 }

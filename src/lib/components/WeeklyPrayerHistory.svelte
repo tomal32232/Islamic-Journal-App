@@ -15,20 +15,15 @@
     const today = new Date();
     const days = [];
     
-    // Get last Sunday (start of the week)
-    const sunday = new Date(today);
-    sunday.setDate(today.getDate() - today.getDay());
-    sunday.setHours(0, 0, 0, 0);
-    
-    // Generate days from Sunday to Saturday
-    for (let i = 0; i < 7; i++) {
-      const current = new Date(sunday);
-      current.setDate(sunday.getDate() + i);
+    // Generate last 7 days ending with today
+    for (let i = 6; i >= 0; i--) {
+      const current = new Date(today);
+      current.setDate(today.getDate() - i);
       days.push({
         date: current.toLocaleDateString('en-CA'), // YYYY-MM-DD format
         dayName: current.toLocaleDateString('en-US', { weekday: 'short' }),
         dayNumber: current.getDate(),
-        isToday: current.toLocaleDateString() === today.toLocaleDateString()
+        isToday: i === 0
       });
     }
     return days;
@@ -104,7 +99,6 @@
 </script>
 
 <div class="prayer-history">
-  <h3>Weekly Prayer History</h3>
   <div class="history-grid">
     <div class="header-row">
       <div class="prayer-label"></div>

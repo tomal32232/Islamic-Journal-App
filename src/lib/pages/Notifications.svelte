@@ -20,12 +20,39 @@
   }
 
   async function markPrayerStatus(prayer, status) {
-    await savePrayerStatus({
-      name: prayer.prayerName,
-      time: prayer.time,
-      status
-    });
-    await getPrayerHistory();
+    console.log('Marking prayer status:', { prayer, status });
+    try {
+      // First update the UI optimistically
+      prayerHistoryStore.update(store => {
+        const updatedPendingByDate = { ...store.pendingByDate };
+        Object.keys(updatedPendingByDate).forEach(date => {
+          updatedPendingByDate[date].prayers = updatedPendingByDate[date].prayers.filter(
+            p => p.prayerId !== prayer.prayerId
+          );
+          if (updatedPendingByDate[date].prayers.length === 0) {
+            delete updatedPendingByDate[date];
+          }
+        });
+        return { ...store, pendingByDate: updatedPendingByDate };
+      });
+
+      // Then save to database
+      await savePrayerStatus({
+        name: prayer.prayerName,
+        time: prayer.time,
+        status,
+        date: prayer.date
+      });
+      console.log('Prayer status saved successfully');
+      
+      // Finally refresh the data
+      await getPrayerHistory();
+      console.log('Prayer history updated');
+    } catch (error) {
+      console.error('Error marking prayer status:', error);
+      // If there's an error, refresh to get the correct state
+      await getPrayerHistory();
+    }
   }
 
   onMount(async () => {

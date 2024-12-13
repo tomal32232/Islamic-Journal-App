@@ -3,7 +3,11 @@ import {
   SunDim, 
   CloudSun,
   SunHorizon, 
-  MoonStars 
+  MoonStars,
+  House,
+  Book,
+  Timer,
+  NotePencil
 } from 'phosphor-svelte';
 
 export const iconMap = {
@@ -11,5 +15,9 @@ export const iconMap = {
   Sun,
   CloudSun,
   SunHorizon,
-  MoonStars
+  MoonStars,
+  Mosque: House,
+  Book,
+  Timer,
+  Note: NotePencil
 }; 
