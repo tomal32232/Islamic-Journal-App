@@ -5,6 +5,7 @@
   import { badgeStore } from '../stores/badgeStore';
   import { Bell, Trophy, Target, Book, ChartBar, SignOut, CaretRight } from 'phosphor-svelte';
   import Toast from '../components/Toast.svelte';
+  import { currentPage } from '../stores/pageStore';
   
   const user = auth.currentUser;
   let prayerStats = { onTime: 0, late: 0, missed: 0, total: 0 };
@@ -105,6 +106,16 @@
     { name: 'Dhikr Count', target: 100, current: $weeklyStatsStore?.dailyCounts?.[0]?.count || 0 }
   ];
 
+  // Handle logout
+  async function handleLogout() {
+    try {
+      await auth.signOut();
+      currentPage.set('home');
+    } catch (error) {
+      console.error("Error signing out:", error);
+    }
+  }
+
   // Favorite verses (to be implemented)
   const favoriteVerses = [
     { surah: 'Al-Fatiha', verse: 1, text: 'In the name of Allah, the Most Gracious, the Most Merciful' },
@@ -178,7 +189,7 @@
             </div>
           </div>
         {/each}
-        <button class="view-all-button">
+        <button class="view-all-button" on:click={() => currentPage.set('badges')}>
           <span>View All Badges</span>
           <CaretRight weight="bold" />
         </button>
