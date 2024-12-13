@@ -1,7 +1,8 @@
 <script>
   import { badgeStore } from '../stores/badgeStore';
   import { Trophy, ArrowLeft } from 'phosphor-svelte';
-  import { currentPage } from '../stores/pageStore';
+
+  export let onBack;
 
   let earnedBadges = [];
   let allBadges = badgeStore.getAllBadges();
@@ -99,7 +100,7 @@
 
 <div class="badges-page">
   <header class="badges-header">
-    <button class="back-button" on:click={() => currentPage.set('profile')}>
+    <button class="back-button" on:click={onBack}>
       <ArrowLeft weight="bold" />
       <span>Back to Profile</span>
     </button>

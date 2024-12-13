@@ -11,6 +11,7 @@
   let prayerStats = { onTime: 0, late: 0, missed: 0, total: 0 };
   let earnedBadges = [];
   let allBadges = badgeStore.getAllBadges();
+  let activeTab = 'profile';
   
   // Initialize badge store when component mounts
   $: if (user?.uid) {
@@ -121,6 +122,8 @@
     { surah: 'Al-Fatiha', verse: 1, text: 'In the name of Allah, the Most Gracious, the Most Merciful' },
     { surah: 'Al-Baqarah', verse: 255, text: 'Allah - there is no deity except Him, the Ever-Living, the Self-Sustaining' }
   ];
+
+  export let navigateTo;
 </script>
 
 <Toast />
@@ -189,7 +192,7 @@
             </div>
           </div>
         {/each}
-        <button class="view-all-button" on:click={() => currentPage.set('badges')}>
+        <button class="view-all-button" on:click={() => navigateTo('badges')}>
           <span>View All Badges</span>
           <CaretRight weight="bold" />
         </button>

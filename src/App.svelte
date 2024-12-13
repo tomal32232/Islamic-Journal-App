@@ -5,7 +5,6 @@
   import Home from './lib/pages/Home.svelte';
   import Notifications from './lib/pages/Notifications.svelte';
   import NotificationIcon from './lib/components/NotificationIcon.svelte';
-  import { currentPage } from './lib/stores/pageStore';
   import Badges from './lib/pages/Badges.svelte';
   import Profile from './lib/pages/Profile.svelte';
   import BottomNav from './lib/components/BottomNav.svelte';
@@ -25,23 +24,27 @@
   function handleTabChange(event) {
     activeTab = event.detail;
   }
+
+  function navigateTo(page) {
+    activeTab = page;
+  }
 </script>
 
 {#if user}
   <div class="app-container">
     {#if activeTab !== 'notifications'}
-      <NotificationIcon on:click={() => activeTab = 'notifications'} />
+      <NotificationIcon on:click={() => navigateTo('notifications')} />
     {/if}
     
     <main>
       {#if activeTab === 'home'}
         <Home />
       {:else if activeTab === 'notifications'}
-        <Notifications onBack={() => activeTab = 'home'} />
+        <Notifications onBack={() => navigateTo('home')} />
       {:else if activeTab === 'badges'}
-        <Badges />
+        <Badges onBack={() => navigateTo('profile')} />
       {:else if activeTab === 'profile'}
-        <Profile />
+        <Profile {navigateTo} />
       {:else if activeTab === 'tasbih'}
         <Tasbih />
       {:else if activeTab === 'journal'}
