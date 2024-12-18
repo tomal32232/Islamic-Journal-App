@@ -11,7 +11,8 @@
     Star, 
     Pencil, 
     CalendarPlus, 
-    Heart 
+    HandsPraying,
+    Sparkle
   } from 'phosphor-svelte';
   import { auth } from '../firebase';
 
@@ -202,9 +203,9 @@
                 {:else if badge.category === 'quran' && badge.requirement.type === 'juz_completion'}
                   <BookBookmark size={20} weight="fill" />
                 {:else if badge.category === 'dhikr' && badge.requirement.type === 'daily_dhikr'}
-                  <Heart size={20} weight="fill" />
+                  <HandsPraying size={20} weight="fill" />
                 {:else if badge.category === 'dhikr' && badge.requirement.type === 'dhikr_streak'}
-                  <Star size={20} weight="fill" />
+                  <Sparkle size={20} weight="fill" />
                 {:else if badge.category === 'journal' && badge.requirement.type === 'journal_entries'}
                   <Pencil size={20} weight="fill" />
                 {:else if badge.category === 'journal' && badge.requirement.type === 'journal_streak'}
