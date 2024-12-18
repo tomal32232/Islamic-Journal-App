@@ -2,6 +2,7 @@
   import { writable } from 'svelte/store';
   import { onMount, onDestroy } from 'svelte';
   import { saveTasbihSession, getWeeklyStats, weeklyStatsStore } from '../stores/tasbihStore';
+  import { updateDhikrProgress, updateDhikrStreak } from '../services/badgeProgressService';
 
   const dhikrOptions = [
     { arabic: 'سُبْحَانَ ٱللَّٰهِ', latin: 'SubhanAllah', meaning: 'Glory be to Allah' },
@@ -52,6 +53,10 @@
       });
       const stats = await getWeeklyStats();
       weeklyStreak = stats?.streak || 0;
+      
+      // Update badge progress
+      updateDhikrProgress(totalCount);
+      updateDhikrStreak(weeklyStreak);
     }
   }
 

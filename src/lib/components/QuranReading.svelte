@@ -4,12 +4,14 @@
   import { quranStore, fetchSurahList, fetchSurahDetails, saveReadingProgress, loadReadingProgress, saveBookmark, removeBookmark, loadBookmarks, playAudio, pauseAudio, setReciter, RECITERS, toggleAutoPlay } from '../services/quranService';
   import { startReadingSession, endReadingSession } from '../services/readingTimeService';
   import { BookmarkSimple, Play, Pause, SpeakerHigh, Repeat } from 'phosphor-svelte';
+  import { getBookmarks, saveBookmark as saveFirebaseBookmark, removeBookmark as removeFirebaseBookmark } from '../services/bookmarkService';
   
   let selectedSurah = null;
   let bookmarkedVerses = [];
   let selectedReciter = RECITERS[0].id;
   let versesContainer;
   let currentSessionId = null;
+  let selectedBookmark = null;
   
   // Subscribe to quranStore
   $: ({ currentSurah, currentVerse, surahList, currentSurahDetails, loading, error, audioPlaying, autoPlay } = $quranStore);
@@ -23,6 +25,8 @@
         currentSessionId = null;
       }
 
+      // Reset current verse when changing surah
+      quranStore.update(s => ({ ...s, currentVerse: null }));
       await fetchSurahDetails(surahNumber);
       selectedSurah = surahNumber;
 
@@ -37,7 +41,27 @@
     }
   }
 
+  async function handleBookmarkSelect(event) {
+    const value = event.target.value;
+    if (!value) return;
+    
+    const [surahNumber, verseNumber] = value.split('-').map(Number);
+    selectedSurah = surahNumber;
+    await fetchSurahDetails(surahNumber);
+    quranStore.update(s => ({ ...s, currentVerse: verseNumber }));
+    handleVerseClick(verseNumber);
+    selectedBookmark = null;
+    event.target.value = '';
+  }
+
   function handleVerseClick(verseNumber) {
+    // Toggle verse selection - if clicking the same verse, deselect it
+    if (currentVerse === verseNumber) {
+      quranStore.update(s => ({ ...s, currentVerse: null }));
+      return;
+    }
+    
+    quranStore.update(s => ({ ...s, currentVerse: verseNumber }));
     saveReadingProgress(selectedSurah, verseNumber);
     
     setTimeout(() => {
@@ -59,19 +83,56 @@
     }, 100);
   }
 
-  function toggleBookmark(verseNumber) {
+  async function toggleBookmark(verseNumber) {
     const surahName = currentSurahDetails?.englishName;
-    const exists = bookmarkedVerses.some(b => b.surah === selectedSurah && b.verse === verseNumber);
+    const verseText = currentSurahDetails?.verses[verseNumber - 1]?.arabic;
+    const exists = bookmarkedVerses.some(b => b.surahNumber === selectedSurah && b.verseNumber === verseNumber);
     
-    if (exists) {
-      bookmarkedVerses = removeBookmark(selectedSurah, verseNumber);
-    } else {
-      bookmarkedVerses = saveBookmark(selectedSurah, verseNumber, surahName);
+    try {
+      if (exists) {
+        await removeFirebaseBookmark(selectedSurah, verseNumber);
+      } else {
+        await saveFirebaseBookmark(selectedSurah, verseNumber, surahName, verseText);
+      }
+      
+      // Refresh bookmarks list
+      bookmarkedVerses = await getBookmarks();
+      
+      // Update verse selection state
+      if (exists) {
+        // If we're removing the bookmark from the current verse, deselect it
+        if (currentVerse === verseNumber) {
+          quranStore.update(s => ({ ...s, currentVerse: null }));
+        }
+      } else {
+        // When adding a bookmark, select the verse
+        quranStore.update(s => ({ ...s, currentVerse: verseNumber }));
+        
+        // Scroll to the bookmarked verse
+        setTimeout(() => {
+          const verseElement = document.getElementById(`verse-${verseNumber}`);
+          if (verseElement) {
+            const containerHeight = versesContainer.offsetHeight;
+            const verseTop = verseElement.offsetTop;
+            const verseHeight = verseElement.offsetHeight;
+            
+            const offset = 80;
+            const scrollPosition = verseTop - (containerHeight / 2) + (verseHeight / 2) + offset;
+            
+            versesContainer.scrollTo({
+              top: scrollPosition,
+              behavior: 'smooth'
+            });
+          }
+        }, 100);
+      }
+    } catch (error) {
+      console.error('Error toggling bookmark:', error);
     }
   }
 
   function isVerseBookmarked(verseNumber) {
-    return bookmarkedVerses.some(b => b.surah === selectedSurah && b.verse === verseNumber);
+    return bookmarkedVerses.some(b => b.surahNumber === selectedSurah && b.verseNumber === verseNumber);
   }
 
   function handleReciterChange(event) {
@@ -111,8 +172,12 @@
       }
     }
     
-    // Load bookmarks
-    bookmarkedVerses = loadBookmarks();
+    // Load bookmarks from Firebase
+    try {
+      bookmarkedVerses = await getBookmarks();
+    } catch (error) {
+      console.error('Error loading bookmarks:', error);
+    }
   });
 
   // End reading session when component is destroyed
@@ -163,6 +228,25 @@
         </select>
       </div>
 
+      <div class="select-wrapper">
+        <select 
+          class="bookmark-select" 
+          on:change={handleBookmarkSelect}
+          disabled={loading}
+        >
+          <option value="" disabled selected>Go to Bookmark</option>
+          {#if bookmarkedVerses.length === 0}
+            <option value="" disabled>No bookmarks available</option>
+          {:else}
+            {#each bookmarkedVerses as bookmark}
+              <option value="{bookmark.surahNumber}-{bookmark.verseNumber}">
+                {bookmark.surahName} - Verse {bookmark.verseNumber}
+              </option>
+            {/each}
+          {/if}
+        </select>
+      </div>
+
       <div class="reciter-controls">
         <div class="select-wrapper">
           <select 
@@ -207,7 +291,7 @@
           {#each currentSurahDetails.verses as verse}
             <div 
               id="verse-{verse.number}"
-              class="verse-card {verse.number === currentVerse ? 'current' : ''}"
+              class="verse-card {verse.number === currentVerse && selectedSurah === currentSurah ? 'current' : ''}"
               on:click={() => handleVerseClick(verse.number)}
             >
               <div class="verse-header">
@@ -254,19 +338,26 @@
             <div 
               class="bookmark-item"
               on:click={async () => {
-                selectedSurah = bookmark.surah;
-                await fetchSurahDetails(bookmark.surah);
-                handleVerseClick(bookmark.verse);
+                selectedSurah = bookmark.surahNumber;
+                await fetchSurahDetails(bookmark.surahNumber);
+                handleVerseClick(bookmark.verseNumber);
               }}
             >
               <div class="bookmark-info">
                 <span class="surah-name">{bookmark.surahName}</span>
-                <span class="verse-number">Verse {bookmark.verse}</span>
+                <span class="verse-number">Verse {bookmark.verseNumber}</span>
               </div>
               <button 
                 class="remove-bookmark"
-                on:click|stopPropagation={() => {
-                  bookmarkedVerses = removeBookmark(bookmark.surah, bookmark.verse);
+                on:click|stopPropagation={async (event) => {
+                  event.preventDefault();
+                  try {
+                    await removeFirebaseBookmark(bookmark.surahNumber, bookmark.verseNumber);
+                    // Refresh bookmarks list
+                    bookmarkedVerses = await getBookmarks();
+                  } catch (error) {
+                    console.error('Error removing bookmark:', error);
+                  }
                 }}
               >
                 Remove
@@ -304,7 +395,7 @@
 
   .sticky-header {
     position: sticky;
-    top: 48px; /* Height of the tabs + padding */
+    top: 48px;
     z-index: 10;
     background: white;
     padding: 0.75rem 1rem;
@@ -321,7 +412,7 @@
 
   .select-wrapper {
     position: relative;
-    flex: 1;
+    width: 100%;
   }
 
   .select-wrapper::after {
@@ -341,32 +432,46 @@
   .reciter-controls {
     display: flex;
     gap: 0.75rem;
+    align-items: center;
   }
 
   .surah-select,
-  .reciter-select {
+  .reciter-select,
+  .bookmark-select {
     width: 100%;
-    padding: 0.75rem 1rem;
-    border: 1px solid #e0e0e0;
+    padding: 0.75rem 2rem 0.75rem 1rem;
+    border: 1px solid #e2e8f0;
     border-radius: 8px;
+    background-color: white;
     font-size: 0.875rem;
-    color: #216974;
-    background: white;
-    appearance: none;
+    color: #1a202c;
     cursor: pointer;
     transition: all 0.2s ease;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
   }
 
   .surah-select:hover,
-  .reciter-select:hover {
+  .reciter-select:hover,
+  .bookmark-select:hover {
     border-color: #216974;
   }
 
   .surah-select:focus,
-  .reciter-select:focus {
+  .reciter-select:focus,
+  .bookmark-select:focus {
     outline: none;
     border-color: #216974;
     box-shadow: 0 0 0 2px rgba(33, 105, 116, 0.1);
+  }
+
+  .surah-select:disabled,
+  .reciter-select:disabled,
+  .bookmark-select:disabled {
+    background-color: #f7fafc;
+    cursor: not-allowed;
+    opacity: 0.7;
   }
 
   .auto-play-toggle {
@@ -406,7 +511,18 @@
   @media (min-width: 640px) {
     .controls-section {
       flex-direction: row;
-      align-items: center;
+      align-items: stretch;
+      gap: 1rem;
+    }
+
+    .select-wrapper {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .reciter-controls {
+      width: auto;
+      flex: 0 0 auto;
     }
   }
 
@@ -420,8 +536,9 @@
     }
 
     .surah-select,
-    .reciter-select {
-      padding: 0.625rem 0.875rem;
+    .reciter-select,
+    .bookmark-select {
+      padding: 0.625rem 2rem 0.625rem 0.875rem;
       font-size: 0.8125rem;
     }
 
@@ -521,8 +638,12 @@
     color: #216974;
   }
 
-  .bookmark-button.active {
+  .bookmark-button:hover {
     color: #E09453;
+  }
+
+  .bookmark-button.active {
+    color: #E09453 !important;
   }
 
   .verse-text {

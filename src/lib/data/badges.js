@@ -7,8 +7,11 @@ export const badges = {
         description: 'Complete all daily prayers for 3 consecutive days',
         level: 1,
         category: 'prayer',
-        image: '🌙', // Placeholder - we can replace with actual image paths
-        requirement: { type: 'streak', count: 3 }
+        image: '🌙',
+        requirement: {
+          type: 'streak',
+          count: 3
+        }
       },
       {
         id: 'prayer_streak_2',
@@ -16,8 +19,11 @@ export const badges = {
         description: 'Complete all daily prayers for 7 consecutive days',
         level: 2,
         category: 'prayer',
-        image: '🌙✨',
-        requirement: { type: 'streak', count: 7 }
+        image: '🌙',
+        requirement: {
+          type: 'streak',
+          count: 7
+        }
       },
       {
         id: 'prayer_streak_3',
@@ -25,19 +31,25 @@ export const badges = {
         description: 'Complete all daily prayers for 30 consecutive days',
         level: 3,
         category: 'prayer',
-        image: '🌙💫',
-        requirement: { type: 'streak', count: 30 }
+        image: '🌙',
+        requirement: {
+          type: 'streak',
+          count: 30
+        }
       }
     ],
-    onTime: [
+    ontime_fajr: [
       {
         id: 'prayer_ontime_1',
         name: 'Early Riser I',
         description: 'Pray Fajr on time for 3 consecutive days',
         level: 1,
         category: 'prayer',
-        image: '🌅',
-        requirement: { type: 'ontime_fajr', count: 3 }
+        image: '☀️',
+        requirement: {
+          type: 'ontime_fajr',
+          count: 3
+        }
       },
       {
         id: 'prayer_ontime_2',
@@ -45,8 +57,11 @@ export const badges = {
         description: 'Pray Fajr on time for 7 consecutive days',
         level: 2,
         category: 'prayer',
-        image: '🌅✨',
-        requirement: { type: 'ontime_fajr', count: 7 }
+        image: '☀️',
+        requirement: {
+          type: 'ontime_fajr',
+          count: 7
+        }
       },
       {
         id: 'prayer_ontime_3',
@@ -54,13 +69,16 @@ export const badges = {
         description: 'Pray Fajr on time for 30 consecutive days',
         level: 3,
         category: 'prayer',
-        image: '🌅💫',
-        requirement: { type: 'ontime_fajr', count: 30 }
+        image: '☀️',
+        requirement: {
+          type: 'ontime_fajr',
+          count: 30
+        }
       }
     ]
   },
   quran: {
-    reading: [
+    daily_reading: [
       {
         id: 'quran_time_1',
         name: 'Quran Reader I',
@@ -68,7 +86,11 @@ export const badges = {
         level: 1,
         category: 'quran',
         image: '📖',
-        requirement: { type: 'daily_reading', minutes: 15, days: 3 }
+        requirement: {
+          type: 'daily_reading',
+          minutes: 15,
+          days: 3
+        }
       },
       {
         id: 'quran_time_2',
@@ -76,8 +98,12 @@ export const badges = {
         description: 'Read Quran for 30 minutes daily for 7 days',
         level: 2,
         category: 'quran',
-        image: '📖✨',
-        requirement: { type: 'daily_reading', minutes: 30, days: 7 }
+        image: '📖',
+        requirement: {
+          type: 'daily_reading',
+          minutes: 30,
+          days: 7
+        }
       },
       {
         id: 'quran_time_3',
@@ -85,97 +111,128 @@ export const badges = {
         description: 'Read Quran for 60 minutes daily for 30 days',
         level: 3,
         category: 'quran',
-        image: '📖💫',
-        requirement: { type: 'daily_reading', minutes: 60, days: 30 }
+        image: '📖',
+        requirement: {
+          type: 'daily_reading',
+          minutes: 60,
+          days: 30
+        }
       }
     ],
-    completion: [
+    juz_completion: [
       {
         id: 'quran_completion_1',
-        name: 'Juz Explorer I',
-        description: 'Complete reading 1 Juz',
+        name: 'Juz Completion I',
+        description: 'Complete 1 Juz of the Quran',
         level: 1,
         category: 'quran',
-        image: '🎯',
-        requirement: { type: 'juz_completion', count: 1 }
+        image: '🌙',
+        requirement: {
+          type: 'juz_completion',
+          count: 1
+        }
       },
       {
         id: 'quran_completion_2',
-        name: 'Juz Explorer II',
-        description: 'Complete reading 5 Juz',
+        name: 'Juz Completion II',
+        description: 'Complete 5 Juz of the Quran',
         level: 2,
         category: 'quran',
-        image: '🎯✨',
-        requirement: { type: 'juz_completion', count: 5 }
+        image: '🌙',
+        requirement: {
+          type: 'juz_completion',
+          count: 5
+        }
       },
       {
         id: 'quran_completion_3',
-        name: 'Hafiz in Progress',
-        description: 'Complete reading the entire Quran',
+        name: 'Juz Completion III',
+        description: 'Complete all 30 Juz of the Quran',
         level: 3,
         category: 'quran',
-        image: '🎯💫',
-        requirement: { type: 'juz_completion', count: 30 }
+        image: '🌙',
+        requirement: {
+          type: 'juz_completion',
+          count: 30
+        }
       }
     ]
   },
   dhikr: {
-    daily: [
+    daily_dhikr: [
       {
         id: 'dhikr_daily_1',
-        name: 'Dhikr Devotee I',
+        name: 'Daily Dhikr I',
         description: 'Complete 100 dhikr in a day',
         level: 1,
         category: 'dhikr',
         image: '📿',
-        requirement: { type: 'daily_dhikr', count: 100 }
+        requirement: {
+          type: 'daily_dhikr',
+          count: 100
+        }
       },
       {
         id: 'dhikr_daily_2',
-        name: 'Dhikr Devotee II',
+        name: 'Daily Dhikr II',
         description: 'Complete 500 dhikr in a day',
         level: 2,
         category: 'dhikr',
-        image: '📿✨',
-        requirement: { type: 'daily_dhikr', count: 500 }
+        image: '📿',
+        requirement: {
+          type: 'daily_dhikr',
+          count: 500
+        }
       },
       {
         id: 'dhikr_daily_3',
-        name: 'Dhikr Devotee III',
+        name: 'Daily Dhikr III',
         description: 'Complete 1000 dhikr in a day',
         level: 3,
         category: 'dhikr',
-        image: '📿💫',
-        requirement: { type: 'daily_dhikr', count: 1000 }
+        image: '📿',
+        requirement: {
+          type: 'daily_dhikr',
+          count: 1000
+        }
       }
     ],
-    streak: [
+    dhikr_streak: [
       {
         id: 'dhikr_streak_1',
-        name: 'Consistent Remembrance I',
-        description: 'Complete daily dhikr goal for 7 days',
+        name: 'Dhikr Streak I',
+        description: 'Complete daily dhikr for 3 consecutive days',
         level: 1,
         category: 'dhikr',
-        image: '🕌',
-        requirement: { type: 'dhikr_streak', days: 7 }
+        image: '🤲',
+        requirement: {
+          type: 'dhikr_streak',
+          days: 3
+        }
       },
       {
         id: 'dhikr_streak_2',
-        name: 'Consistent Remembrance II',
-        description: 'Complete daily dhikr goal for 30 days',
+        name: 'Dhikr Streak II',
+        description: 'Complete daily dhikr for 7 consecutive days',
         level: 2,
         category: 'dhikr',
-        image: '🕌✨',
-        requirement: { type: 'dhikr_streak', days: 30 }
+        image: '🤲',
+        requirement: {
+          type: 'dhikr_streak',
+          days: 7
+        }
       },
       {
         id: 'dhikr_streak_3',
-        name: 'Consistent Remembrance III',
-        description: 'Complete daily dhikr goal for 100 days',
+        name: 'Dhikr Streak III',
+        description: 'Complete daily dhikr for 30 consecutive days',
         level: 3,
         category: 'dhikr',
-        image: '🕌💫',
-        requirement: { type: 'dhikr_streak', days: 100 }
+        image: '🤲',
+        requirement: {
+          type: 'dhikr_streak',
+          days: 30
+        }
       }
     ]
   },
@@ -183,59 +240,77 @@ export const badges = {
     entries: [
       {
         id: 'journal_entries_1',
-        name: 'Reflection Seeker I',
-        description: 'Write 5 journal entries',
+        name: 'Journal Keeper I',
+        description: 'Write 3 journal entries',
         level: 1,
         category: 'journal',
         image: '✍️',
-        requirement: { type: 'journal_entries', count: 5 }
+        requirement: {
+          type: 'journal_entries',
+          count: 3
+        }
       },
       {
         id: 'journal_entries_2',
-        name: 'Reflection Seeker II',
-        description: 'Write 25 journal entries',
+        name: 'Journal Keeper II',
+        description: 'Write 7 journal entries',
         level: 2,
         category: 'journal',
-        image: '✍️✨',
-        requirement: { type: 'journal_entries', count: 25 }
+        image: '✍️',
+        requirement: {
+          type: 'journal_entries',
+          count: 7
+        }
       },
       {
         id: 'journal_entries_3',
-        name: 'Reflection Seeker III',
-        description: 'Write 100 journal entries',
+        name: 'Journal Keeper III',
+        description: 'Write 30 journal entries',
         level: 3,
         category: 'journal',
-        image: '✍️💫',
-        requirement: { type: 'journal_entries', count: 100 }
+        image: '✍️',
+        requirement: {
+          type: 'journal_entries',
+          count: 30
+        }
       }
     ],
     streak: [
       {
         id: 'journal_streak_1',
-        name: 'Daily Reflector I',
-        description: 'Write journal entries for 7 consecutive days',
+        name: 'Journal Streak I',
+        description: 'Write journal entries for 3 consecutive days',
         level: 1,
         category: 'journal',
-        image: '📔',
-        requirement: { type: 'journal_streak', days: 7 }
+        image: '📝',
+        requirement: {
+          type: 'journal_streak',
+          days: 3
+        }
       },
       {
         id: 'journal_streak_2',
-        name: 'Daily Reflector II',
-        description: 'Write journal entries for 30 consecutive days',
+        name: 'Journal Streak II',
+        description: 'Write journal entries for 7 consecutive days',
         level: 2,
         category: 'journal',
-        image: '📔✨',
-        requirement: { type: 'journal_streak', days: 30 }
+        image: '📝',
+        requirement: {
+          type: 'journal_streak',
+          days: 7
+        }
       },
       {
         id: 'journal_streak_3',
-        name: 'Daily Reflector III',
-        description: 'Write journal entries for 100 consecutive days',
+        name: 'Journal Streak III',
+        description: 'Write journal entries for 30 consecutive days',
         level: 3,
         category: 'journal',
-        image: '📔💫',
-        requirement: { type: 'journal_streak', days: 100 }
+        image: '📝',
+        requirement: {
+          type: 'journal_streak',
+          days: 30
+        }
       }
     ]
   }

@@ -3,7 +3,7 @@
   import { prayerHistoryStore } from '../stores/prayerHistoryStore';
   import { weeklyStatsStore } from '../stores/tasbihStore';
   import { badgeStore } from '../stores/badgeStore';
-  import { Bell, Trophy, Target, Book, ChartBar, SignOut, CaretRight } from 'phosphor-svelte';
+  import { Bell, Trophy, Target, Book, ChartBar, SignOut, CaretRight, ArrowRight, Mosque, Sun, BookBookmark, HandsPraying, Sparkle, Pencil, CalendarPlus } from 'phosphor-svelte';
   import Toast from '../components/Toast.svelte';
   import { currentPage } from '../stores/pageStore';
   
@@ -69,6 +69,16 @@
     return Math.min((current / target) * 100, 100);
   }
 
+  // Get in-progress badges
+  $: inProgressBadges = Object.values(allBadges)
+    .flatMap(category => Object.values(category).flat())
+    .filter(badge => {
+      const progress = getBadgeProgress(badge);
+      return progress > 0 && progress < 100 && !earnedBadges.some(eb => eb.id === badge.id);
+    })
+    .sort((a, b) => getBadgeProgress(b) - getBadgeProgress(a))
+    .slice(0, 3); // Show top 3 in-progress badges
+
   // Get first badge from each category
   function getFirstBadgeFromCategory(category) {
     const categoryBadges = allBadges[category];
@@ -124,6 +134,26 @@
   ];
 
   export let navigateTo;
+
+  function getBadgeIcon(badge) {
+    if (badge.category === 'prayer') {
+      if (badge.requirement.type === 'streak') return Mosque;
+      if (badge.requirement.type === 'ontime_fajr') return Sun;
+    }
+    if (badge.category === 'quran') {
+      if (badge.requirement.type === 'daily_reading') return Book;
+      if (badge.requirement.type === 'juz_completion') return BookBookmark;
+    }
+    if (badge.category === 'dhikr') {
+      if (badge.requirement.type === 'daily_dhikr') return HandsPraying;
+      if (badge.requirement.type === 'dhikr_streak') return Sparkle;
+    }
+    if (badge.category === 'journal') {
+      if (badge.requirement.type === 'journal_entries') return Pencil;
+      if (badge.requirement.type === 'journal_streak') return CalendarPlus;
+    }
+    return Trophy;
+  }
 </script>
 
 <Toast />
@@ -163,40 +193,34 @@
     </div>
 
     <!-- Achievement Badges Card -->
-    <div class="card">
-      <div class="card-header">
-        <h3><Trophy weight="fill" /> Achievement Badges</h3>
-        <div class="badge-stats">
-          <span>{earnedBadgesCount}/{getTotalBadgesCount()}</span>
-        </div>
+    <div class="badges-section">
+      <div class="section-header">
+        <h2>
+          <Trophy weight="fill" />
+          Achievement Badges
+        </h2>
+        <span class="badge-count">{earnedBadges.length}/{getTotalBadgesCount()}</span>
       </div>
-      <div class="badges-container">
-        {#each Object.keys(allBadges) as category}
-          {@const badge = getFirstBadgeFromCategory(category)}
-          <div class="badge-item {badge.unlocked ? 'unlocked' : ''}">
-            <div class="badge-icon">{badge.image}</div>
+      <div class="badges-preview">
+        {#each inProgressBadges as badge}
+          <div class="badge-item">
+            <div class="badge-icon" data-level={badge.level}>
+              <svelte:component this={getBadgeIcon(badge)} size={20} weight="fill" />
+            </div>
             <div class="badge-details">
               <span class="badge-name">{badge.name}</span>
-              <span class="badge-description">{badge.description}</span>
-              {#if !badge.unlocked}
-                <div class="badge-progress">
-                  <div class="progress-bar">
-                    <div 
-                      class="progress" 
-                      style="width: {getBadgeProgress(badge)}%"
-                    ></div>
-                  </div>
-                  <span class="progress-text">{Math.round(getBadgeProgress(badge))}%</span>
-                </div>
-              {/if}
+              <div class="progress-bar">
+                <div class="progress" style="width: {getBadgeProgress(badge)}%"></div>
+              </div>
             </div>
+            <span class="progress-text">{Math.round(getBadgeProgress(badge))}%</span>
           </div>
         {/each}
-        <button class="view-all-button" on:click={() => navigateTo('badges')}>
-          <span>View All Badges</span>
-          <CaretRight weight="bold" />
-        </button>
       </div>
+      <button class="view-all" on:click={() => navigateTo('badges')}>
+        <span>View All Badges</span>
+        <ArrowRight weight="bold" />
+      </button>
     </div>
 
     <!-- Personal Goals Card -->
@@ -338,62 +362,139 @@
     color: #666;
   }
 
-  .badges-container {
+  .badges-section {
+    background: white;
+    border-radius: 12px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+  }
+
+  h2 {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+    font-size: 1rem;
+    color: #216974;
+  }
+
+  .badge-count {
+    font-size: 0.875rem;
+    color: #216974;
+    font-weight: 500;
+  }
+
+  .badges-preview {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
   }
 
   .badge-item {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     gap: 0.75rem;
-    padding: 1rem;
-    border-radius: 8px;
-    background: #f8f8f8;
-    opacity: 0.6;
-    transition: all 0.2s ease;
-    border: 1px solid rgba(33, 105, 116, 0.1);
-  }
-
-  .badge-item.unlocked {
-    opacity: 1;
-    background: rgba(33, 105, 116, 0.1);
-    border-color: rgba(33, 105, 116, 0.3);
+    padding: 0.5rem;
+    border-radius: 6px;
+    background: #F8FAFC;
   }
 
   .badge-icon {
-    font-size: 1.5rem;
-    width: 2.5rem;
-    height: 2.5rem;
+    width: 2.25rem;
+    height: 2.25rem;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(33, 105, 116, 0.05);
-    border-radius: 50%;
+    background: white;
+    border: 1px solid rgba(190, 159, 104, 0.2);
+    color: #BE9F68;
+    border-radius: 4px;
     flex-shrink: 0;
+    position: relative;
   }
 
-  .badge-item.unlocked .badge-icon {
-    background: #216974;
+  .badge-icon::after {
+    content: attr(data-level);
+    position: absolute;
+    bottom: -2px;
+    right: -2px;
+    background: #BE9F68;
     color: white;
+    font-size: 0.625rem;
+    font-weight: 600;
+    min-width: 12px;
+    height: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    padding: 1px;
   }
 
   .badge-details {
     flex: 1;
-    display: flex;
-    flex-direction: column;
+    min-width: 0;
   }
 
   .badge-name {
+    display: block;
+    font-size: 0.875rem;
     font-weight: 500;
     color: #216974;
+    margin-bottom: 0.25rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
-  .badge-description {
+  .progress-bar {
+    height: 3px;
+    background: rgba(33, 105, 116, 0.1);
+    border-radius: 1.5px;
+    overflow: hidden;
+  }
+
+  .progress {
+    height: 100%;
+    background: #216974;
+    border-radius: 1.5px;
+    transition: width 0.3s ease;
+  }
+
+  .progress-text {
     font-size: 0.75rem;
-    color: #666;
-    margin-top: 0.25rem;
+    color: #216974;
+    font-weight: 500;
+    min-width: 2.5rem;
+    text-align: right;
+  }
+
+  .view-all {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    background: none;
+    border: 1px solid rgba(33, 105, 116, 0.2);
+    border-radius: 6px;
+    color: #216974;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .view-all:hover {
+    background: rgba(33, 105, 116, 0.05);
   }
 
   .goals-list {
@@ -525,19 +626,19 @@
     justify-content: center;
     gap: 0.5rem;
     width: 100%;
-    background-color: #dc3545;
-    color: white;
-    padding: 1rem;
-    border: none;
-    border-radius: 8px;
+    background: none;
+    color: #BE9F68;
+    padding: 0.75rem;
+    border: 1px solid rgba(190, 159, 104, 0.3);
+    border-radius: 6px;
     font-weight: 500;
     cursor: pointer;
-    transition: background-color 0.2s;
+    transition: all 0.2s ease;
     margin-top: 1rem;
   }
 
   .sign-out-button:hover {
-    background-color: #c82333;
+    background: rgba(190, 159, 104, 0.1);
   }
 
   @media (max-width: 480px) {
@@ -561,77 +662,5 @@
     .achievement-icon {
       font-size: 1.25rem;
     }
-  }
-
-  .badge-progress {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin-top: 0.5rem;
-  }
-
-  .badge-progress .progress-bar {
-    flex: 1;
-    height: 4px;
-    background: rgba(33, 105, 116, 0.1);
-    border-radius: 2px;
-    overflow: hidden;
-  }
-
-  .badge-progress .progress {
-    height: 100%;
-    background: #216974;
-    border-radius: 2px;
-    transition: width 0.3s ease;
-  }
-
-  .progress-text {
-    font-size: 0.75rem;
-    color: #216974;
-    min-width: 2.5rem;
-  }
-
-  .card-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1rem;
-  }
-
-  .badge-stats {
-    font-size: 0.875rem;
-    color: #216974;
-    font-weight: 500;
-    background: rgba(33, 105, 116, 0.1);
-    padding: 0.25rem 0.75rem;
-    border-radius: 1rem;
-  }
-
-  .view-all-button {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    background: #216974;
-    color: white;
-    border: none;
-    padding: 0.75rem;
-    border-radius: 8px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: background-color 0.2s ease;
-    margin-top: 0.5rem;
-  }
-
-  .view-all-button:hover {
-    background: #184f57;
-  }
-
-  .view-all-button :global(svg) {
-    transition: transform 0.2s ease;
-  }
-
-  .view-all-button:hover :global(svg) {
-    transform: translateX(4px);
   }
 </style> 
