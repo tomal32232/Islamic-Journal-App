@@ -10,6 +10,7 @@
   let selectedReciter = RECITERS[0].id;
   let versesContainer;
   let currentSessionId = null;
+  let selectedBookmark = null;
   
   // Subscribe to quranStore
   $: ({ currentSurah, currentVerse, surahList, currentSurahDetails, loading, error, audioPlaying, autoPlay } = $quranStore);
@@ -35,6 +36,18 @@
         );
       }
     }
+  }
+
+  async function handleBookmarkSelect(event) {
+    const value = event.target.value;
+    if (!value) return;
+    
+    const [surahNumber, verseNumber] = value.split('-').map(Number);
+    selectedSurah = surahNumber;
+    await fetchSurahDetails(surahNumber);
+    handleVerseClick(verseNumber);
+    selectedBookmark = null;
+    event.target.value = '';
   }
 
   function handleVerseClick(verseNumber) {
@@ -158,6 +171,22 @@
           {#each surahList as surah}
             <option value={surah.number}>
               {surah.number}. {surah.englishName} ({surah.name})
+            </option>
+          {/each}
+        </select>
+      </div>
+
+      <div class="select-wrapper">
+        <select 
+          class="bookmark-select" 
+          value={selectedBookmark} 
+          on:change={handleBookmarkSelect}
+          disabled={loading}
+        >
+          <option value="">Go to Bookmark</option>
+          {#each bookmarkedVerses as bookmark}
+            <option value="{bookmark.surah}-{bookmark.verse}">
+              {bookmark.surahName} - Verse {bookmark.verse}
             </option>
           {/each}
         </select>
@@ -304,7 +333,7 @@
 
   .sticky-header {
     position: sticky;
-    top: 48px; /* Height of the tabs + padding */
+    top: 48px;
     z-index: 10;
     background: white;
     padding: 0.75rem 1rem;
@@ -321,7 +350,7 @@
 
   .select-wrapper {
     position: relative;
-    flex: 1;
+    width: 100%;
   }
 
   .select-wrapper::after {
@@ -341,32 +370,46 @@
   .reciter-controls {
     display: flex;
     gap: 0.75rem;
+    align-items: center;
   }
 
   .surah-select,
-  .reciter-select {
+  .reciter-select,
+  .bookmark-select {
     width: 100%;
-    padding: 0.75rem 1rem;
-    border: 1px solid #e0e0e0;
+    padding: 0.75rem 2rem 0.75rem 1rem;
+    border: 1px solid #e2e8f0;
     border-radius: 8px;
+    background-color: white;
     font-size: 0.875rem;
-    color: #216974;
-    background: white;
-    appearance: none;
+    color: #1a202c;
     cursor: pointer;
     transition: all 0.2s ease;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
   }
 
   .surah-select:hover,
-  .reciter-select:hover {
+  .reciter-select:hover,
+  .bookmark-select:hover {
     border-color: #216974;
   }
 
   .surah-select:focus,
-  .reciter-select:focus {
+  .reciter-select:focus,
+  .bookmark-select:focus {
     outline: none;
     border-color: #216974;
     box-shadow: 0 0 0 2px rgba(33, 105, 116, 0.1);
+  }
+
+  .surah-select:disabled,
+  .reciter-select:disabled,
+  .bookmark-select:disabled {
+    background-color: #f7fafc;
+    cursor: not-allowed;
+    opacity: 0.7;
   }
 
   .auto-play-toggle {
@@ -406,7 +449,18 @@
   @media (min-width: 640px) {
     .controls-section {
       flex-direction: row;
-      align-items: center;
+      align-items: stretch;
+      gap: 1rem;
+    }
+
+    .select-wrapper {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .reciter-controls {
+      width: auto;
+      flex: 0 0 auto;
     }
   }
 
@@ -420,8 +474,9 @@
     }
 
     .surah-select,
-    .reciter-select {
-      padding: 0.625rem 0.875rem;
+    .reciter-select,
+    .bookmark-select {
+      padding: 0.625rem 2rem 0.625rem 0.875rem;
       font-size: 0.8125rem;
     }
 
