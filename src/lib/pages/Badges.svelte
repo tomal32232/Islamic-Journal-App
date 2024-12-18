@@ -1,6 +1,20 @@
 <script>
+  import { onMount } from 'svelte';
   import { badgeStore } from '../stores/badgeStore';
-  import { Trophy, ArrowLeft } from 'phosphor-svelte';
+  import { 
+    Trophy, 
+    ArrowLeft, 
+    Mosque, 
+    Sun, 
+    Book, 
+    BookBookmark, 
+    Star, 
+    Pencil, 
+    CalendarPlus, 
+    HandsPraying,
+    Sparkle
+  } from 'phosphor-svelte';
+  import { auth } from '../firebase';
 
   export let onBack;
 
@@ -10,55 +24,86 @@
   let searchQuery = '';
   let filterUnlocked = 'all'; // 'all', 'unlocked', 'locked'
 
+  onMount(() => {
+    console.log('=== Badges Component Mounted ===');
+    const user = auth.currentUser;
+    if (user) {
+      console.log('Initializing badge store for user:', user.uid);
+      badgeStore.init(user.uid);
+    } else {
+      console.log('No user found');
+    }
+  });
+
   // Update earned badges when store changes
   $: if ($badgeStore) {
+    console.log('Badge store updated:', $badgeStore);
     earnedBadges = badgeStore.getEarnedBadges($badgeStore.earnedBadges);
   }
 
   // Calculate badge progress
   function getBadgeProgress(badge) {
-    if (!$badgeStore?.progress) return 0;
+    console.log('=== Getting Badge Progress ===');
+    console.log('Badge:', badge);
+    console.log('Badge Store:', $badgeStore);
+    
+    if (!$badgeStore?.progress) {
+      console.log('No progress data in badge store');
+      return 0;
+    }
     
     const progress = $badgeStore.progress;
     let current = 0;
     let target = 0;
 
+    // Get the base progress key without the _progress suffix
+    const progressKey = badge.requirement.type;
+    const progressKeyWithSuffix = `${progressKey}_progress`;
+    console.log('Progress key:', progressKey);
+    console.log('Progress key with suffix:', progressKeyWithSuffix);
+    console.log('All progress keys:', Object.keys(progress));
+
     switch (badge.requirement.type) {
       case 'streak':
-        current = progress['streak'] || 0;
+        current = progress['streak'] || progress['streak_progress'] || 0;
         target = badge.requirement.count;
         break;
       case 'ontime_fajr':
-        current = progress['ontime_fajr'] || 0;
+        current = progress['ontime_fajr'] || progress['ontime_fajr_progress'] || 0;
         target = badge.requirement.count;
         break;
       case 'daily_reading':
-        current = progress['daily_reading'] || 0;
+        current = progress['daily_reading'] || progress['daily_reading_progress'] || 0;
         target = badge.requirement.minutes;
         break;
       case 'juz_completion':
-        current = progress['juz_completion'] || 0;
+        current = progress['juz_completion'] || progress['juz_completion_progress'] || 0;
         target = badge.requirement.count;
         break;
       case 'daily_dhikr':
-        current = progress['daily_dhikr'] || 0;
+        current = progress['daily_dhikr'] || progress['daily_dhikr_progress'] || 0;
         target = badge.requirement.count;
         break;
       case 'dhikr_streak':
-        current = progress['dhikr_streak'] || 0;
+        current = progress['dhikr_streak'] || progress['dhikr_streak_progress'] || 0;
         target = badge.requirement.days;
         break;
       case 'journal_entries':
-        current = progress['journal_entries'] || 0;
+        current = progress['journal_entries'] || progress['journal_entries_progress'] || 0;
         target = badge.requirement.count;
         break;
       case 'journal_streak':
-        current = progress['journal_streak'] || 0;
+        current = progress['journal_streak'] || progress['journal_streak_progress'] || 0;
         target = badge.requirement.days;
         break;
     }
 
-    return Math.min((current / target) * 100, 100);
+    console.log('Current value:', current);
+    console.log('Target value:', target);
+    const percentage = Math.min((current / target) * 100, 100);
+    console.log('Calculated percentage:', percentage);
+    
+    return percentage;
   }
 
   // Filter badges based on search, category, and unlock status
@@ -148,19 +193,39 @@
         <div class="badges-grid">
           {#each badges as badge}
             <div class="badge-item {badge.unlocked ? 'unlocked' : ''}">
-              <div class="badge-icon">{badge.image}</div>
+              <div class="badge-icon" data-level={badge.level}>
+                {#if badge.category === 'prayer' && badge.requirement.type === 'streak'}
+                  <Mosque size={20} weight="fill" />
+                {:else if badge.category === 'prayer' && badge.requirement.type === 'ontime_fajr'}
+                  <Sun size={20} weight="fill" />
+                {:else if badge.category === 'quran' && badge.requirement.type === 'daily_reading'}
+                  <Book size={20} weight="fill" />
+                {:else if badge.category === 'quran' && badge.requirement.type === 'juz_completion'}
+                  <BookBookmark size={20} weight="fill" />
+                {:else if badge.category === 'dhikr' && badge.requirement.type === 'daily_dhikr'}
+                  <HandsPraying size={20} weight="fill" />
+                {:else if badge.category === 'dhikr' && badge.requirement.type === 'dhikr_streak'}
+                  <Sparkle size={20} weight="fill" />
+                {:else if badge.category === 'journal' && badge.requirement.type === 'journal_entries'}
+                  <Pencil size={20} weight="fill" />
+                {:else if badge.category === 'journal' && badge.requirement.type === 'journal_streak'}
+                  <CalendarPlus size={20} weight="fill" />
+                {/if}
+              </div>
               <div class="badge-details">
-                <span class="badge-name">{badge.name}</span>
+                <div class="badge-header">
+                  <span class="badge-name">{badge.name}</span>
+                  {#if !badge.unlocked}
+                    <span class="progress-text">{Math.round(getBadgeProgress(badge))}%</span>
+                  {/if}
+                </div>
                 <span class="badge-description">{badge.description}</span>
                 {#if !badge.unlocked}
-                  <div class="badge-progress">
-                    <div class="progress-bar">
-                      <div 
-                        class="progress" 
-                        style="width: {getBadgeProgress(badge)}%"
-                      ></div>
-                    </div>
-                    <span class="progress-text">{Math.round(getBadgeProgress(badge))}%</span>
+                  <div class="progress-bar">
+                    <div 
+                      class="progress" 
+                      style="width: {getBadgeProgress(badge)}%"
+                    ></div>
                   </div>
                 {/if}
               </div>
@@ -178,10 +243,12 @@
     padding-bottom: 64px;
     background: #F8FAFC;
     min-height: 100vh;
+    max-width: 100%;
+    overflow-x: hidden;
   }
 
   .badges-header {
-    margin-bottom: 2rem;
+    margin-bottom: 1rem;
   }
 
   .back-button {
@@ -192,7 +259,7 @@
     border: none;
     color: #216974;
     padding: 0;
-    margin-bottom: 1rem;
+    margin-bottom: 0.5rem;
     cursor: pointer;
     font-weight: 500;
   }
@@ -209,7 +276,14 @@
     gap: 0.5rem;
     margin: 0;
     color: #216974;
-    font-size: 1.5rem;
+    font-size: 1.25rem;
+  }
+
+  h2 {
+    color: #216974;
+    font-size: 1rem;
+    margin: 0 0 0.5rem 0;
+    font-weight: 500;
   }
 
   .badge-stats {
@@ -219,78 +293,71 @@
   }
 
   .badge-stats span {
-    font-size: 1.25rem;
+    font-size: 1rem;
     font-weight: 600;
     color: #216974;
   }
 
   .stats-label {
-    font-size: 0.875rem !important;
+    font-size: 0.75rem !important;
     font-weight: normal !important;
     opacity: 0.8;
   }
 
   .filters {
-    margin-bottom: 2rem;
+    margin-bottom: 1rem;
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: 0.5rem;
   }
 
   .search-box input {
     width: 100%;
-    padding: 0.75rem;
+    padding: 0.5rem;
     border: 1px solid rgba(33, 105, 116, 0.2);
-    border-radius: 8px;
-    font-size: 1rem;
+    border-radius: 6px;
+    font-size: 0.875rem;
     color: #216974;
-  }
-
-  .search-box input::placeholder {
-    color: rgba(33, 105, 116, 0.5);
   }
 
   .filter-options {
     display: flex;
-    gap: 1rem;
+    gap: 0.5rem;
   }
 
   .filter-options select {
     flex: 1;
-    padding: 0.75rem;
+    padding: 0.5rem;
     border: 1px solid rgba(33, 105, 116, 0.2);
-    border-radius: 8px;
-    font-size: 1rem;
+    border-radius: 6px;
+    font-size: 0.875rem;
     color: #216974;
     background: white;
   }
 
   .category-section {
-    margin-bottom: 2rem;
-  }
-
-  .category-section h2 {
-    color: #216974;
-    font-size: 1.25rem;
-    margin: 0 0 1rem 0;
+    margin-bottom: 1rem;
   }
 
   .badges-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 1rem;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 0.5rem;
+    width: 100%;
   }
 
   .badge-item {
     display: flex;
     align-items: flex-start;
-    gap: 1rem;
-    padding: 1rem;
-    border-radius: 8px;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    border-radius: 6px;
     background: white;
     opacity: 0.6;
     transition: all 0.2s ease;
     border: 1px solid rgba(33, 105, 116, 0.1);
+    width: 100%;
+    box-sizing: border-box;
   }
 
   .badge-item.unlocked {
@@ -300,74 +367,117 @@
   }
 
   .badge-icon {
-    font-size: 1.5rem;
-    width: 2.5rem;
-    height: 2.5rem;
+    font-size: 1rem;
+    width: 2.25rem;
+    height: 2.25rem;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(33, 105, 116, 0.05);
-    border-radius: 50%;
+    background: white;
+    border: 1px solid rgba(190, 159, 104, 0.2);
+    color: #BE9F68;
+    border-radius: 4px;
     flex-shrink: 0;
+    position: relative;
+  }
+
+  .badge-icon :global(svg) {
+    width: 20px;
+    height: 20px;
   }
 
   .badge-item.unlocked .badge-icon {
-    background: #216974;
+    background: #BE9F68;
     color: white;
+    border: none;
+  }
+
+  .badge-icon::after {
+    content: attr(data-level);
+    position: absolute;
+    bottom: -2px;
+    right: -2px;
+    background: #BE9F68;
+    color: white;
+    font-size: 0.625rem;
+    font-weight: 600;
+    min-width: 12px;
+    height: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    padding: 1px;
+  }
+
+  .badge-item.unlocked .badge-icon::after {
+    background: white;
+    color: #BE9F68;
+    border: 1px solid #BE9F68;
   }
 
   .badge-details {
     flex: 1;
     display: flex;
     flex-direction: column;
+    gap: 0.25rem;
+    padding-top: 0.25rem;
+    min-width: 0; /* Prevent flex item from overflowing */
+  }
+
+  .badge-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
   }
 
   .badge-name {
     font-weight: 500;
     color: #216974;
+    font-size: 0.875rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .badge-description {
-    font-size: 0.875rem;
+    font-size: 0.75rem;
     color: #666;
-    margin-top: 0.25rem;
-  }
-
-  .badge-progress {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin-top: 0.5rem;
+    word-wrap: break-word;
   }
 
   .progress-bar {
-    flex: 1;
-    height: 4px;
+    height: 3px;
     background: rgba(33, 105, 116, 0.1);
-    border-radius: 2px;
+    border-radius: 1.5px;
     overflow: hidden;
+    margin-top: 0.25rem;
   }
 
   .progress {
     height: 100%;
     background: #216974;
-    border-radius: 2px;
+    border-radius: 1.5px;
     transition: width 0.3s ease;
   }
 
   .progress-text {
     font-size: 0.75rem;
     color: #216974;
-    min-width: 2.5rem;
+    font-weight: 500;
   }
 
   @media (max-width: 640px) {
-    .filter-options {
-      flex-direction: column;
+    .badges-page {
+      padding: 0.75rem;
     }
 
     .badges-grid {
       grid-template-columns: 1fr;
+    }
+
+    .filter-options {
+      flex-direction: column;
     }
   }
 </style> 

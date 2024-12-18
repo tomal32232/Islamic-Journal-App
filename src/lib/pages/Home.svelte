@@ -476,6 +476,11 @@
                   {/if}
                 </div>
               </div>
+            {:else}
+              <div class="no-prayer-message">
+                <p>All prayers for today are complete. 🌙</p>
+                <p class="subtitle">Have a blessed rest of your day!</p>
+              </div>
             {/if}
           </div>
         </div>
@@ -1040,6 +1045,24 @@
     width: 1.25rem;
     height: 1.25rem;
     color: white;
+  }
+
+  .no-prayer-message {
+    text-align: center;
+    padding: 1.5rem 1rem;
+    color: #216974;
+  }
+
+  .no-prayer-message p {
+    margin: 0;
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
+
+  .no-prayer-message .subtitle {
+    margin-top: 0.5rem;
+    color: #666;
+    font-weight: normal;
   }
 </style>
 
