@@ -1,7 +1,18 @@
 <script>
   import { onMount } from 'svelte';
   import { badgeStore } from '../stores/badgeStore';
-  import { Trophy, ArrowLeft, Mosque, Sun, Book, BookBookmark, Star, NotePencil, Notebook, Heart } from 'phosphor-svelte';
+  import { 
+    Trophy, 
+    ArrowLeft, 
+    Mosque, 
+    Sun, 
+    Book, 
+    BookBookmark, 
+    Star, 
+    Pencil, 
+    CalendarPlus, 
+    Heart 
+  } from 'phosphor-svelte';
   import { auth } from '../firebase';
 
   export let onBack;
@@ -183,21 +194,21 @@
             <div class="badge-item {badge.unlocked ? 'unlocked' : ''}">
               <div class="badge-icon" data-level={badge.level}>
                 {#if badge.category === 'prayer' && badge.requirement.type === 'streak'}
-                  <Mosque weight="fill" />
+                  <Mosque size={20} weight="fill" />
                 {:else if badge.category === 'prayer' && badge.requirement.type === 'ontime_fajr'}
-                  <Sun weight="fill" />
+                  <Sun size={20} weight="fill" />
                 {:else if badge.category === 'quran' && badge.requirement.type === 'daily_reading'}
-                  <Book weight="fill" />
+                  <Book size={20} weight="fill" />
                 {:else if badge.category === 'quran' && badge.requirement.type === 'juz_completion'}
-                  <BookBookmark weight="fill" />
+                  <BookBookmark size={20} weight="fill" />
                 {:else if badge.category === 'dhikr' && badge.requirement.type === 'daily_dhikr'}
-                  <Heart weight="fill" />
+                  <Heart size={20} weight="fill" />
                 {:else if badge.category === 'dhikr' && badge.requirement.type === 'dhikr_streak'}
-                  <Star weight="fill" />
-                {:else if badge.category === 'journal' && badge.requirement.type === 'entries'}
-                  <NotePencil weight="fill" />
-                {:else if badge.category === 'journal' && badge.requirement.type === 'streak'}
-                  <Notebook weight="fill" />
+                  <Star size={20} weight="fill" />
+                {:else if badge.category === 'journal' && badge.requirement.type === 'journal_entries'}
+                  <Pencil size={20} weight="fill" />
+                {:else if badge.category === 'journal' && badge.requirement.type === 'journal_streak'}
+                  <CalendarPlus size={20} weight="fill" />
                 {/if}
               </div>
               <div class="badge-details">
@@ -365,8 +376,8 @@
   }
 
   .badge-icon :global(svg) {
-    width: 1.25rem;
-    height: 1.25rem;
+    width: 20px;
+    height: 20px;
   }
 
   .badge-item.unlocked .badge-icon {
