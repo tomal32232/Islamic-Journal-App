@@ -69,6 +69,16 @@
     return Math.min((current / target) * 100, 100);
   }
 
+  // Get in-progress badges
+  $: inProgressBadges = Object.values(allBadges)
+    .flatMap(category => Object.values(category).flat())
+    .filter(badge => {
+      const progress = getBadgeProgress(badge);
+      return progress > 0 && progress < 100 && !earnedBadges.some(eb => eb.id === badge.id);
+    })
+    .sort((a, b) => getBadgeProgress(b) - getBadgeProgress(a))
+    .slice(0, 3); // Show top 3 in-progress badges
+
   // Get first badge from each category
   function getFirstBadgeFromCategory(category) {
     const categoryBadges = allBadges[category];
@@ -171,27 +181,27 @@
         </div>
       </div>
       <div class="badges-container">
-        {#each Object.keys(allBadges) as category}
-          {@const badge = getFirstBadgeFromCategory(category)}
-          <div class="badge-item {badge.unlocked ? 'unlocked' : ''}">
-            <div class="badge-icon">{badge.image}</div>
-            <div class="badge-details">
-              <span class="badge-name">{badge.name}</span>
-              <span class="badge-description">{badge.description}</span>
-              {#if !badge.unlocked}
-                <div class="badge-progress">
+        {#if inProgressBadges.length > 0}
+          <div class="in-progress-badges">
+            {#each inProgressBadges as badge}
+              <div class="badge-item">
+                <div class="badge-icon">{badge.image}</div>
+                <div class="badge-details">
+                  <div class="badge-header">
+                    <span class="badge-name">{badge.name}</span>
+                    <span class="progress-text">{Math.round(getBadgeProgress(badge))}%</span>
+                  </div>
                   <div class="progress-bar">
                     <div 
                       class="progress" 
                       style="width: {getBadgeProgress(badge)}%"
                     ></div>
                   </div>
-                  <span class="progress-text">{Math.round(getBadgeProgress(badge))}%</span>
                 </div>
-              {/if}
-            </div>
+              </div>
+            {/each}
           </div>
-        {/each}
+        {/if}
         <button class="view-all-button" on:click={() => navigateTo('badges')}>
           <span>View All Badges</span>
           <CaretRight weight="bold" />
@@ -341,31 +351,29 @@
   .badges-container {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: 0.5rem;
+  }
+
+  .in-progress-badges {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
   }
 
   .badge-item {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     gap: 0.75rem;
-    padding: 1rem;
-    border-radius: 8px;
-    background: #f8f8f8;
-    opacity: 0.6;
+    padding: 0.5rem;
+    background: rgba(33, 105, 116, 0.05);
+    border-radius: 6px;
     transition: all 0.2s ease;
-    border: 1px solid rgba(33, 105, 116, 0.1);
-  }
-
-  .badge-item.unlocked {
-    opacity: 1;
-    background: rgba(33, 105, 116, 0.1);
-    border-color: rgba(33, 105, 116, 0.3);
   }
 
   .badge-icon {
-    font-size: 1.5rem;
-    width: 2.5rem;
-    height: 2.5rem;
+    font-size: 1.25rem;
+    width: 2rem;
+    height: 2rem;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -374,26 +382,74 @@
     flex-shrink: 0;
   }
 
-  .badge-item.unlocked .badge-icon {
-    background: #216974;
-    color: white;
-  }
-
   .badge-details {
     flex: 1;
     display: flex;
     flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .badge-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
   }
 
   .badge-name {
     font-weight: 500;
     color: #216974;
+    font-size: 0.875rem;
   }
 
-  .badge-description {
+  .progress-bar {
+    height: 3px;
+    background: rgba(33, 105, 116, 0.1);
+    border-radius: 1.5px;
+    overflow: hidden;
+  }
+
+  .progress {
+    height: 100%;
+    background: #216974;
+    border-radius: 1.5px;
+    transition: width 0.3s ease;
+  }
+
+  .progress-text {
     font-size: 0.75rem;
-    color: #666;
-    margin-top: 0.25rem;
+    color: #216974;
+    font-weight: 500;
+  }
+
+  .view-all-button {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem;
+    background: white;
+    border: 1px solid rgba(33, 105, 116, 0.2);
+    border-radius: 6px;
+    color: #216974;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .view-all-button:hover {
+    background: rgba(33, 105, 116, 0.05);
+  }
+
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+  }
+
+  .badge-stats {
+    font-size: 0.875rem;
+    color: #216974;
+    font-weight: 500;
   }
 
   .goals-list {
@@ -561,77 +617,5 @@
     .achievement-icon {
       font-size: 1.25rem;
     }
-  }
-
-  .badge-progress {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin-top: 0.5rem;
-  }
-
-  .badge-progress .progress-bar {
-    flex: 1;
-    height: 4px;
-    background: rgba(33, 105, 116, 0.1);
-    border-radius: 2px;
-    overflow: hidden;
-  }
-
-  .badge-progress .progress {
-    height: 100%;
-    background: #216974;
-    border-radius: 2px;
-    transition: width 0.3s ease;
-  }
-
-  .progress-text {
-    font-size: 0.75rem;
-    color: #216974;
-    min-width: 2.5rem;
-  }
-
-  .card-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1rem;
-  }
-
-  .badge-stats {
-    font-size: 0.875rem;
-    color: #216974;
-    font-weight: 500;
-    background: rgba(33, 105, 116, 0.1);
-    padding: 0.25rem 0.75rem;
-    border-radius: 1rem;
-  }
-
-  .view-all-button {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    background: #216974;
-    color: white;
-    border: none;
-    padding: 0.75rem;
-    border-radius: 8px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: background-color 0.2s ease;
-    margin-top: 0.5rem;
-  }
-
-  .view-all-button:hover {
-    background: #184f57;
-  }
-
-  .view-all-button :global(svg) {
-    transition: transform 0.2s ease;
-  }
-
-  .view-all-button:hover :global(svg) {
-    transform: translateX(4px);
   }
 </style> 
