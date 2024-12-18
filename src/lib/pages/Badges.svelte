@@ -124,6 +124,16 @@
     return acc;
   }, {});
 
+  // Get in-progress badges
+  $: inProgressBadges = Object.values(allBadges)
+    .flatMap(category => Object.values(category).flat())
+    .filter(badge => {
+      const progress = getBadgeProgress(badge);
+      return progress > 0 && progress < 100 && !earnedBadges.some(eb => eb.id === badge.id);
+    })
+    .sort((a, b) => getBadgeProgress(b) - getBadgeProgress(a))
+    .slice(0, 3); // Show top 3 in-progress badges
+
   // Get total and earned counts
   $: totalBadges = Object.values(allBadges).reduce((total, category) => {
     return total + Object.values(category).reduce((sum, badges) => sum + badges.length, 0);
@@ -148,6 +158,31 @@
       </div>
     </div>
   </header>
+
+  {#if inProgressBadges.length > 0}
+    <section class="in-progress-section">
+      <h2>In Progress</h2>
+      <div class="in-progress-badges">
+        {#each inProgressBadges as badge}
+          <div class="in-progress-badge">
+            <div class="badge-icon">{badge.image}</div>
+            <div class="badge-details">
+              <div class="badge-header">
+                <span class="badge-name">{badge.name}</span>
+                <span class="progress-text">{Math.round(getBadgeProgress(badge))}%</span>
+              </div>
+              <div class="progress-bar">
+                <div 
+                  class="progress" 
+                  style="width: {getBadgeProgress(badge)}%"
+                ></div>
+              </div>
+            </div>
+          </div>
+        {/each}
+      </div>
+    </section>
+  {/if}
 
   <div class="filters">
     <div class="search-box">
@@ -183,17 +218,19 @@
             <div class="badge-item {badge.unlocked ? 'unlocked' : ''}">
               <div class="badge-icon">{badge.image}</div>
               <div class="badge-details">
-                <span class="badge-name">{badge.name}</span>
+                <div class="badge-header">
+                  <span class="badge-name">{badge.name}</span>
+                  {#if !badge.unlocked}
+                    <span class="progress-text">{Math.round(getBadgeProgress(badge))}%</span>
+                  {/if}
+                </div>
                 <span class="badge-description">{badge.description}</span>
                 {#if !badge.unlocked}
-                  <div class="badge-progress">
-                    <div class="progress-bar">
-                      <div 
-                        class="progress" 
-                        style="width: {getBadgeProgress(badge)}%"
-                      ></div>
-                    </div>
-                    <span class="progress-text">{Math.round(getBadgeProgress(badge))}%</span>
+                  <div class="progress-bar">
+                    <div 
+                      class="progress" 
+                      style="width: {getBadgeProgress(badge)}%"
+                    ></div>
                   </div>
                 {/if}
               </div>
@@ -214,7 +251,7 @@
   }
 
   .badges-header {
-    margin-bottom: 2rem;
+    margin-bottom: 1rem;
   }
 
   .back-button {
@@ -225,7 +262,7 @@
     border: none;
     color: #216974;
     padding: 0;
-    margin-bottom: 1rem;
+    margin-bottom: 0.5rem;
     cursor: pointer;
     font-weight: 500;
   }
@@ -242,7 +279,14 @@
     gap: 0.5rem;
     margin: 0;
     color: #216974;
-    font-size: 1.5rem;
+    font-size: 1.25rem;
+  }
+
+  h2 {
+    color: #216974;
+    font-size: 1rem;
+    margin: 0 0 0.5rem 0;
+    font-weight: 500;
   }
 
   .badge-stats {
@@ -252,74 +296,87 @@
   }
 
   .badge-stats span {
-    font-size: 1.25rem;
+    font-size: 1rem;
     font-weight: 600;
     color: #216974;
   }
 
   .stats-label {
-    font-size: 0.875rem !important;
+    font-size: 0.75rem !important;
     font-weight: normal !important;
     opacity: 0.8;
   }
 
-  .filters {
-    margin-bottom: 2rem;
+  .in-progress-section {
+    margin-bottom: 1rem;
+    background: white;
+    padding: 0.75rem;
+    border-radius: 8px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  }
+
+  .in-progress-badges {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: 0.5rem;
+  }
+
+  .in-progress-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem;
+    background: rgba(33, 105, 116, 0.05);
+    border-radius: 6px;
+  }
+
+  .filters {
+    margin-bottom: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
   }
 
   .search-box input {
     width: 100%;
-    padding: 0.75rem;
+    padding: 0.5rem;
     border: 1px solid rgba(33, 105, 116, 0.2);
-    border-radius: 8px;
-    font-size: 1rem;
+    border-radius: 6px;
+    font-size: 0.875rem;
     color: #216974;
-  }
-
-  .search-box input::placeholder {
-    color: rgba(33, 105, 116, 0.5);
   }
 
   .filter-options {
     display: flex;
-    gap: 1rem;
+    gap: 0.5rem;
   }
 
   .filter-options select {
     flex: 1;
-    padding: 0.75rem;
+    padding: 0.5rem;
     border: 1px solid rgba(33, 105, 116, 0.2);
-    border-radius: 8px;
-    font-size: 1rem;
+    border-radius: 6px;
+    font-size: 0.875rem;
     color: #216974;
     background: white;
   }
 
   .category-section {
-    margin-bottom: 2rem;
-  }
-
-  .category-section h2 {
-    color: #216974;
-    font-size: 1.25rem;
-    margin: 0 0 1rem 0;
+    margin-bottom: 1rem;
   }
 
   .badges-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 1rem;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 0.5rem;
   }
 
   .badge-item {
     display: flex;
     align-items: flex-start;
-    gap: 1rem;
-    padding: 1rem;
-    border-radius: 8px;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    border-radius: 6px;
     background: white;
     opacity: 0.6;
     transition: all 0.2s ease;
@@ -333,9 +390,9 @@
   }
 
   .badge-icon {
-    font-size: 1.5rem;
-    width: 2.5rem;
-    height: 2.5rem;
+    font-size: 1.25rem;
+    width: 2rem;
+    height: 2rem;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -353,45 +410,45 @@
     flex: 1;
     display: flex;
     flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .badge-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
   }
 
   .badge-name {
     font-weight: 500;
     color: #216974;
+    font-size: 0.875rem;
   }
 
   .badge-description {
-    font-size: 0.875rem;
+    font-size: 0.75rem;
     color: #666;
-    margin-top: 0.25rem;
-  }
-
-  .badge-progress {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin-top: 0.5rem;
   }
 
   .progress-bar {
-    flex: 1;
-    height: 4px;
+    height: 3px;
     background: rgba(33, 105, 116, 0.1);
-    border-radius: 2px;
+    border-radius: 1.5px;
     overflow: hidden;
+    margin-top: 0.25rem;
   }
 
   .progress {
     height: 100%;
     background: #216974;
-    border-radius: 2px;
+    border-radius: 1.5px;
     transition: width 0.3s ease;
   }
 
   .progress-text {
     font-size: 0.75rem;
     color: #216974;
-    min-width: 2.5rem;
+    font-weight: 500;
   }
 
   @media (max-width: 640px) {
