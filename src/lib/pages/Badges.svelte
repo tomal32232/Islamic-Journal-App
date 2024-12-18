@@ -124,16 +124,6 @@
     return acc;
   }, {});
 
-  // Get in-progress badges
-  $: inProgressBadges = Object.values(allBadges)
-    .flatMap(category => Object.values(category).flat())
-    .filter(badge => {
-      const progress = getBadgeProgress(badge);
-      return progress > 0 && progress < 100 && !earnedBadges.some(eb => eb.id === badge.id);
-    })
-    .sort((a, b) => getBadgeProgress(b) - getBadgeProgress(a))
-    .slice(0, 3); // Show top 3 in-progress badges
-
   // Get total and earned counts
   $: totalBadges = Object.values(allBadges).reduce((total, category) => {
     return total + Object.values(category).reduce((sum, badges) => sum + badges.length, 0);
@@ -158,31 +148,6 @@
       </div>
     </div>
   </header>
-
-  {#if inProgressBadges.length > 0}
-    <section class="in-progress-section">
-      <h2>In Progress</h2>
-      <div class="in-progress-badges">
-        {#each inProgressBadges as badge}
-          <div class="in-progress-badge">
-            <div class="badge-icon">{badge.image}</div>
-            <div class="badge-details">
-              <div class="badge-header">
-                <span class="badge-name">{badge.name}</span>
-                <span class="progress-text">{Math.round(getBadgeProgress(badge))}%</span>
-              </div>
-              <div class="progress-bar">
-                <div 
-                  class="progress" 
-                  style="width: {getBadgeProgress(badge)}%"
-                ></div>
-              </div>
-            </div>
-          </div>
-        {/each}
-      </div>
-    </section>
-  {/if}
 
   <div class="filters">
     <div class="search-box">
@@ -305,29 +270,6 @@
     font-size: 0.75rem !important;
     font-weight: normal !important;
     opacity: 0.8;
-  }
-
-  .in-progress-section {
-    margin-bottom: 1rem;
-    background: white;
-    padding: 0.75rem;
-    border-radius: 8px;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-  }
-
-  .in-progress-badges {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-  }
-
-  .in-progress-badge {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.5rem;
-    background: rgba(33, 105, 116, 0.05);
-    border-radius: 6px;
   }
 
   .filters {
