@@ -1,5 +1,6 @@
 import { getFirestore, collection, addDoc, query, where, getDocs, doc, updateDoc, getDoc } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
+import { updateQuranProgress } from './badgeProgressService';
 
 const READING_SESSIONS_COLLECTION = 'readingSessions';
 
@@ -43,11 +44,15 @@ export async function endReadingSession(sessionId) {
       const sessionData = sessionDoc.data();
       const startTime = new Date(sessionData.startTime);
       const duration = Math.floor((endTime - startTime) / 1000); // Duration in seconds
+      const minutes = Math.floor(duration / 60); // Convert to minutes
 
       await updateDoc(sessionRef, {
         endTime: endTime.toISOString(),
         duration
       });
+
+      // Update badge progress with reading minutes
+      await updateQuranProgress(minutes);
     }
   } catch (error) {
     console.error('Error ending reading session:', error);

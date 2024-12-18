@@ -11,6 +11,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { prayerTimesStore } from './prayerTimes';
+import { updatePrayerProgress } from '../services/badgeProgressService';
 
 export const prayerHistoryStore = writable({
   pendingByDate: {},
@@ -137,12 +138,12 @@ export async function updatePrayerStatuses() {
     const prayerDate = new Date(prayer.date);
     const prayerDateStr = prayerDate.toLocaleDateString('en-CA');
     
-    console.log('\nPrayer Details:');
-    console.log('- Name:', prayer.prayerName);
-    console.log('- Date:', prayerDateStr);
-    console.log('- Time:', prayer.time);
-    console.log('- Status:', prayer.status);
-    console.log('Is before today?', prayerDateStr < today);
+    // console.log('\nPrayer Details:');
+    // console.log('- Name:', prayer.prayerName);
+    // console.log('- Date:', prayerDateStr);
+    // console.log('- Time:', prayer.time);
+    // console.log('- Status:', prayer.status);
+    // console.log('Is before today?', prayerDateStr < today);
 
     if (prayerDateStr < today) {
       console.log('→ Marking as missed:', prayer.prayerName);
@@ -171,11 +172,15 @@ export async function savePrayerStatus(prayerData) {
     return;
   }
 
-  console.log('Saving prayer status:', prayerData);
+  console.log('=== Saving Prayer Status ===');
+  console.log('Prayer Data:', prayerData);
+  
   const today = new Date().toLocaleDateString('en-CA');
-  const prayerDate = prayerData.date || today; // Use provided date or default to today
+  const prayerDate = prayerData.date || today;
   const prayerId = `${prayerDate}-${prayerData.name.toLowerCase()}`;
+  
   console.log('Generated prayerId:', prayerId);
+  console.log('Date:', prayerDate);
 
   // Query to find existing prayer document
   const prayerQuery = query(
@@ -201,6 +206,8 @@ export async function savePrayerStatus(prayerData) {
       
       // Immediately update the store to reflect changes
       const currentStore = get(prayerHistoryStore);
+      console.log('Current store state:', currentStore);
+      
       const updatedPendingByDate = { ...currentStore.pendingByDate };
       
       // Remove the prayer from pending if it exists
@@ -218,6 +225,10 @@ export async function savePrayerStatus(prayerData) {
         ...currentStore,
         pendingByDate: updatedPendingByDate
       });
+
+      // Update badge progress after saving prayer status
+      console.log('Updating badge progress');
+      updatePrayerProgress();
     } else {
       // If not found (shouldn't happen normally), create new
       console.log('Creating new prayer record');
@@ -228,7 +239,7 @@ export async function savePrayerStatus(prayerData) {
         prayerName: prayerData.name,
         time: prayerData.time,
         status: prayerData.status,
-        date: today,
+        date: prayerDate,
         timestamp: Timestamp.now()
       });
     }

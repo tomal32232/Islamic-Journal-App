@@ -1,6 +1,8 @@
 <script>
+  import { onMount } from 'svelte';
   import { badgeStore } from '../stores/badgeStore';
   import { Trophy, ArrowLeft } from 'phosphor-svelte';
+  import { auth } from '../firebase';
 
   export let onBack;
 
@@ -10,14 +12,33 @@
   let searchQuery = '';
   let filterUnlocked = 'all'; // 'all', 'unlocked', 'locked'
 
+  onMount(() => {
+    console.log('=== Badges Component Mounted ===');
+    const user = auth.currentUser;
+    if (user) {
+      console.log('Initializing badge store for user:', user.uid);
+      badgeStore.init(user.uid);
+    } else {
+      console.log('No user found');
+    }
+  });
+
   // Update earned badges when store changes
   $: if ($badgeStore) {
+    console.log('Badge store updated:', $badgeStore);
     earnedBadges = badgeStore.getEarnedBadges($badgeStore.earnedBadges);
   }
 
   // Calculate badge progress
   function getBadgeProgress(badge) {
-    if (!$badgeStore?.progress) return 0;
+    console.log('=== Getting Badge Progress ===');
+    console.log('Badge:', badge);
+    console.log('Badge Store:', $badgeStore);
+    
+    if (!$badgeStore?.progress) {
+      console.log('No progress data in badge store');
+      return 0;
+    }
     
     const progress = $badgeStore.progress;
     let current = 0;
@@ -58,7 +79,12 @@
         break;
     }
 
-    return Math.min((current / target) * 100, 100);
+    console.log('Current value:', current);
+    console.log('Target value:', target);
+    const percentage = Math.min((current / target) * 100, 100);
+    console.log('Calculated percentage:', percentage);
+    
+    return percentage;
   }
 
   // Filter badges based on search, category, and unlock status

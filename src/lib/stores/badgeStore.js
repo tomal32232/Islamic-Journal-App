@@ -53,13 +53,22 @@ function createBadgeStore() {
       const userId = auth.currentUser?.uid;
       if (!userId) return;
 
+      console.log('=== Updating Badge Progress ===');
+      console.log('Type:', type);
+      console.log('Value:', value);
+
       const userDoc = doc(db, 'users', userId, 'achievements', 'badges');
       
       update(state => {
+        console.log('Current state:', state);
         const progress = { ...state.progress };
         const previousValue = progress[type] || 0;
         progress[type] = value;
         
+        console.log('Previous value:', previousValue);
+        console.log('New value:', value);
+        console.log('Updated progress:', progress);
+
         // Check if any new badges should be earned
         const earnedBadges = [...state.earnedBadges];
         const newlyEarnedBadges = [];
@@ -131,6 +140,7 @@ function createBadgeStore() {
           progress,
           lastUpdated: new Date()
         };
+        console.log('Saving to Firestore:', updatedData);
         setDoc(userDoc, updatedData, { merge: true });
 
         return updatedData;
@@ -145,10 +155,18 @@ function createBadgeStore() {
     // Get earned badges with details
     getEarnedBadges(earnedBadgeIds) {
       const earnedBadges = [];
+      
+      // Map legacy badge IDs to new format
+      const mappedBadgeIds = earnedBadgeIds.map(id => {
+        // Map "total_prayers_1" to "prayer_streak_1"
+        if (id === 'total_prayers_1') return 'prayer_streak_1';
+        return id;
+      });
+      
       Object.values(badges).forEach(category => {
         Object.values(category).forEach(badgeList => {
           badgeList.forEach(badge => {
-            if (earnedBadgeIds.includes(badge.id)) {
+            if (mappedBadgeIds.includes(badge.id)) {
               earnedBadges.push(badge);
             }
           });
