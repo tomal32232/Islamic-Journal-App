@@ -24,6 +24,8 @@
         currentSessionId = null;
       }
 
+      // Reset current verse when changing surah
+      quranStore.update(s => ({ ...s, currentVerse: null }));
       await fetchSurahDetails(surahNumber);
       selectedSurah = surahNumber;
 
@@ -51,6 +53,12 @@
   }
 
   function handleVerseClick(verseNumber) {
+    // Toggle verse selection - if clicking the same verse, deselect it
+    if (currentVerse === verseNumber) {
+      quranStore.update(s => ({ ...s, currentVerse: null }));
+      return;
+    }
+    
     saveReadingProgress(selectedSurah, verseNumber);
     
     setTimeout(() => {
@@ -78,8 +86,32 @@
     
     if (exists) {
       bookmarkedVerses = removeBookmark(selectedSurah, verseNumber);
+      // If we're removing the bookmark from the current verse, deselect it
+      if (currentVerse === verseNumber) {
+        quranStore.update(s => ({ ...s, currentVerse: null }));
+      }
     } else {
       bookmarkedVerses = saveBookmark(selectedSurah, verseNumber, surahName);
+      // When adding a bookmark, select the verse
+      quranStore.update(s => ({ ...s, currentVerse: verseNumber }));
+      
+      // Scroll to the bookmarked verse
+      setTimeout(() => {
+        const verseElement = document.getElementById(`verse-${verseNumber}`);
+        if (verseElement) {
+          const containerHeight = versesContainer.offsetHeight;
+          const verseTop = verseElement.offsetTop;
+          const verseHeight = verseElement.offsetHeight;
+          
+          const offset = 80;
+          const scrollPosition = verseTop - (containerHeight / 2) + (verseHeight / 2) + offset;
+          
+          versesContainer.scrollTo({
+            top: scrollPosition,
+            behavior: 'smooth'
+          });
+        }
+      }, 100);
     }
   }
 
@@ -236,7 +268,7 @@
           {#each currentSurahDetails.verses as verse}
             <div 
               id="verse-{verse.number}"
-              class="verse-card {verse.number === currentVerse ? 'current' : ''}"
+              class="verse-card {verse.number === currentVerse && selectedSurah === currentSurah ? 'current' : ''}"
               on:click={() => handleVerseClick(verse.number)}
             >
               <div class="verse-header">
