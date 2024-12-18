@@ -374,8 +374,8 @@
     align-items: center;
     justify-content: center;
     background: white;
-    border: 1px solid rgba(33, 105, 116, 0.2);
-    color: #216974;
+    border: 1px solid rgba(190, 159, 104, 0.2);
+    color: #BE9F68;
     border-radius: 4px;
     flex-shrink: 0;
     position: relative;
@@ -387,7 +387,7 @@
   }
 
   .badge-item.unlocked .badge-icon {
-    background: #216974;
+    background: #BE9F68;
     color: white;
     border: none;
   }
@@ -397,7 +397,7 @@
     position: absolute;
     bottom: -2px;
     right: -2px;
-    background: #216974;
+    background: #BE9F68;
     color: white;
     font-size: 0.625rem;
     font-weight: 600;
@@ -412,8 +412,8 @@
 
   .badge-item.unlocked .badge-icon::after {
     background: white;
-    color: #216974;
-    border: 1px solid #216974;
+    color: #BE9F68;
+    border: 1px solid #BE9F68;
   }
 
   .badge-details {
