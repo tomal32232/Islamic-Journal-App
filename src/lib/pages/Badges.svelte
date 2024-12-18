@@ -243,6 +243,8 @@
     padding-bottom: 64px;
     background: #F8FAFC;
     min-height: 100vh;
+    max-width: 100%;
+    overflow-x: hidden;
   }
 
   .badges-header {
@@ -339,8 +341,9 @@
 
   .badges-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
     gap: 0.5rem;
+    width: 100%;
   }
 
   .badge-item {
@@ -353,6 +356,8 @@
     opacity: 0.6;
     transition: all 0.2s ease;
     border: 1px solid rgba(33, 105, 116, 0.1);
+    width: 100%;
+    box-sizing: border-box;
   }
 
   .badge-item.unlocked {
@@ -417,6 +422,7 @@
     flex-direction: column;
     gap: 0.25rem;
     padding-top: 0.25rem;
+    min-width: 0; /* Prevent flex item from overflowing */
   }
 
   .badge-header {
@@ -429,11 +435,15 @@
     font-weight: 500;
     color: #216974;
     font-size: 0.875rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .badge-description {
     font-size: 0.75rem;
     color: #666;
+    word-wrap: break-word;
   }
 
   .progress-bar {
@@ -458,12 +468,16 @@
   }
 
   @media (max-width: 640px) {
-    .filter-options {
-      flex-direction: column;
+    .badges-page {
+      padding: 0.75rem;
     }
 
     .badges-grid {
       grid-template-columns: 1fr;
+    }
+
+    .filter-options {
+      flex-direction: column;
     }
   }
 </style> 
