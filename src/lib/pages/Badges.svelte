@@ -44,37 +44,44 @@
     let current = 0;
     let target = 0;
 
+    // Get the base progress key without the _progress suffix
+    const progressKey = badge.requirement.type;
+    const progressKeyWithSuffix = `${progressKey}_progress`;
+    console.log('Progress key:', progressKey);
+    console.log('Progress key with suffix:', progressKeyWithSuffix);
+    console.log('All progress keys:', Object.keys(progress));
+
     switch (badge.requirement.type) {
       case 'streak':
-        current = progress['streak'] || 0;
+        current = progress['streak'] || progress['streak_progress'] || 0;
         target = badge.requirement.count;
         break;
       case 'ontime_fajr':
-        current = progress['ontime_fajr'] || 0;
+        current = progress['ontime_fajr'] || progress['ontime_fajr_progress'] || 0;
         target = badge.requirement.count;
         break;
       case 'daily_reading':
-        current = progress['daily_reading'] || 0;
+        current = progress['daily_reading'] || progress['daily_reading_progress'] || 0;
         target = badge.requirement.minutes;
         break;
       case 'juz_completion':
-        current = progress['juz_completion'] || 0;
+        current = progress['juz_completion'] || progress['juz_completion_progress'] || 0;
         target = badge.requirement.count;
         break;
       case 'daily_dhikr':
-        current = progress['daily_dhikr'] || 0;
+        current = progress['daily_dhikr'] || progress['daily_dhikr_progress'] || 0;
         target = badge.requirement.count;
         break;
       case 'dhikr_streak':
-        current = progress['dhikr_streak'] || 0;
+        current = progress['dhikr_streak'] || progress['dhikr_streak_progress'] || 0;
         target = badge.requirement.days;
         break;
       case 'journal_entries':
-        current = progress['journal_entries'] || 0;
+        current = progress['journal_entries'] || progress['journal_entries_progress'] || 0;
         target = badge.requirement.count;
         break;
       case 'journal_streak':
-        current = progress['journal_streak'] || 0;
+        current = progress['journal_streak'] || progress['journal_streak_progress'] || 0;
         target = badge.requirement.days;
         break;
     }

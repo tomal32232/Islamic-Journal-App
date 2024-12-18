@@ -62,11 +62,11 @@ function createBadgeStore() {
       update(state => {
         console.log('Current state:', state);
         const progress = { ...state.progress };
-        const previousValue = progress[type] || 0;
-        progress[type] = value;
         
-        console.log('Previous value:', previousValue);
-        console.log('New value:', value);
+        // Store progress with both formats for backward compatibility
+        progress[type] = value;
+        progress[`${type}_progress`] = value;
+        
         console.log('Updated progress:', progress);
 
         // Check if any new badges should be earned
@@ -78,30 +78,34 @@ function createBadgeStore() {
           if (earnedBadges.includes(badge.id)) return;
           
           let earned = false;
+          // Try both formats for progress value
+          const currentValue = progress[badge.requirement.type] || 
+                             progress[`${badge.requirement.type}_progress`] || 0;
+          
           switch (badge.requirement.type) {
             case 'streak':
-              earned = value >= badge.requirement.count;
+              earned = currentValue >= badge.requirement.count;
               break;
             case 'ontime_fajr':
-              earned = value >= badge.requirement.count;
+              earned = currentValue >= badge.requirement.count;
               break;
             case 'daily_reading':
-              earned = value >= badge.requirement.minutes;
+              earned = currentValue >= badge.requirement.minutes;
               break;
             case 'juz_completion':
-              earned = value >= badge.requirement.count;
+              earned = currentValue >= badge.requirement.count;
               break;
             case 'daily_dhikr':
-              earned = value >= badge.requirement.count;
+              earned = currentValue >= badge.requirement.count;
               break;
             case 'dhikr_streak':
-              earned = value >= badge.requirement.days;
+              earned = currentValue >= badge.requirement.days;
               break;
             case 'journal_entries':
-              earned = value >= badge.requirement.count;
+              earned = currentValue >= badge.requirement.count;
               break;
             case 'journal_streak':
-              earned = value >= badge.requirement.days;
+              earned = currentValue >= badge.requirement.days;
               break;
           }
 

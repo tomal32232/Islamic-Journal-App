@@ -35,6 +35,15 @@ export function updatePrayerProgress() {
   console.log('Today:', today);
   console.log('Prayer History:', history);
   
+  // Skip today if Fajr hasn't been marked yet
+  const todayFajr = history.find(p => p.date === today && p.prayerName === 'Fajr');
+  console.log('Today\'s Fajr prayer:', todayFajr);
+  
+  if (!todayFajr || todayFajr.status !== 'ontime') {
+    console.log('Skipping today as Fajr is not marked as on time');
+    currentDate.setDate(currentDate.getDate() - 1);
+  }
+  
   while (true) {
     const dateStr = currentDate.toLocaleDateString('en-CA');
     const fajrPrayer = history.find(p => 
@@ -44,13 +53,6 @@ export function updatePrayerProgress() {
     
     console.log('\nChecking date:', dateStr);
     console.log('Found Fajr prayer:', fajrPrayer);
-    
-    // Skip today if Fajr hasn't been marked yet
-    if (dateStr === today && (!fajrPrayer || fajrPrayer.status === 'pending')) {
-      console.log('Skipping today as Fajr is not marked yet');
-      currentDate.setDate(currentDate.getDate() - 1);
-      continue;
-    }
     
     // Break if no Fajr prayer or not prayed on time
     if (!fajrPrayer || fajrPrayer.status !== 'ontime') {
