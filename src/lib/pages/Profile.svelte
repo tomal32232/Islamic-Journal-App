@@ -3,7 +3,7 @@
   import { prayerHistoryStore } from '../stores/prayerHistoryStore';
   import { weeklyStatsStore } from '../stores/tasbihStore';
   import { badgeStore } from '../stores/badgeStore';
-  import { Bell, Trophy, Target, Book, ChartBar, SignOut, CaretRight } from 'phosphor-svelte';
+  import { Bell, Trophy, Target, Book, ChartBar, SignOut, CaretRight, ArrowRight, Mosque, Sun, BookBookmark, HandsPraying, Sparkle, Pencil, CalendarPlus } from 'phosphor-svelte';
   import Toast from '../components/Toast.svelte';
   import { currentPage } from '../stores/pageStore';
   
@@ -134,6 +134,26 @@
   ];
 
   export let navigateTo;
+
+  function getBadgeIcon(badge) {
+    if (badge.category === 'prayer') {
+      if (badge.requirement.type === 'streak') return Mosque;
+      if (badge.requirement.type === 'ontime_fajr') return Sun;
+    }
+    if (badge.category === 'quran') {
+      if (badge.requirement.type === 'daily_reading') return Book;
+      if (badge.requirement.type === 'juz_completion') return BookBookmark;
+    }
+    if (badge.category === 'dhikr') {
+      if (badge.requirement.type === 'daily_dhikr') return HandsPraying;
+      if (badge.requirement.type === 'dhikr_streak') return Sparkle;
+    }
+    if (badge.category === 'journal') {
+      if (badge.requirement.type === 'journal_entries') return Pencil;
+      if (badge.requirement.type === 'journal_streak') return CalendarPlus;
+    }
+    return Trophy;
+  }
 </script>
 
 <Toast />
@@ -173,40 +193,34 @@
     </div>
 
     <!-- Achievement Badges Card -->
-    <div class="card">
-      <div class="card-header">
-        <h3><Trophy weight="fill" /> Achievement Badges</h3>
-        <div class="badge-stats">
-          <span>{earnedBadgesCount}/{getTotalBadgesCount()}</span>
-        </div>
+    <div class="badges-section">
+      <div class="section-header">
+        <h2>
+          <Trophy weight="fill" />
+          Achievement Badges
+        </h2>
+        <span class="badge-count">{earnedBadges.length}/{getTotalBadgesCount()}</span>
       </div>
-      <div class="badges-container">
-        {#if inProgressBadges.length > 0}
-          <div class="in-progress-badges">
-            {#each inProgressBadges as badge}
-              <div class="badge-item">
-                <div class="badge-icon">{badge.image}</div>
-                <div class="badge-details">
-                  <div class="badge-header">
-                    <span class="badge-name">{badge.name}</span>
-                    <span class="progress-text">{Math.round(getBadgeProgress(badge))}%</span>
-                  </div>
-                  <div class="progress-bar">
-                    <div 
-                      class="progress" 
-                      style="width: {getBadgeProgress(badge)}%"
-                    ></div>
-                  </div>
-                </div>
+      <div class="badges-preview">
+        {#each inProgressBadges as badge}
+          <div class="badge-item">
+            <div class="badge-icon" data-level={badge.level}>
+              <svelte:component this={getBadgeIcon(badge)} size={20} weight="fill" />
+            </div>
+            <div class="badge-details">
+              <span class="badge-name">{badge.name}</span>
+              <div class="progress-bar">
+                <div class="progress" style="width: {getBadgeProgress(badge)}%"></div>
               </div>
-            {/each}
+            </div>
+            <span class="progress-text">{Math.round(getBadgeProgress(badge))}%</span>
           </div>
-        {/if}
-        <button class="view-all-button" on:click={() => navigateTo('badges')}>
-          <span>View All Badges</span>
-          <CaretRight weight="bold" />
-        </button>
+        {/each}
       </div>
+      <button class="view-all" on:click={() => navigateTo('badges')}>
+        <span>View All Badges</span>
+        <ArrowRight weight="bold" />
+      </button>
     </div>
 
     <!-- Personal Goals Card -->
@@ -348,16 +362,40 @@
     color: #666;
   }
 
-  .badges-container {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
+  .badges-section {
+    background: white;
+    border-radius: 12px;
+    padding: 1rem;
+    margin-bottom: 1rem;
   }
 
-  .in-progress-badges {
+  .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+  }
+
+  h2 {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+    font-size: 1rem;
+    color: #216974;
+  }
+
+  .badge-count {
+    font-size: 0.875rem;
+    color: #216974;
+    font-weight: 500;
+  }
+
+  .badges-preview {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
+    margin-bottom: 0.75rem;
   }
 
   .badge-item {
@@ -366,38 +404,55 @@
     gap: 0.75rem;
     padding: 0.5rem;
     border-radius: 6px;
-    transition: all 0.2s ease;
+    background: #F8FAFC;
   }
 
   .badge-icon {
-    font-size: 1.25rem;
-    width: 2rem;
-    height: 2rem;
+    width: 2.25rem;
+    height: 2.25rem;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(33, 105, 116, 0.05);
-    border-radius: 50%;
+    background: white;
+    border: 1px solid rgba(190, 159, 104, 0.2);
+    color: #BE9F68;
+    border-radius: 4px;
     flex-shrink: 0;
+    position: relative;
+  }
+
+  .badge-icon::after {
+    content: attr(data-level);
+    position: absolute;
+    bottom: -2px;
+    right: -2px;
+    background: #BE9F68;
+    color: white;
+    font-size: 0.625rem;
+    font-weight: 600;
+    min-width: 12px;
+    height: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    padding: 1px;
   }
 
   .badge-details {
     flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-  }
-
-  .badge-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+    min-width: 0;
   }
 
   .badge-name {
+    display: block;
+    font-size: 0.875rem;
     font-weight: 500;
     color: #216974;
-    font-size: 0.875rem;
+    margin-bottom: 0.25rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .progress-bar {
@@ -418,38 +473,28 @@
     font-size: 0.75rem;
     color: #216974;
     font-weight: 500;
+    min-width: 2.5rem;
+    text-align: right;
   }
 
-  .view-all-button {
+  .view-all {
+    width: 100%;
     display: flex;
     align-items: center;
-    justify-content: flex-end;
-    gap: 0.25rem;
-    padding: 0.5rem;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.75rem;
     background: none;
-    border: none;
+    border: 1px solid rgba(33, 105, 116, 0.2);
+    border-radius: 6px;
     color: #216974;
-    font-size: 0.875rem;
     font-weight: 500;
     cursor: pointer;
     transition: all 0.2s ease;
   }
 
-  .view-all-button:hover {
-    opacity: 0.8;
-  }
-
-  .card-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 0.75rem;
-  }
-
-  .badge-stats {
-    font-size: 0.875rem;
-    color: #216974;
-    font-weight: 500;
+  .view-all:hover {
+    background: rgba(33, 105, 116, 0.05);
   }
 
   .goals-list {
