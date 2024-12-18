@@ -365,7 +365,6 @@
     align-items: center;
     gap: 0.75rem;
     padding: 0.5rem;
-    background: rgba(33, 105, 116, 0.05);
     border-radius: 6px;
     transition: all 0.2s ease;
   }
@@ -424,19 +423,20 @@
   .view-all-button {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    padding: 0.75rem;
-    background: white;
-    border: 1px solid rgba(33, 105, 116, 0.2);
-    border-radius: 6px;
+    justify-content: flex-end;
+    gap: 0.25rem;
+    padding: 0.5rem;
+    background: none;
+    border: none;
     color: #216974;
+    font-size: 0.875rem;
     font-weight: 500;
     cursor: pointer;
     transition: all 0.2s ease;
   }
 
   .view-all-button:hover {
-    background: rgba(33, 105, 116, 0.05);
+    opacity: 0.8;
   }
 
   .card-header {
