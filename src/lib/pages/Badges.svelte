@@ -181,7 +181,7 @@
         <div class="badges-grid">
           {#each badges as badge}
             <div class="badge-item {badge.unlocked ? 'unlocked' : ''}">
-              <div class="badge-icon">{badge.image}</div>
+              <div class="badge-icon" data-level={badge.level}>{badge.image}</div>
               <div class="badge-details">
                 <div class="badge-header">
                   <span class="badge-name">{badge.name}</span>
@@ -332,20 +332,48 @@
   }
 
   .badge-icon {
-    font-size: 1.25rem;
-    width: 2rem;
-    height: 2rem;
+    font-size: 1rem;
+    width: 2.25rem;
+    height: 2.25rem;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(33, 105, 116, 0.05);
-    border-radius: 50%;
+    background: white;
+    border: 1px solid rgba(33, 105, 116, 0.2);
+    color: #216974;
+    border-radius: 4px;
     flex-shrink: 0;
+    position: relative;
+  }
+
+  .badge-icon::after {
+    content: attr(data-level);
+    position: absolute;
+    bottom: -2px;
+    right: -2px;
+    background: #216974;
+    color: white;
+    font-size: 0.625rem;
+    font-weight: 600;
+    min-width: 12px;
+    height: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    padding: 1px;
   }
 
   .badge-item.unlocked .badge-icon {
     background: #216974;
     color: white;
+    border: none;
+  }
+
+  .badge-item.unlocked .badge-icon::after {
+    background: white;
+    color: #216974;
+    border: 1px solid #216974;
   }
 
   .badge-details {
@@ -353,6 +381,7 @@
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
+    padding-top: 0.25rem;
   }
 
   .badge-header {
