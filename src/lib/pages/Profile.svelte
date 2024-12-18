@@ -626,19 +626,19 @@
     justify-content: center;
     gap: 0.5rem;
     width: 100%;
-    background-color: #dc3545;
-    color: white;
-    padding: 1rem;
-    border: none;
-    border-radius: 8px;
+    background: none;
+    color: #BE9F68;
+    padding: 0.75rem;
+    border: 1px solid rgba(190, 159, 104, 0.3);
+    border-radius: 6px;
     font-weight: 500;
     cursor: pointer;
-    transition: background-color 0.2s;
+    transition: all 0.2s ease;
     margin-top: 1rem;
   }
 
   .sign-out-button:hover {
-    background-color: #c82333;
+    background: rgba(190, 159, 104, 0.1);
   }
 
   @media (max-width: 480px) {
