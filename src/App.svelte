@@ -7,7 +7,6 @@
   import NotificationIcon from './lib/components/NotificationIcon.svelte';
   import Badges from './lib/pages/Badges.svelte';
   import Profile from './lib/pages/Profile.svelte';
-  import BottomNav from './lib/components/BottomNav.svelte';
   import Tasbih from './lib/pages/Tasbih.svelte';
   import Journal from './lib/pages/Journal.svelte';
   import Prayer from './lib/pages/Prayer.svelte';
@@ -55,10 +54,6 @@
         <Home />
       {/if}
     </main>
-
-    {#if activeTab !== 'notifications' && activeTab !== 'badges'}
-      <BottomNav {activeTab} on:tabChange={handleTabChange} />
-    {/if}
   </div>
 {:else}
   <main>
