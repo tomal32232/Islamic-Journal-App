@@ -146,15 +146,13 @@
 <div class="badges-page">
   <header class="badges-header">
     <div class="header-content">
-      <div class="title-section">
-        <h1>
-          <Trophy weight="fill" />
-          Achievements
-        </h1>
-      </div>
-      <div class="badge-stats">
-        <span>{earnedCount}/{totalBadges}</span>
-        <span class="stats-label">Badges Earned</span>
+      <h1>
+        <Trophy weight="fill" />
+        Achievements
+      </h1>
+      <div class="badge-count">
+        <span class="count">{earnedCount}/{totalBadges}</span>
+        <span class="label">Badges Earned</span>
       </div>
     </div>
   </header>
@@ -253,19 +251,15 @@
     background: #F8FAFC;
     z-index: 10;
     padding: 0.5rem 0;
-    border-bottom: 1px solid rgba(33, 105, 116, 0.1);
   }
 
   .header-content {
     display: flex;
     justify-content: space-between;
     align-items: center;
-  }
-
-  .title-section {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
+    border-bottom: 1px solid rgba(33, 105, 116, 0.1);
+    padding-bottom: 1rem;
+    width: 100%;
   }
 
   h1 {
@@ -278,25 +272,20 @@
     font-weight: 600;
   }
 
-  .badge-stats {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    background: rgba(33, 105, 116, 0.1);
-    padding: 0.5rem 0.75rem;
-    border-radius: 8px;
+  .badge-count {
+    text-align: right;
   }
 
-  .badge-stats span {
-    font-size: 1.125rem;
+  .badge-count .count {
+    display: block;
+    font-size: 1.25rem;
     font-weight: 600;
     color: #216974;
-    line-height: 1.2;
   }
 
-  .stats-label {
-    font-size: 0.75rem !important;
-    font-weight: normal !important;
+  .badge-count .label {
+    display: block;
+    font-size: 0.875rem;
     color: #216974;
     opacity: 0.8;
   }
@@ -488,12 +477,20 @@
       padding: 0;
     }
 
+    .header-content {
+      padding-bottom: 0.75rem;
+    }
+
     h1 {
       font-size: 1.25rem;
     }
 
-    .badge-stats {
-      padding: 0.375rem 0.625rem;
+    .badge-count .count {
+      font-size: 1.125rem;
+    }
+
+    .badge-count .label {
+      font-size: 0.75rem;
     }
   }
 </style> 
