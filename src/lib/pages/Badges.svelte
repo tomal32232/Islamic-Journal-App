@@ -245,12 +245,11 @@
   }
 
   .badges-header {
-    margin-bottom: 1.5rem;
+    margin-bottom: 1rem;
     position: sticky;
     top: 0;
     background: #F8FAFC;
     z-index: 10;
-    padding: 0.5rem 0;
   }
 
   .header-content {
@@ -260,6 +259,9 @@
     border-bottom: 1px solid rgba(33, 105, 116, 0.1);
     padding-bottom: 1rem;
     width: 100%;
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 0 1rem;
   }
 
   h1 {
@@ -298,7 +300,13 @@
     position: sticky;
     background: #F8FAFC;
     z-index: 9;
-    padding: 0.5rem 0;
+    width: 100%;
+    max-width: 600px;
+    margin: 0 auto;
+  }
+
+  .search-box {
+    width: 100%;
   }
 
   .search-box input {
@@ -310,6 +318,7 @@
     color: #216974;
     background: white;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    box-sizing: border-box;
   }
 
   .search-box input::placeholder {
@@ -321,6 +330,7 @@
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 0.75rem;
+    width: 100%;
   }
 
   .filter-options select {
