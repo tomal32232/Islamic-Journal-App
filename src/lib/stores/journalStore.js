@@ -1,67 +1,126 @@
 import { writable } from 'svelte/store';
 import { auth, db } from '../firebase';
-import { collection, addDoc, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { collection, addDoc, query, where, getDocs, orderBy, doc, getDoc, setDoc } from 'firebase/firestore';
 import { updateJournalProgress, updateJournalStreak } from '../services/badgeProgressService';
 
 function createJournalStore() {
   const { subscribe, set, update } = writable({
-    entries: [],
-    streak: 0,
+    todayMorningReflection: null,
+    todayEveningReflection: null,
+    streak: {
+      current: 0,
+      morning: false,
+      evening: false
+    },
     totalEntries: 0
   });
 
   return {
     subscribe,
-    addEntry: async (entry) => {
-      const docRef = await addDoc(collection(db, 'journal'), {
-        ...entry,
-        userId: auth.currentUser.uid,
-        createdAt: new Date()
-      });
+    
+    saveMorningReflection: async (reflection) => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
 
-      update(store => {
-        const newEntries = [...store.entries, { ...entry, id: docRef.id }];
-        const newTotal = newEntries.length;
-        
-        // Update badge progress
-        updateJournalProgress(newTotal);
-        
-        return {
-          ...store,
-          entries: newEntries,
-          totalEntries: newTotal
-        };
-      });
+      const docRef = doc(db, 'reflections', `${auth.currentUser.uid}_${today.toISOString().split('T')[0]}`);
+      const existingDoc = await getDoc(docRef);
 
-      // Calculate and update streak
-      await calculateStreak();
-    },
-
-    loadEntries: async () => {
-      if (!auth.currentUser) return;
-
-      const entriesQuery = query(
-        collection(db, 'journal'),
-        where('userId', '==', auth.currentUser.uid),
-        orderBy('createdAt', 'desc')
-      );
-
-      const snapshot = await getDocs(entriesQuery);
-      const entries = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+      if (existingDoc.exists()) {
+        // Update existing document
+        await setDoc(docRef, {
+          ...existingDoc.data(),
+          morning: {
+            ...reflection,
+            timestamp: new Date()
+          }
+        }, { merge: true });
+      } else {
+        // Create new document
+        await setDoc(docRef, {
+          userId: auth.currentUser.uid,
+          date: today,
+          morning: {
+            ...reflection,
+            timestamp: new Date()
+          }
+        });
+      }
 
       update(store => ({
         ...store,
-        entries,
-        totalEntries: entries.length
+        todayMorningReflection: reflection,
+        streak: {
+          ...store.streak,
+          morning: true
+        }
       }));
 
-      // Update badge progress with total entries
-      updateJournalProgress(entries.length);
+      await calculateStreak();
+    },
 
-      // Calculate and update streak
+    saveEveningReflection: async (reflection) => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const docRef = doc(db, 'reflections', `${auth.currentUser.uid}_${today.toISOString().split('T')[0]}`);
+      const existingDoc = await getDoc(docRef);
+
+      if (existingDoc.exists()) {
+        // Update existing document
+        await setDoc(docRef, {
+          ...existingDoc.data(),
+          evening: {
+            ...reflection,
+            timestamp: new Date()
+          }
+        }, { merge: true });
+      } else {
+        // Create new document
+        await setDoc(docRef, {
+          userId: auth.currentUser.uid,
+          date: today,
+          evening: {
+            ...reflection,
+            timestamp: new Date()
+          }
+        });
+      }
+
+      update(store => ({
+        ...store,
+        todayEveningReflection: reflection,
+        streak: {
+          ...store.streak,
+          evening: true
+        }
+      }));
+
+      await calculateStreak();
+    },
+
+    loadTodayReflections: async () => {
+      if (!auth.currentUser) return;
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const docRef = doc(db, 'reflections', `${auth.currentUser.uid}_${today.toISOString().split('T')[0]}`);
+      const docSnap = await getDoc(docRef);
+
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        update(store => ({
+          ...store,
+          todayMorningReflection: data.morning || null,
+          todayEveningReflection: data.evening || null,
+          streak: {
+            ...store.streak,
+            morning: !!data.morning,
+            evening: !!data.evening
+          }
+        }));
+      }
+
       await calculateStreak();
     }
   };
@@ -73,35 +132,61 @@ async function calculateStreak() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   
-  const entriesQuery = query(
-    collection(db, 'journal'),
+  const reflectionsQuery = query(
+    collection(db, 'reflections'),
     where('userId', '==', auth.currentUser.uid),
-    orderBy('createdAt', 'desc')
+    orderBy('date', 'desc')
   );
 
-  const snapshot = await getDocs(entriesQuery);
+  const snapshot = await getDocs(reflectionsQuery);
   let streak = 0;
   let currentDate = today;
 
-  // Sort entries by date
-  const entriesByDate = new Map();
+  // Sort reflections by date
+  const reflectionsByDate = new Map();
   snapshot.docs.forEach(doc => {
-    const entry = doc.data();
-    const date = new Date(entry.createdAt.toDate());
+    const reflection = doc.data();
+    const date = new Date(reflection.date.toDate());
     date.setHours(0, 0, 0, 0);
-    entriesByDate.set(date.getTime(), true);
+    reflectionsByDate.set(date.getTime(), {
+      morning: !!reflection.morning,
+      evening: !!reflection.evening
+    });
   });
 
   // Calculate streak
-  while (entriesByDate.has(currentDate.getTime())) {
-    streak++;
+  while (true) {
+    const dateReflections = reflectionsByDate.get(currentDate.getTime());
+    if (!dateReflections) break;
+
+    // For today, we only need either morning or evening
+    if (currentDate.getTime() === today.getTime()) {
+      if (dateReflections.morning || dateReflections.evening) {
+        streak += 0.5;
+      }
+    } 
+    // For past days, we need both morning and evening
+    else {
+      if (dateReflections.morning && dateReflections.evening) {
+        streak += 1;
+      } else {
+        break;
+      }
+    }
+    
     currentDate.setDate(currentDate.getDate() - 1);
   }
 
   // Update streak in store and badge progress
-  journalStore.update(store => ({ ...store, streak }));
-  updateJournalStreak(streak);
-
+  journalStore.update(store => ({
+    ...store,
+    streak: {
+      ...store.streak,
+      current: streak
+    }
+  }));
+  
+  updateJournalStreak(Math.floor(streak));
   return streak;
 }
 
