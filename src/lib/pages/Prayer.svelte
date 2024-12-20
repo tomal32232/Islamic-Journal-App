@@ -176,15 +176,15 @@
     grid-template-columns: repeat(5, 1fr);
     gap: 0.5rem;
     margin-bottom: 1rem;
+    padding: 0.5rem;
     background: white;
-    padding: 0.75rem;
     border-radius: 12px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
   }
 
   .prayer-time-card {
     background: #f8fafc;
-    padding: 0.75rem 0.5rem;
+    padding: 0.75rem;
     border-radius: 8px;
     display: flex;
     flex-direction: column;
@@ -196,15 +196,14 @@
   }
 
   .prayer-time-card.current {
-    border: 2px solid #E09453;
-    padding: calc(0.75rem - 1px) calc(0.5rem - 1px);
     background: rgba(224, 148, 83, 0.05);
+    border: 1px solid #E09453;
   }
 
   .icon-wrapper {
     background: rgba(33, 105, 116, 0.1);
     padding: 0.5rem;
-    border-radius: 50%;
+    border-radius: 8px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -254,16 +253,13 @@
     }
 
     .prayer-times-grid {
-      padding: 0.5rem;
       gap: 0.375rem;
+      padding: 0.375rem;
     }
 
     .prayer-time-card {
-      padding: 0.5rem 0.25rem;
-    }
-
-    .prayer-time-card.current {
-      padding: calc(0.5rem - 1px) calc(0.25rem - 1px);
+      padding: 0.5rem;
+      gap: 0.25rem;
     }
 
     .icon-wrapper {
@@ -276,10 +272,6 @@
 
     .prayer-time {
       font-size: 0.75rem;
-    }
-
-    svelte:component {
-      size: 16;
     }
   }
 </style>
