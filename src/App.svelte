@@ -37,7 +37,7 @@
     
     <main>
       {#if activeTab === 'home'}
-        <Home />
+        <Home on:navigate={e => navigateTo(e.detail)} />
       {:else if activeTab === 'notifications'}
         <Notifications onBack={() => navigateTo('home')} />
       {:else if activeTab === 'badges'}
