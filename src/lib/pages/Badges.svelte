@@ -296,7 +296,6 @@
     flex-direction: column;
     gap: 0.75rem;
     position: sticky;
-    top: 120px;
     background: #F8FAFC;
     z-index: 9;
     padding: 0.5rem 0;
