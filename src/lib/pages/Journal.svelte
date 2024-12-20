@@ -363,7 +363,7 @@
 
   .reflection-card {
     background: #f8fafc;
-    border-radius: 12px;
+    border-radius: 16px;
     padding: 1.5rem;
     cursor: pointer;
     transition: all 0.2s;
@@ -408,7 +408,7 @@
 
   .challenge-card {
     background: #f8fafc;
-    border-radius: 12px;
+    border-radius: 16px;
     padding: 1.5rem;
     margin-bottom: 1.5rem;
     border: 1px solid #e0e0e0;
@@ -474,37 +474,57 @@
 
   .modal-content {
     background: white;
-    border-radius: 12px;
+    border-radius: 24px;
     width: 100%;
     max-width: 500px;
     max-height: 90vh;
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    padding: 2rem;
+    position: relative;
   }
 
   .modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1rem 1.5rem;
-    background: #f8fafc;
-    border-bottom: 1px solid #e0e0e0;
+    text-align: left;
+    margin-bottom: 1rem;
+    padding-right: 2rem;
   }
 
   .modal-header h3 {
     margin: 0;
-    font-size: 1.125rem;
+    font-size: 1.75rem;
     font-weight: 500;
     color: #216974;
+  }
+
+  .close-btn {
+    background: none;
+    border: none;
+    color: #666;
+    cursor: pointer;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    position: absolute;
+    right: 1.5rem;
+    top: 1.5rem;
+  }
+
+  .close-btn:hover {
+    background: rgba(0,0,0,0.05);
   }
 
   .progress-bar {
     display: flex;
     justify-content: center;
-    gap: 0.5rem;
-    padding: 1rem;
+    gap: 0.75rem;
+    padding: 1rem 0;
     background: #f8fafc;
+    margin: 0 -2rem;
   }
 
   .progress-dot {
@@ -520,55 +540,91 @@
   }
 
   .modal-body {
-    padding: 1.5rem;
-    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    flex-grow: 1;
+    padding: 2rem 0;
   }
 
   .question-content {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  label {
+    display: block;
+    font-size: 1.75rem;
     margin-bottom: 2rem;
+    color: #333;
+    font-weight: 400;
+    line-height: 1.3;
+    max-width: 90%;
+  }
+
+  form {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  textarea {
+    width: 90%;
+    padding: 1rem;
+    border: 1px solid #e0e0e0;
+    border-radius: 16px;
+    background: white;
+    color: #333;
+    resize: none;
+    font-family: inherit;
+    font-size: 1rem;
+    line-height: 1.5;
+    min-height: 120px;
+  }
+
+  textarea:focus {
+    outline: none;
+    border-color: #216974;
+    box-shadow: 0 0 0 2px rgba(33, 105, 116, 0.1);
   }
 
   .modal-footer {
     display: flex;
-    justify-content: space-between;
-    gap: 1rem;
-  }
-
-  .nav-btn {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.75rem 1.25rem;
-    border: 1px solid #e0e0e0;
-    border-radius: 8px;
-    background: white;
-    color: #666;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s;
-  }
-
-  .nav-btn:hover {
-    border-color: #216974;
-    color: #216974;
+    justify-content: center;
+    margin-top: 2rem;
+    width: 100%;
   }
 
   .submit-btn {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    padding: 0.75rem 1.5rem;
+    padding: 1rem 2rem;
     border: none;
-    border-radius: 8px;
+    border-radius: 100px;
     background: #216974;
     color: white;
     font-weight: 500;
+    font-size: 1.125rem;
     cursor: pointer;
-    transition: opacity 0.2s;
-    margin-left: auto;
+    transition: all 0.2s;
+    min-width: 200px;
+    justify-content: center;
   }
 
   .submit-btn:hover {
     opacity: 0.9;
+    transform: translateY(-1px);
+  }
+
+  .submit-btn:active {
+    transform: translateY(0);
+  }
+
+  .nav-btn {
+    display: none;
   }
 </style> 
