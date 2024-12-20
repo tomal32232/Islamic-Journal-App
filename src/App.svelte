@@ -10,6 +10,7 @@
   import Tasbih from './lib/pages/Tasbih.svelte';
   import Journal from './lib/pages/Journal.svelte';
   import Prayer from './lib/pages/Prayer.svelte';
+  import BottomNav from './lib/components/BottomNav.svelte';
 
   let user = null;
   let activeTab = 'home';
@@ -54,6 +55,7 @@
         <Home />
       {/if}
     </main>
+    <BottomNav {activeTab} on:tabChange={handleTabChange} />
   </div>
 {:else}
   <main>

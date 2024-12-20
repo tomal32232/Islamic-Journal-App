@@ -145,15 +145,13 @@
 
 <div class="badges-page">
   <header class="badges-header">
-    <button class="back-button" on:click={onBack}>
-      <ArrowLeft weight="bold" />
-      <span>Back to Profile</span>
-    </button>
     <div class="header-content">
-      <h1>
-        <Trophy weight="fill" />
-        Achievements
-      </h1>
+      <div class="title-section">
+        <h1>
+          <Trophy weight="fill" />
+          Achievements
+        </h1>
+      </div>
       <div class="badge-stats">
         <span>{earnedCount}/{totalBadges}</span>
         <span class="stats-label">Badges Earned</span>
@@ -239,29 +237,23 @@
 
 <style>
   .badges-page {
-    padding: 1rem;
-    padding-bottom: 64px;
+    padding: 1.5rem 1rem;
+    padding-bottom: 96px;
     background: #F8FAFC;
     min-height: 100vh;
     max-width: 100%;
     overflow-x: hidden;
+    box-sizing: border-box;
   }
 
   .badges-header {
-    margin-bottom: 1rem;
-  }
-
-  .back-button {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    background: none;
-    border: none;
-    color: #216974;
-    padding: 0;
-    margin-bottom: 0.5rem;
-    cursor: pointer;
-    font-weight: 500;
+    margin-bottom: 1.5rem;
+    position: sticky;
+    top: 0;
+    background: #F8FAFC;
+    z-index: 10;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid rgba(33, 105, 116, 0.1);
   }
 
   .header-content {
@@ -270,79 +262,98 @@
     align-items: center;
   }
 
+  .title-section {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
   h1 {
     display: flex;
     align-items: center;
     gap: 0.5rem;
     margin: 0;
     color: #216974;
-    font-size: 1.25rem;
-  }
-
-  h2 {
-    color: #216974;
-    font-size: 1rem;
-    margin: 0 0 0.5rem 0;
-    font-weight: 500;
+    font-size: 1.5rem;
+    font-weight: 600;
   }
 
   .badge-stats {
     display: flex;
     flex-direction: column;
     align-items: flex-end;
+    background: rgba(33, 105, 116, 0.1);
+    padding: 0.5rem 0.75rem;
+    border-radius: 8px;
   }
 
   .badge-stats span {
-    font-size: 1rem;
+    font-size: 1.125rem;
     font-weight: 600;
     color: #216974;
+    line-height: 1.2;
   }
 
   .stats-label {
     font-size: 0.75rem !important;
     font-weight: normal !important;
+    color: #216974;
     opacity: 0.8;
   }
 
   .filters {
-    margin-bottom: 1rem;
+    margin-bottom: 1.5rem;
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: 0.75rem;
+    position: sticky;
+    top: 120px;
+    background: #F8FAFC;
+    z-index: 9;
+    padding: 0.5rem 0;
   }
 
   .search-box input {
     width: 100%;
-    padding: 0.5rem;
+    padding: 0.875rem 1rem;
     border: 1px solid rgba(33, 105, 116, 0.2);
-    border-radius: 6px;
-    font-size: 0.875rem;
-    color: #216974;
-  }
-
-  .filter-options {
-    display: flex;
-    gap: 0.5rem;
-  }
-
-  .filter-options select {
-    flex: 1;
-    padding: 0.5rem;
-    border: 1px solid rgba(33, 105, 116, 0.2);
-    border-radius: 6px;
+    border-radius: 12px;
     font-size: 0.875rem;
     color: #216974;
     background: white;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  }
+
+  .search-box input::placeholder {
+    color: #216974;
+    opacity: 0.5;
+  }
+
+  .filter-options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+  }
+
+  .filter-options select {
+    padding: 0.875rem 1rem;
+    border: 1px solid rgba(33, 105, 116, 0.2);
+    border-radius: 12px;
+    font-size: 0.875rem;
+    color: #216974;
+    background: white;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    cursor: pointer;
   }
 
   .category-section {
-    margin-bottom: 1rem;
+    margin-bottom: 2rem;
   }
 
   .badges-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 0.5rem;
+    gap: 0.75rem;
     width: 100%;
   }
 
@@ -350,10 +361,9 @@
     display: flex;
     align-items: flex-start;
     gap: 0.75rem;
-    padding: 0.75rem;
-    border-radius: 6px;
+    padding: 1rem;
+    border-radius: 8px;
     background: white;
-    opacity: 0.6;
     transition: all 0.2s ease;
     border: 1px solid rgba(33, 105, 116, 0.1);
     width: 100%;
@@ -361,22 +371,21 @@
   }
 
   .badge-item.unlocked {
-    opacity: 1;
-    background: rgba(33, 105, 116, 0.1);
-    border-color: rgba(33, 105, 116, 0.3);
+    background: rgba(190, 159, 104, 0.1);
+    border-color: rgba(190, 159, 104, 0.3);
   }
 
   .badge-icon {
     font-size: 1rem;
-    width: 2.25rem;
-    height: 2.25rem;
+    width: 2.5rem;
+    height: 2.5rem;
     display: flex;
     align-items: center;
     justify-content: center;
     background: white;
     border: 1px solid rgba(190, 159, 104, 0.2);
     color: #BE9F68;
-    border-radius: 4px;
+    border-radius: 6px;
     flex-shrink: 0;
     position: relative;
   }
@@ -395,14 +404,14 @@
   .badge-icon::after {
     content: attr(data-level);
     position: absolute;
-    bottom: -2px;
-    right: -2px;
+    bottom: -4px;
+    right: -4px;
     background: #BE9F68;
     color: white;
     font-size: 0.625rem;
     font-weight: 600;
-    min-width: 12px;
-    height: 12px;
+    min-width: 14px;
+    height: 14px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -420,8 +429,8 @@
     flex: 1;
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
-    padding-top: 0.25rem;
+    gap: 0.375rem;
+    padding-top: 0.125rem;
     min-width: 0; /* Prevent flex item from overflowing */
   }
 
@@ -429,6 +438,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 0.5rem;
   }
 
   .badge-name {
@@ -444,12 +454,13 @@
     font-size: 0.75rem;
     color: #666;
     word-wrap: break-word;
+    line-height: 1.4;
   }
 
   .progress-bar {
-    height: 3px;
+    height: 4px;
     background: rgba(33, 105, 116, 0.1);
-    border-radius: 1.5px;
+    border-radius: 2px;
     overflow: hidden;
     margin-top: 0.25rem;
   }
@@ -457,7 +468,7 @@
   .progress {
     height: 100%;
     background: #216974;
-    border-radius: 1.5px;
+    border-radius: 2px;
     transition: width 0.3s ease;
   }
 
@@ -469,15 +480,20 @@
 
   @media (max-width: 640px) {
     .badges-page {
-      padding: 0.75rem;
+      padding: 1rem 0.75rem;
+      padding-bottom: 96px;
     }
 
-    .badges-grid {
-      grid-template-columns: 1fr;
+    .badges-header {
+      padding: 0;
     }
 
-    .filter-options {
-      flex-direction: column;
+    h1 {
+      font-size: 1.25rem;
+    }
+
+    .badge-stats {
+      padding: 0.375rem 0.625rem;
     }
   }
 </style> 
