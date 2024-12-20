@@ -226,12 +226,44 @@
     </div>
     <div class="challenge-progress">
       {#each Array(7) as _, i}
-        <div class="progress-day {i < $journalStore.completedDays ? 'completed' : ''}">
-          {#if i < $journalStore.completedDays}
-            <span class="checkmark">✓</span>
-          {:else}
-            <span class="day-number">{i + 1}</span>
-          {/if}
+        <div class="progress-circle">
+          <div class="circle-content">
+            <div class="circle-number">{i + 1}</div>
+            <svg class="circle-svg" viewBox="0 0 36 36">
+              <!-- Background circle -->
+              <circle 
+                class="circle-bg"
+                cx="18" 
+                cy="18" 
+                r="16"
+                fill="none"
+                stroke="#e0e0e0"
+                stroke-width="2"
+              />
+              
+              <!-- Morning progress (left half) -->
+              {#if $journalStore.dailyProgress[i]?.morning}
+                <path
+                  class="progress-path morning"
+                  d="M18,2 A16,16 0 0,0 18,34"
+                  fill="none"
+                  stroke="#216974"
+                  stroke-width="2"
+                />
+              {/if}
+              
+              <!-- Evening progress (right half) -->
+              {#if $journalStore.dailyProgress[i]?.evening}
+                <path
+                  class="progress-path evening"
+                  d="M18,2 A16,16 0 0,1 18,34"
+                  fill="none"
+                  stroke="#216974"
+                  stroke-width="2"
+                />
+              {/if}
+            </svg>
+          </div>
         </div>
       {/each}
     </div>
@@ -387,6 +419,15 @@
     cursor: default;
   }
 
+  .reflection-card.completed .card-content h3,
+  .reflection-card.completed .status {
+    color: white;
+  }
+
+  .reflection-card.completed :global(svg) {
+    color: white;
+  }
+
   .card-content {
     display: flex;
     flex-direction: column;
@@ -399,11 +440,12 @@
     margin: 0;
     font-size: 1.125rem;
     font-weight: 500;
+    color: #216974;
   }
 
   .status {
     font-size: 0.875rem;
-    color: rgba(255, 255, 255, 0.9);
+    color: #216974;
   }
 
   .challenge-card {
@@ -437,25 +479,54 @@
     display: flex;
     justify-content: center;
     gap: 1rem;
+    padding: 1rem 0;
   }
 
-  .progress-day {
+  .progress-circle {
     width: 48px;
     height: 48px;
+    position: relative;
+  }
+
+  .circle-content {
+    position: relative;
+    width: 100%;
+    height: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 12px;
-    background: white;
-    color: #666;
-    font-weight: 500;
-    border: 1px solid #e0e0e0;
   }
 
-  .progress-day.completed {
-    background: #216974;
-    color: white;
-    border: none;
+  .circle-number {
+    position: absolute;
+    font-size: 1rem;
+    font-weight: 500;
+    color: #666;
+    z-index: 1;
+  }
+
+  .circle-svg {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    transform: rotate(-90deg);
+  }
+
+  .circle-bg {
+    stroke-linecap: round;
+  }
+
+  .progress-path {
+    stroke-linecap: round;
+    transition: all 0.3s ease;
+  }
+
+  .progress-path.morning {
+    stroke: #216974;
+  }
+
+  .progress-path.evening {
+    stroke: #216974;
   }
 
   .modal-overlay {
