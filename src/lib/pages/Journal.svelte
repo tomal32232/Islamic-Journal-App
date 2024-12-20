@@ -1,8 +1,10 @@
 <script>
   import { onMount } from 'svelte';
-  import { Book, Sun, Moon, X } from 'phosphor-svelte';
+  import { Book, Sun, Moon, X, CaretRight, CaretLeft } from 'phosphor-svelte';
   import { auth } from '../firebase';
   import { journalStore } from '../stores/journalStore';
+  import { fade, fly } from 'svelte/transition';
+  import { quintOut } from 'svelte/easing';
 
   // Get current week days
   function getCurrentWeek() {
@@ -22,7 +24,7 @@
   }
 
   let weekDays = getCurrentWeek();
-  let selectedTab = 'morning';
+  let selectedReflection = null; // 'morning' or 'evening' or null
   let morningReflection = {
     plans: '',
     newThing: '',
@@ -48,6 +50,111 @@
     return 'Good evening';
   }
 
+  let currentQuestionIndex = 0;
+  
+  const morningQuestions = [
+    {
+      question: "What are 3 things you plan to do today?",
+      placeholder: "1. \n2. \n3.",
+      field: "plans",
+      rows: 4
+    },
+    {
+      question: "What new thing would you like to try today?",
+      placeholder: "Write about something new you'd like to try...",
+      field: "newThing",
+      rows: 3
+    },
+    {
+      question: "Today's Affirmation",
+      placeholder: "Write a positive affirmation for today...",
+      field: "affirmation",
+      rows: 2
+    }
+  ];
+
+  const eveningQuestions = [
+    {
+      question: "What were the highlights of your day?",
+      placeholder: "Write about the best moments of your day...",
+      field: "highlights",
+      rows: 3
+    },
+    {
+      question: "What did you learn today?",
+      placeholder: "Share your learnings and insights...",
+      field: "learnings",
+      rows: 3
+    },
+    {
+      question: "Are you satisfied with what you accomplished today?",
+      placeholder: "Reflect on your satisfaction with today's accomplishments...",
+      field: "satisfaction",
+      rows: 3
+    },
+    {
+      question: "If not fully satisfied, what were the barriers?",
+      placeholder: "What prevented you from achieving your goals?",
+      field: "barriers",
+      rows: 3
+    }
+  ];
+
+  $: currentQuestions = selectedReflection === 'morning' ? morningQuestions : eveningQuestions;
+  $: currentQuestion = currentQuestions[currentQuestionIndex];
+  $: isLastQuestion = currentQuestionIndex === currentQuestions.length - 1;
+  $: isFirstQuestion = currentQuestionIndex === 0;
+
+  // Add computed value for current reflection value
+  $: currentReflectionValue = {
+    get value() {
+      return selectedReflection === 'morning'
+        ? morningReflection[currentQuestion.field]
+        : eveningReflection[currentQuestion.field];
+    },
+    set value(newValue) {
+      if (selectedReflection === 'morning') {
+        morningReflection[currentQuestion.field] = newValue;
+      } else {
+        eveningReflection[currentQuestion.field] = newValue;
+      }
+    }
+  };
+
+  function handleReflectionClick(type) {
+    if ((type === 'morning' && !todayStreak.morning) || 
+        (type === 'evening' && !todayStreak.evening)) {
+      selectedReflection = selectedReflection === type ? null : type;
+      currentQuestionIndex = 0;
+    }
+  }
+
+  function nextQuestion() {
+    if (!isLastQuestion) {
+      currentQuestionIndex++;
+    }
+  }
+
+  function previousQuestion() {
+    if (!isFirstQuestion) {
+      currentQuestionIndex--;
+    }
+  }
+
+  async function handleSubmit() {
+    if (isLastQuestion) {
+      if (selectedReflection === 'morning') {
+        await saveMorningReflection();
+      } else {
+        await saveEveningReflection();
+      }
+      selectedReflection = null;
+      currentQuestionIndex = 0;
+    } else {
+      nextQuestion();
+    }
+  }
+
   onMount(async () => {
     await journalStore.loadTodayReflections();
     
@@ -62,10 +169,12 @@
 
   async function saveMorningReflection() {
     await journalStore.saveMorningReflection(morningReflection);
+    selectedReflection = null;
   }
 
   async function saveEveningReflection() {
     await journalStore.saveEveningReflection(eveningReflection);
+    selectedReflection = null;
   }
 </script>
 
@@ -87,7 +196,10 @@
   </div>
 
   <div class="reflection-cards">
-    <div class="reflection-card {todayStreak.morning ? 'completed' : ''}">
+    <div 
+      class="reflection-card {todayStreak.morning ? 'completed' : ''} {selectedReflection === 'morning' ? 'active' : ''}"
+      on:click={() => handleReflectionClick('morning')}
+    >
       <div class="card-content">
         <Sun weight={todayStreak.morning ? 'fill' : 'regular'} size={24} />
         <h3>Morning reflection</h3>
@@ -95,7 +207,10 @@
       </div>
     </div>
 
-    <div class="reflection-card {todayStreak.evening ? 'completed' : ''}">
+    <div 
+      class="reflection-card {todayStreak.evening ? 'completed' : ''} {selectedReflection === 'evening' ? 'active' : ''}"
+      on:click={() => handleReflectionClick('evening')}
+    >
       <div class="card-content">
         <Moon weight={todayStreak.evening ? 'fill' : 'regular'} size={24} />
         <h3>Evening reflection</h3>
@@ -122,79 +237,56 @@
     </div>
   </div>
 
-  {#if selectedTab === 'morning' && !todayStreak.morning}
-    <form class="reflection-form" on:submit|preventDefault={saveMorningReflection}>
-      <div class="form-group">
-        <label>What are 3 things you plan to do today?</label>
-        <textarea 
-          bind:value={morningReflection.plans}
-          placeholder="1. &#10;2. &#10;3."
-          rows="4"
-        ></textarea>
+  {#if selectedReflection}
+    <div class="modal-overlay" transition:fade={{ duration: 200 }}>
+      <div 
+        class="modal-content"
+        transition:fly={{ y: 20, duration: 300, easing: quintOut }}
+      >
+        <div class="modal-header">
+          <h3>{selectedReflection === 'morning' ? 'Morning' : 'Evening'} Reflection</h3>
+          <button class="close-btn" on:click={() => selectedReflection = null}>
+            <X size={20} />
+          </button>
+        </div>
+
+        <div class="progress-bar">
+          {#each currentQuestions as _, i}
+            <div class="progress-dot {i <= currentQuestionIndex ? 'active' : ''}"></div>
+          {/each}
+        </div>
+
+        <div class="modal-body">
+          <form on:submit|preventDefault={handleSubmit}>
+            <div class="question-content">
+              <label>{currentQuestion.question}</label>
+              <textarea 
+                bind:value={currentReflectionValue.value}
+                placeholder={currentQuestion.placeholder}
+                rows={currentQuestion.rows}
+                autofocus
+              ></textarea>
+            </div>
+
+            <div class="modal-footer">
+              {#if !isFirstQuestion}
+                <button type="button" class="nav-btn" on:click={previousQuestion}>
+                  <CaretLeft size={20} />
+                  Previous
+                </button>
+              {/if}
+
+              <button type="submit" class="submit-btn">
+                {isLastQuestion ? 'Complete Reflection' : 'Next Question'}
+                {#if !isLastQuestion}
+                  <CaretRight size={20} />
+                {/if}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
-
-      <div class="form-group">
-        <label>What new thing would you like to try today?</label>
-        <textarea 
-          bind:value={morningReflection.newThing}
-          placeholder="Write about something new you'd like to try..."
-          rows="3"
-        ></textarea>
-      </div>
-
-      <div class="form-group">
-        <label>Today's Affirmation</label>
-        <textarea 
-          bind:value={morningReflection.affirmation}
-          placeholder="Write a positive affirmation for today..."
-          rows="2"
-        ></textarea>
-      </div>
-
-      <button type="submit" class="submit-btn">Save Morning Reflection</button>
-    </form>
-  {/if}
-
-  {#if selectedTab === 'evening' && !todayStreak.evening}
-    <form class="reflection-form" on:submit|preventDefault={saveEveningReflection}>
-      <div class="form-group">
-        <label>What were the highlights of your day?</label>
-        <textarea 
-          bind:value={eveningReflection.highlights}
-          placeholder="Write about the best moments of your day..."
-          rows="3"
-        ></textarea>
-      </div>
-
-      <div class="form-group">
-        <label>What did you learn today?</label>
-        <textarea 
-          bind:value={eveningReflection.learnings}
-          placeholder="Share your learnings and insights..."
-          rows="3"
-        ></textarea>
-      </div>
-
-      <div class="form-group">
-        <label>Are you satisfied with what you accomplished today?</label>
-        <textarea 
-          bind:value={eveningReflection.satisfaction}
-          placeholder="Reflect on your satisfaction with today's accomplishments..."
-          rows="3"
-        ></textarea>
-      </div>
-
-      <div class="form-group">
-        <label>If not fully satisfied, what were the barriers?</label>
-        <textarea 
-          bind:value={eveningReflection.barriers}
-          placeholder="What prevented you from achieving your goals?"
-          rows="3"
-        ></textarea>
-      </div>
-
-      <button type="submit" class="submit-btn">Save Evening Reflection</button>
-    </form>
+    </div>
   {/if}
 </div>
 
@@ -278,10 +370,21 @@
     border: 1px solid #e0e0e0;
   }
 
+  .reflection-card:hover:not(.completed) {
+    border-color: #216974;
+    background: #f0f9fa;
+  }
+
+  .reflection-card.active {
+    border-color: #216974;
+    background: #f0f9fa;
+  }
+
   .reflection-card.completed {
     background: #216974;
     color: white;
     border: none;
+    cursor: default;
   }
 
   .card-content {
@@ -355,44 +458,106 @@
     border: none;
   }
 
-  .reflection-form {
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    z-index: 1000;
+  }
+
+  .modal-content {
     background: white;
-    padding: 1.5rem;
     border-radius: 12px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-    border: 1px solid #e0e0e0;
-  }
-
-  .form-group {
-    margin-bottom: 1.5rem;
-  }
-
-  label {
-    display: block;
-    margin-bottom: 0.5rem;
-    color: #216974;
-    font-weight: 500;
-  }
-
-  textarea {
     width: 100%;
-    padding: 0.75rem;
+    max-width: 500px;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    background: #f8fafc;
+    border-bottom: 1px solid #e0e0e0;
+  }
+
+  .modal-header h3 {
+    margin: 0;
+    font-size: 1.125rem;
+    font-weight: 500;
+    color: #216974;
+  }
+
+  .progress-bar {
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 1rem;
+    background: #f8fafc;
+  }
+
+  .progress-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #e0e0e0;
+    transition: all 0.2s;
+  }
+
+  .progress-dot.active {
+    background: #216974;
+  }
+
+  .modal-body {
+    padding: 1.5rem;
+    overflow-y: auto;
+  }
+
+  .question-content {
+    margin-bottom: 2rem;
+  }
+
+  .modal-footer {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .nav-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.25rem;
     border: 1px solid #e0e0e0;
     border-radius: 8px;
     background: white;
-    color: #333;
-    resize: vertical;
-    font-family: inherit;
+    color: #666;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
   }
 
-  textarea:focus {
-    outline: none;
+  .nav-btn:hover {
     border-color: #216974;
+    color: #216974;
   }
 
   .submit-btn {
-    width: 100%;
-    padding: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
     border: none;
     border-radius: 8px;
     background: #216974;
@@ -400,6 +565,7 @@
     font-weight: 500;
     cursor: pointer;
     transition: opacity 0.2s;
+    margin-left: auto;
   }
 
   .submit-btn:hover {
