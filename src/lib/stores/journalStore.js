@@ -13,6 +13,7 @@ function createJournalStore() {
       evening: false
     },
     completedDays: 0,
+    dailyProgress: Array(7).fill({ morning: false, evening: false }),
     totalEntries: 0
   });
 
@@ -26,12 +27,15 @@ function createJournalStore() {
       collection(db, 'reflections'),
       where('userId', '==', auth.currentUser.uid),
       orderBy('date', 'desc')
+      // Limit to last 7 days
+      // limit(7)
     );
 
     const snapshot = await getDocs(reflectionsQuery);
     let streak = 0;
     let completedDays = 0;
     let currentDate = today;
+    let dailyProgress = Array(7).fill({ morning: false, evening: false });
 
     // Sort reflections by date
     const reflectionsByDate = new Map();
@@ -45,32 +49,39 @@ function createJournalStore() {
       });
     });
 
-    // Calculate streak and completed days
-    while (true) {
+    // Calculate streak and daily progress
+    let dayIndex = 0;
+    while (dayIndex < 7) {
       const dateReflections = reflectionsByDate.get(currentDate.getTime());
-      if (!dateReflections) break;
+      if (dateReflections) {
+        dailyProgress[dayIndex] = {
+          morning: dateReflections.morning,
+          evening: dateReflections.evening
+        };
 
-      // For today, we only need either morning or evening
-      if (currentDate.getTime() === today.getTime()) {
-        if (dateReflections.morning || dateReflections.evening) {
-          streak += 0.5;
-        }
-      } 
-      // For past days, we need both morning and evening
-      else {
         if (dateReflections.morning && dateReflections.evening) {
-          streak += 1;
-          completedDays += 1;
-        } else {
-          break;
+          completedDays++;
+        }
+
+        // For today, we only need either morning or evening
+        if (currentDate.getTime() === today.getTime()) {
+          if (dateReflections.morning || dateReflections.evening) {
+            streak += 0.5;
+          }
+        } 
+        // For past days, we need both morning and evening
+        else {
+          if (dateReflections.morning && dateReflections.evening) {
+            streak += 1;
+          } else {
+            break;
+          }
         }
       }
       
       currentDate.setDate(currentDate.getDate() - 1);
+      dayIndex++;
     }
-
-    // Cap completed days at 7 for the challenge
-    completedDays = Math.min(completedDays, 7);
 
     // Update streak in store and badge progress
     update(store => ({
@@ -79,7 +90,8 @@ function createJournalStore() {
         ...store.streak,
         current: streak
       },
-      completedDays
+      completedDays,
+      dailyProgress
     }));
     
     updateJournalStreak(Math.floor(streak));
@@ -97,7 +109,6 @@ function createJournalStore() {
       const existingDoc = await getDoc(docRef);
 
       if (existingDoc.exists()) {
-        // Update existing document
         await setDoc(docRef, {
           ...existingDoc.data(),
           morning: {
@@ -106,7 +117,6 @@ function createJournalStore() {
           }
         }, { merge: true });
       } else {
-        // Create new document
         await setDoc(docRef, {
           userId: auth.currentUser.uid,
           date: today,
@@ -137,7 +147,6 @@ function createJournalStore() {
       const existingDoc = await getDoc(docRef);
 
       if (existingDoc.exists()) {
-        // Update existing document
         await setDoc(docRef, {
           ...existingDoc.data(),
           evening: {
@@ -146,7 +155,6 @@ function createJournalStore() {
           }
         }, { merge: true });
       } else {
-        // Create new document
         await setDoc(docRef, {
           userId: auth.currentUser.uid,
           date: today,
