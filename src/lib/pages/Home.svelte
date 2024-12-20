@@ -29,6 +29,10 @@
   else if (hour < 17) greeting = 'Good Afternoon';
   else greeting = 'Good Evening';
 
+  function navigateTo(page) {
+    dispatch('navigate', page);
+  }
+
   function handleTabChange(event) {
     currentPage = event.detail;
     if (currentPage === 'home') {
@@ -502,7 +506,7 @@
     {:else if currentPage === 'journal'}
       <Journal />
     {:else if currentPage === 'profile'}
-      <Profile />
+      <Profile {navigateTo} />
     {/if}
     <BottomNav activeTab={currentPage} on:tabChange={handleTabChange} />
   </div>
