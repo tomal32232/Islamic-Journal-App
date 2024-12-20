@@ -16,6 +16,76 @@ function createJournalStore() {
     totalEntries: 0
   });
 
+  async function calculateProgress() {
+    if (!auth.currentUser) return 0;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const reflectionsQuery = query(
+      collection(db, 'reflections'),
+      where('userId', '==', auth.currentUser.uid),
+      orderBy('date', 'desc')
+    );
+
+    const snapshot = await getDocs(reflectionsQuery);
+    let streak = 0;
+    let completedDays = 0;
+    let currentDate = today;
+
+    // Sort reflections by date
+    const reflectionsByDate = new Map();
+    snapshot.docs.forEach(doc => {
+      const reflection = doc.data();
+      const date = new Date(reflection.date.toDate());
+      date.setHours(0, 0, 0, 0);
+      reflectionsByDate.set(date.getTime(), {
+        morning: !!reflection.morning,
+        evening: !!reflection.evening
+      });
+    });
+
+    // Calculate streak and completed days
+    while (true) {
+      const dateReflections = reflectionsByDate.get(currentDate.getTime());
+      if (!dateReflections) break;
+
+      // For today, we only need either morning or evening
+      if (currentDate.getTime() === today.getTime()) {
+        if (dateReflections.morning || dateReflections.evening) {
+          streak += 0.5;
+        }
+      } 
+      // For past days, we need both morning and evening
+      else {
+        if (dateReflections.morning && dateReflections.evening) {
+          streak += 1;
+          completedDays += 1;
+        } else {
+          break;
+        }
+      }
+      
+      currentDate.setDate(currentDate.getDate() - 1);
+    }
+
+    // Cap completed days at 7 for the challenge
+    completedDays = Math.min(completedDays, 7);
+
+    // Update streak in store and badge progress
+    update(store => ({
+      ...store,
+      streak: {
+        ...store.streak,
+        current: streak
+      },
+      completedDays
+    }));
+    
+    updateJournalStreak(Math.floor(streak));
+    return streak;
+  }
+
   return {
     subscribe,
     
@@ -125,76 +195,6 @@ function createJournalStore() {
       await calculateProgress();
     }
   };
-}
-
-async function calculateProgress() {
-  if (!auth.currentUser) return 0;
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  
-  const reflectionsQuery = query(
-    collection(db, 'reflections'),
-    where('userId', '==', auth.currentUser.uid),
-    orderBy('date', 'desc')
-  );
-
-  const snapshot = await getDocs(reflectionsQuery);
-  let streak = 0;
-  let completedDays = 0;
-  let currentDate = today;
-
-  // Sort reflections by date
-  const reflectionsByDate = new Map();
-  snapshot.docs.forEach(doc => {
-    const reflection = doc.data();
-    const date = new Date(reflection.date.toDate());
-    date.setHours(0, 0, 0, 0);
-    reflectionsByDate.set(date.getTime(), {
-      morning: !!reflection.morning,
-      evening: !!reflection.evening
-    });
-  });
-
-  // Calculate streak and completed days
-  while (true) {
-    const dateReflections = reflectionsByDate.get(currentDate.getTime());
-    if (!dateReflections) break;
-
-    // For today, we only need either morning or evening
-    if (currentDate.getTime() === today.getTime()) {
-      if (dateReflections.morning || dateReflections.evening) {
-        streak += 0.5;
-      }
-    } 
-    // For past days, we need both morning and evening
-    else {
-      if (dateReflections.morning && dateReflections.evening) {
-        streak += 1;
-        completedDays += 1;
-      } else {
-        break;
-      }
-    }
-    
-    currentDate.setDate(currentDate.getDate() - 1);
-  }
-
-  // Cap completed days at 7 for the challenge
-  completedDays = Math.min(completedDays, 7);
-
-  // Update streak in store and badge progress
-  journalStore.update(store => ({
-    ...store,
-    streak: {
-      ...store.streak,
-      current: streak
-    },
-    completedDays
-  }));
-  
-  updateJournalStreak(Math.floor(streak));
-  return streak;
 }
 
 export const journalStore = createJournalStore(); 
