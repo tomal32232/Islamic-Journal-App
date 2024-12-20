@@ -172,37 +172,38 @@
   }
 
   .prayer-times-grid {
-    display: flex;
-    justify-content: space-between;
-    gap: 0.25rem;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 0.5rem;
     margin-bottom: 1rem;
+    background: white;
+    padding: 0.75rem;
+    border-radius: 12px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
   }
 
   .prayer-time-card {
-    background: white;
-    padding: 0.375rem;
+    background: #f8fafc;
+    padding: 0.75rem 0.5rem;
     border-radius: 8px;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.125rem;
+    gap: 0.375rem;
     text-align: center;
     transition: all 0.2s ease;
     border: 1px solid #eee;
-    width: calc(100% / 6 - 0.25rem);
-    min-width: unset;
-    max-width: unset;
   }
 
   .prayer-time-card.current {
     border: 2px solid #E09453;
-    padding: calc(0.375rem - 1px);
+    padding: calc(0.75rem - 1px) calc(0.5rem - 1px);
     background: rgba(224, 148, 83, 0.05);
   }
 
   .icon-wrapper {
     background: rgba(33, 105, 116, 0.1);
-    padding: 0.375rem;
+    padding: 0.5rem;
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -214,15 +215,15 @@
   }
 
   .prayer-name {
-    font-size: 0.75rem;
-    color: #666;
+    font-size: 0.875rem;
+    color: #216974;
     font-weight: 500;
   }
 
   .prayer-time {
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: #216974;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #666;
   }
 
   .prayer-time-card.current .prayer-name {
@@ -252,38 +253,29 @@
       padding: 0.5rem;
     }
 
-    .tabs {
-      margin-bottom: 1rem;
-    }
-
-    .tab-button {
-      font-size: 0.875rem;
-      padding: 0.375rem 0.75rem;
-    }
-
-    h2 {
-      font-size: 1rem;
-      margin-bottom: 0.5rem;
+    .prayer-times-grid {
+      padding: 0.5rem;
+      gap: 0.375rem;
     }
 
     .prayer-time-card {
-      padding: 0.25rem;
+      padding: 0.5rem 0.25rem;
     }
 
     .prayer-time-card.current {
-      padding: calc(0.25rem - 1px);
+      padding: calc(0.5rem - 1px) calc(0.25rem - 1px);
     }
 
     .icon-wrapper {
-      padding: 0.25rem;
+      padding: 0.375rem;
     }
 
     .prayer-name {
-      font-size: 0.625rem;
+      font-size: 0.75rem;
     }
 
     .prayer-time {
-      font-size: 0.625rem;
+      font-size: 0.75rem;
     }
 
     svelte:component {
