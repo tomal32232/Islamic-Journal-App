@@ -12,6 +12,7 @@ function createJournalStore() {
       morning: false,
       evening: false
     },
+    completedDays: 0,
     totalEntries: 0
   });
 
@@ -55,7 +56,7 @@ function createJournalStore() {
         }
       }));
 
-      await calculateStreak();
+      await calculateProgress();
     },
 
     saveEveningReflection: async (reflection) => {
@@ -95,7 +96,7 @@ function createJournalStore() {
         }
       }));
 
-      await calculateStreak();
+      await calculateProgress();
     },
 
     loadTodayReflections: async () => {
@@ -121,12 +122,12 @@ function createJournalStore() {
         }));
       }
 
-      await calculateStreak();
+      await calculateProgress();
     }
   };
 }
 
-async function calculateStreak() {
+async function calculateProgress() {
   if (!auth.currentUser) return 0;
 
   const today = new Date();
@@ -140,6 +141,7 @@ async function calculateStreak() {
 
   const snapshot = await getDocs(reflectionsQuery);
   let streak = 0;
+  let completedDays = 0;
   let currentDate = today;
 
   // Sort reflections by date
@@ -154,7 +156,7 @@ async function calculateStreak() {
     });
   });
 
-  // Calculate streak
+  // Calculate streak and completed days
   while (true) {
     const dateReflections = reflectionsByDate.get(currentDate.getTime());
     if (!dateReflections) break;
@@ -169,6 +171,7 @@ async function calculateStreak() {
     else {
       if (dateReflections.morning && dateReflections.evening) {
         streak += 1;
+        completedDays += 1;
       } else {
         break;
       }
@@ -177,13 +180,17 @@ async function calculateStreak() {
     currentDate.setDate(currentDate.getDate() - 1);
   }
 
+  // Cap completed days at 7 for the challenge
+  completedDays = Math.min(completedDays, 7);
+
   // Update streak in store and badge progress
   journalStore.update(store => ({
     ...store,
     streak: {
       ...store.streak,
       current: streak
-    }
+    },
+    completedDays
   }));
   
   updateJournalStreak(Math.floor(streak));
