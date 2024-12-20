@@ -122,10 +122,36 @@
   };
 
   function handleReflectionClick(type) {
-    if ((type === 'morning' && !todayStreak.morning) || 
+    if (type === 'morning' && todayStreak.morning) {
+      // Show completed morning reflection
+      selectedReflection = 'morning-view';
+      morningReflection = { ...$journalStore.todayMorningReflection };
+    } else if (type === 'evening' && todayStreak.evening) {
+      // Show completed evening reflection
+      selectedReflection = 'evening-view';
+      eveningReflection = { ...$journalStore.todayEveningReflection };
+    } else if ((type === 'morning' && !todayStreak.morning) || 
         (type === 'evening' && !todayStreak.evening)) {
+      // Start new reflection
       selectedReflection = selectedReflection === type ? null : type;
       currentQuestionIndex = 0;
+    }
+  }
+
+  // Helper function to get reflection data based on type
+  function getReflectionData(type) {
+    if (type === 'morning-view') {
+      return {
+        title: 'Morning Reflection',
+        questions: morningQuestions,
+        answers: morningReflection
+      };
+    } else {
+      return {
+        title: 'Evening Reflection',
+        questions: eveningQuestions,
+        answers: eveningReflection
+      };
     }
   }
 
@@ -276,47 +302,66 @@
         transition:fly={{ y: 20, duration: 300, easing: quintOut }}
       >
         <div class="modal-header">
-          <h3>{selectedReflection === 'morning' ? 'Morning' : 'Evening'} Reflection</h3>
+          <h3>
+            {#if selectedReflection === 'morning-view' || selectedReflection === 'evening-view'}
+              {getReflectionData(selectedReflection).title}
+            {:else}
+              {selectedReflection === 'morning' ? 'Morning' : 'Evening'} Reflection
+            {/if}
+          </h3>
           <button class="close-btn" on:click={() => selectedReflection = null}>
-            <X size={20} />
+            <X weight="regular" size={32} />
           </button>
         </div>
 
-        <div class="progress-bar">
-          {#each currentQuestions as _, i}
-            <div class="progress-dot {i <= currentQuestionIndex ? 'active' : ''}"></div>
-          {/each}
-        </div>
+        {#if selectedReflection === 'morning-view' || selectedReflection === 'evening-view'}
+          <!-- View completed reflection -->
+          <div class="modal-body view-mode">
+            {#each getReflectionData(selectedReflection).questions as question}
+              <div class="completed-question">
+                <h4>{question.question}</h4>
+                <p class="answer">{getReflectionData(selectedReflection).answers[question.field]}</p>
+              </div>
+            {/each}
+          </div>
+        {:else}
+          <!-- Normal reflection input mode -->
+          <div class="progress-bar">
+            {#each currentQuestions as _, i}
+              <div class="progress-dot {i <= currentQuestionIndex ? 'active' : ''}"></div>
+            {/each}
+          </div>
 
-        <div class="modal-body">
-          <form on:submit|preventDefault={handleSubmit}>
-            <div class="question-content">
-              <label>{currentQuestion.question}</label>
-              <textarea 
-                bind:value={currentReflectionValue.value}
-                placeholder={currentQuestion.placeholder}
-                rows={currentQuestion.rows}
-                autofocus
-              ></textarea>
-            </div>
+          <div class="modal-body">
+            <form on:submit|preventDefault={handleSubmit}>
+              <div class="question-content">
+                <label>{currentQuestion.question}</label>
+                <textarea 
+                  bind:value={currentReflectionValue.value}
+                  placeholder={currentQuestion.placeholder}
+                  rows={currentQuestion.rows}
+                  autofocus
+                ></textarea>
+              </div>
 
-            <div class="modal-footer">
-              {#if !isFirstQuestion}
-                <button type="button" class="nav-btn" on:click={previousQuestion}>
-                  <CaretLeft size={20} />
-                  Previous
-                </button>
-              {/if}
-
-              <button type="submit" class="submit-btn">
-                {isLastQuestion ? 'Complete Reflection' : 'Next Question'}
-                {#if !isLastQuestion}
-                  <CaretRight size={20} />
+              <div class="modal-footer">
+                {#if !isFirstQuestion}
+                  <button type="button" class="nav-btn" on:click={previousQuestion}>
+                    <CaretLeft size={20} />
+                    Previous
+                  </button>
                 {/if}
-              </button>
-            </div>
-          </form>
-        </div>
+
+                <button type="submit" class="submit-btn">
+                  {isLastQuestion ? 'Complete Reflection' : 'Next Question'}
+                  {#if !isLastQuestion}
+                    <CaretRight size={20} />
+                  {/if}
+                </button>
+              </div>
+            </form>
+          </div>
+        {/if}
       </div>
     </div>
   {/if}
@@ -558,7 +603,6 @@
   .modal-header {
     text-align: left;
     margin-bottom: 1rem;
-    padding-right: 2rem;
   }
 
   .modal-header h3 {
@@ -569,24 +613,27 @@
   }
 
   .close-btn {
-    background: none;
-    border: none;
-    color: #666;
-    cursor: pointer;
-    width: 32px;
-    height: 32px;
+    position: absolute;
+    top: 1.5rem;
+    right: 1.5rem;
+    width: 56px;
+    height: 56px;
     border-radius: 50%;
+    background: #f5f5f5;
+    border: none;
+    cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.2s;
-    position: absolute;
-    right: 1.5rem;
-    top: 1.5rem;
+    transition: all 0.2s ease;
+    color: #666;
+    z-index: 2;
+    padding: 0;
   }
 
   .close-btn:hover {
-    background: rgba(0,0,0,0.05);
+    background: #eeeeee;
+    color: #333;
   }
 
   .progress-bar {
@@ -697,5 +744,34 @@
 
   .nav-btn {
     display: none;
+  }
+
+  .view-mode {
+    padding: 1rem 0;
+    overflow-y: auto;
+  }
+
+  .completed-question {
+    padding: 1rem 2rem;
+    border-bottom: 1px solid #e0e0e0;
+  }
+
+  .completed-question:last-child {
+    border-bottom: none;
+  }
+
+  .completed-question h4 {
+    font-size: 1.125rem;
+    color: #216974;
+    margin: 0 0 0.75rem 0;
+    font-weight: 500;
+  }
+
+  .answer {
+    font-size: 1rem;
+    line-height: 1.6;
+    color: #333;
+    white-space: pre-line;
+    margin: 0;
   }
 </style> 
