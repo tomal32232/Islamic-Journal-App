@@ -62,17 +62,20 @@
 <style>
   .bottom-nav {
     position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
+    bottom: 16px;
+    left: 16px;
+    right: 16px;
     z-index: 1000;
     padding: 0 16px;
-    background: rgba(23, 23, 23, 0.95);
+    background: rgba(255, 255, 255, 0.95);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
+    border-radius: 32px;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(33, 105, 116, 0.1);
     height: 64px;
-    display: flex;
-    justify-content: center;
+    max-width: 400px;
+    margin: 0 auto;
   }
 
   .nav-container {
@@ -81,8 +84,6 @@
     align-items: center;
     height: 100%;
     position: relative;
-    max-width: 400px;
-    width: 100%;
   }
 
   .nav-group {
@@ -131,9 +132,10 @@
     border: none;
   }
 
-  @media (prefers-color-scheme: light) {
+  @media (prefers-color-scheme: dark) {
     .bottom-nav {
-      background: rgba(255, 255, 255, 0.95);
+      background: rgba(23, 23, 23, 0.95);
+      border-color: rgba(255, 255, 255, 0.1);
     }
   }
 </style> 

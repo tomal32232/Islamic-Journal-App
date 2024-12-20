@@ -1,6 +1,5 @@
 <script>
   import { onMount } from 'svelte';
-  import BottomNav from '../BottomNav.svelte';
   import Profile from './Profile.svelte';
   import { iconMap } from '../utils/icons';
   import { prayerTimesStore, loadingStore, errorStore, fetchPrayerTimes, locationStore } from '../services/prayerTimes';
@@ -508,7 +507,6 @@
     {:else if currentPage === 'profile'}
       <Profile {navigateTo} />
     {/if}
-    <BottomNav activeTab={currentPage} on:tabChange={handleTabChange} />
   </div>
 </main>
 
