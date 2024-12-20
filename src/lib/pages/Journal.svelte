@@ -23,6 +23,33 @@
     return days;
   }
 
+  function getChallengeMessage() {
+    const completedDays = $journalStore.dailyProgress.filter(
+      day => day?.morning && day?.evening
+    ).length;
+
+    switch(completedDays) {
+      case 0:
+        return "Ready to begin your journaling journey? Let's take the first step together!";
+      case 1:
+        return "Amazing start! You've completed your first day. Keep the momentum going!";
+      case 2:
+        return "Two days down! You're building a beautiful habit, keep going!";
+      case 3:
+        return "Halfway there! Your dedication is inspiring!";
+      case 4:
+        return "Four days strong! You're proving that consistency is key!";
+      case 5:
+        return "Just two more days! You're so close to achieving your goal!";
+      case 6:
+        return "One final day! You've come so far, finish strong!";
+      case 7:
+        return "Congratulations! You've completed the challenge! Ready for another week of growth?";
+      default:
+        return "One day at a time, one step closer to a better you";
+    }
+  }
+
   let weekDays = getCurrentWeek();
   let selectedReflection = null; // 'morning' or 'evening' or null
   let morningReflection = {
@@ -202,6 +229,9 @@
     await journalStore.saveEveningReflection(eveningReflection);
     selectedReflection = null;
   }
+
+  // Add this computed value
+  $: challengeMessage = getChallengeMessage();
 </script>
 
 <div class="journal-container">
@@ -248,7 +278,7 @@
   <div class="challenge-card">
     <div class="challenge-header">
       <h3>7-DAY JOURNALING CHALLENGE</h3>
-      <p>One day at a time, one step closer to a better you</p>
+      <p>{challengeMessage}</p>
     </div>
     <div class="challenge-progress">
       {#each Array(7) as _, i}
