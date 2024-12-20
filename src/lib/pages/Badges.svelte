@@ -19,6 +19,7 @@
   export let onBack;
 
   let earnedBadges = [];
+  let earnedCount = 0;
   let allBadges = badgeStore.getAllBadges();
   let selectedCategory = 'all';
   let searchQuery = '';
@@ -38,7 +39,10 @@
   // Update earned badges when store changes
   $: if ($badgeStore) {
     console.log('Badge store updated:', $badgeStore);
+    console.log('Earned badges from store:', $badgeStore.earnedBadges);
     earnedBadges = badgeStore.getEarnedBadges($badgeStore.earnedBadges);
+    console.log('Processed earned badges:', earnedBadges);
+    earnedCount = earnedBadges.length;
   }
 
   // Calculate badge progress
@@ -140,7 +144,11 @@
   $: totalBadges = Object.values(allBadges).reduce((total, category) => {
     return total + Object.values(category).reduce((sum, badges) => sum + badges.length, 0);
   }, 0);
-  $: earnedCount = earnedBadges.length;
+  $: {
+    earnedCount = earnedBadges.length;
+    console.log('Total badges:', totalBadges);
+    console.log('Earned count:', earnedCount);
+  }
 </script>
 
 <div class="badges-page">
