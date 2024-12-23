@@ -78,6 +78,7 @@ function createJournalStore() {
           evening: reflection.evening,
           date: dateStr
         };
+        // Only count as completed if both morning and evening are done
         if (reflection.morning && reflection.evening) {
           completedDays++;
           // Calculate streak only for consecutive days up to today
@@ -95,8 +96,38 @@ function createJournalStore() {
       }
     });
 
+    // Sort completed days to be consecutive in the progress display
+    let sortedProgress = Array(7).fill(null).map(() => ({ 
+      morning: false, 
+      evening: false,
+      date: null 
+    }));
+
+    // First, add completed days in sequence
+    let progressIndex = 0;
+    dailyProgress.forEach((day) => {
+      if (day.morning && day.evening) {
+        sortedProgress[progressIndex] = {
+          morning: true,
+          evening: true,
+          date: day.date
+        };
+        progressIndex++;
+      }
+    });
+
+    // Add today's progress if it's morning-only
+    const todayProgress = dailyProgress[dailyProgress.length - 1];
+    if (todayProgress.morning && !todayProgress.evening) {
+      sortedProgress[progressIndex] = {
+        morning: true,
+        evening: false,
+        date: todayProgress.date
+      };
+    }
+
     console.log('Days being tracked:', days);
-    console.log('Final dailyProgress:', dailyProgress);
+    console.log('Final dailyProgress:', sortedProgress);
     console.log('Completed days:', completedDays);
     console.log('Streak:', streak);
 
@@ -110,7 +141,7 @@ function createJournalStore() {
         evening: !!reflectionsByDate.get(today.toISOString().split('T')[0])?.evening
       },
       completedDays,
-      dailyProgress
+      dailyProgress: sortedProgress
     }));
     
     updateJournalStreak(Math.floor(streak));

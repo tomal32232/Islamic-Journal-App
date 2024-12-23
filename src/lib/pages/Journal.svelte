@@ -577,8 +577,9 @@
       #216974 50%,
       #e0e0e0 50%
     );
-    background-clip: text;
     -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
     color: transparent;
   }
 
