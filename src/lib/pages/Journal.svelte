@@ -24,9 +24,7 @@
   }
 
   function getChallengeMessage() {
-    const completedDays = $journalStore.dailyProgress.filter(
-      day => day?.morning && day?.evening
-    ).length;
+    const completedDays = $journalStore.completedDays;
 
     switch(completedDays) {
       case 0:
