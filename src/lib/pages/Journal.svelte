@@ -12,14 +12,15 @@
     const days = [];
     for (let i = 0; i < 7; i++) {
       const date = new Date(today);
-      date.setDate(date.getDate() - 3 + i); // Center current day
+      date.setDate(date.getDate() - 6 + i); // Start from 6 days ago
       days.push({
         day: date.toLocaleDateString('en-US', { weekday: 'short' }),
         date: date.getDate(),
         fullDate: date.toISOString().split('T')[0],
-        isToday: i === 3
+        isToday: date.toDateString() === today.toDateString()
       });
     }
+    console.log('Calendar days:', days);
     return days;
   }
 
@@ -67,6 +68,18 @@
   $: todayStreak = $journalStore.streak;
   $: userName = auth.currentUser?.displayName?.split(' ')[0] || 'friend';
   $: greeting = getGreeting();
+  $: weekDays.forEach(({ fullDate, isToday }) => {
+    const hasCompletion = $journalStore.dailyProgress.find(d => d.date === fullDate && d.morning && d.evening);
+    const isTodayComplete = isToday && $journalStore.streak?.morning && $journalStore.streak?.evening;
+    if (hasCompletion || isTodayComplete) {
+      console.log('Tick mark debug:', { 
+        fullDate, 
+        hasCompletion, 
+        isTodayComplete, 
+        dailyProgress: $journalStore.dailyProgress 
+      });
+    }
+  });
 
   function getGreeting() {
     const hour = new Date().getHours();
@@ -240,10 +253,16 @@
     </div>
 
     <div class="week-strip">
-      {#each weekDays as { day, date, isToday }}
+      {#each weekDays as { day, date, isToday, fullDate }}
+        {@const hasCompletion = $journalStore.dailyProgress.find(d => d.date === fullDate)}
+        {@const isTodayComplete = isToday && $journalStore.streak?.morning && $journalStore.streak?.evening}
+        {@const shouldShowTick = (hasCompletion?.morning && hasCompletion?.evening) || isTodayComplete}
         <div class="day-item {isToday ? 'active' : ''}">
           <span class="day-name">{day}</span>
           <span class="day-number">{date}</span>
+          {#if shouldShowTick}
+            <div class="completion-mark">✓</div>
+          {/if}
         </div>
       {/each}
     </div>
@@ -412,6 +431,7 @@
     gap: 0.25rem;
     padding: 0.5rem;
     color: #666;
+    position: relative;
   }
 
   .day-item.active {
@@ -765,5 +785,11 @@
     color: #333;
     white-space: pre-line;
     margin: 0;
+  }
+
+  .completion-mark {
+    color: #216974;
+    font-size: 0.875rem;
+    margin-top: 0.125rem;
   }
 </style> 
