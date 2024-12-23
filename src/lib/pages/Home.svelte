@@ -49,8 +49,9 @@
       completedPrayersToday = todayPrayers.length;
     }
 
-    if ($weeklyStatsStore?.dailyCount?.[today]) {
-      todayTasbihCount = $weeklyStatsStore.dailyCount[today];
+    if ($weeklyStatsStore?.dailyCounts) {
+      const todayCount = $weeklyStatsStore.dailyCounts.find(day => day.isToday);
+      todayTasbihCount = todayCount ? todayCount.count : 0;
     }
   }
 
@@ -149,8 +150,9 @@
       completedPrayersToday = todayPrayers.length;
     }
 
-    if ($weeklyStatsStore?.dailyCount?.[today]) {
-      todayTasbihCount = $weeklyStatsStore.dailyCount[today];
+    if ($weeklyStatsStore?.dailyCounts) {
+      const todayCount = $weeklyStatsStore.dailyCounts.find(day => day.isToday);
+      todayTasbihCount = todayCount ? todayCount.count : 0;
     }
   }
 
