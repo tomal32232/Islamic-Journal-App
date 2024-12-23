@@ -9,6 +9,7 @@
   import { goalStore } from '../stores/goalStore';
   import { onMount } from 'svelte';
   import { fade } from 'svelte/transition';
+  import { getTodayReadingTime } from '../services/readingTimeService';
 
   const user = auth.currentUser;
   let prayerStats = { onTime: 0, late: 0, missed: 0, total: 0 };
@@ -17,6 +18,8 @@
   let activeTab = 'profile';
   let showToast = false;
   let toastMessage = '';
+  let todayReadingTime = 0;
+  let todayDhikrCount = 0;
 
   function showErrorToast(message) {
     toastMessage = message;
@@ -126,6 +129,18 @@
     };
   }
 
+  // Update today's reading time
+  async function updateTodayReadingTime() {
+    const seconds = await getTodayReadingTime();
+    todayReadingTime = Math.floor(seconds / 60); // Convert to minutes
+  }
+
+  // Update today's dhikr count
+  $: if ($weeklyStatsStore?.dailyCounts?.length > 0) {
+    const today = $weeklyStatsStore.dailyCounts.find(d => d.isToday);
+    todayDhikrCount = today?.count || 0;
+  }
+
   // Goals data
   $: goals = [
     { 
@@ -138,47 +153,78 @@
     { 
       name: 'Daily Quran Reading', 
       target: $goalStore.dailyQuranReading, 
-      current: $badgeStore?.progress?.['daily_reading'] || 0, 
+      current: todayReadingTime, 
       type: 'dailyQuranReading',
-      unit: 'minutes' 
+      unit: 'minutes',
+      displayTarget: formatTimeDisplay($goalStore.dailyQuranReading),
+      isTimeInput: true
     },
     { 
       name: 'Daily Dhikr', 
       target: $goalStore.dailyDhikr, 
-      current: $weeklyStatsStore?.dailyCounts?.[0]?.count || 0,
+      current: todayDhikrCount,
       type: 'dailyDhikr',
       unit: ''
     }
   ];
 
   let editingGoal = null;
+  let editHours = '0';
+  let editMinutes = '0';
   let editValue = '';
+
+  function formatTimeDisplay(totalMinutes) {
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    return `${hours}h ${minutes}m`;
+  }
 
   function startEditing(goal) {
     editingGoal = goal;
-    editValue = goal.target.toString();
+    if (goal.isTimeInput) {
+      const totalMinutes = goal.target;
+      editHours = Math.floor(totalMinutes / 60).toString();
+      editMinutes = (totalMinutes % 60).toString();
+    } else {
+      editValue = goal.target.toString();
+    }
   }
 
   async function saveGoal() {
     if (!editingGoal) return;
     
-    const value = parseInt(editValue);
-    if (isNaN(value) || value < 1) {
-      showErrorToast('Please enter a valid number greater than 0');
-      return;
-    }
+    if (editingGoal.isTimeInput) {
+      const hours = parseInt(editHours) || 0;
+      const minutes = parseInt(editMinutes) || 0;
+      const totalMinutes = (hours * 60) + minutes;
+      
+      if (totalMinutes < 1) {
+        showErrorToast('Please enter a valid time greater than 0');
+        return;
+      }
+      
+      await goalStore.updateGoal(editingGoal.type, totalMinutes);
+    } else {
+      const value = parseInt(editValue);
+      if (isNaN(value) || value < 1) {
+        showErrorToast('Please enter a valid number greater than 0');
+        return;
+      }
 
-    if (editingGoal.type === 'dailyPrayers' && value > 5) {
-      showErrorToast('Daily prayers goal cannot exceed 5');
-      return;
+      if (editingGoal.type === 'dailyPrayers' && value > 5) {
+        showErrorToast('Daily prayers goal cannot exceed 5');
+        return;
+      }
+      
+      await goalStore.updateGoal(editingGoal.type, value);
     }
     
-    await goalStore.updateGoal(editingGoal.type, value);
     editingGoal = null;
   }
 
   onMount(async () => {
     await goalStore.loadGoals();
+    await updateTodayReadingTime();
   });
 
   // Handle logout
@@ -303,17 +349,43 @@
               <span class="goal-name">{goal.name}</span>
               {#if editingGoal?.type === goal.type}
                 <div class="edit-input">
-                  <input 
-                    type="number" 
-                    bind:value={editValue}
-                    min="1"
-                    on:keydown={(e) => e.key === 'Enter' && saveGoal()}
-                  >
+                  {#if goal.isTimeInput}
+                    <div class="time-input">
+                      <input 
+                        type="number" 
+                        bind:value={editHours}
+                        min="0"
+                        placeholder="Hours"
+                      >
+                      <span>h</span>
+                      <input 
+                        type="number" 
+                        bind:value={editMinutes}
+                        min="0"
+                        max="59"
+                        placeholder="Minutes"
+                      >
+                      <span>m</span>
+                    </div>
+                  {:else}
+                    <input 
+                      type="number" 
+                      bind:value={editValue}
+                      min="1"
+                      on:keydown={(e) => e.key === 'Enter' && saveGoal()}
+                    >
+                  {/if}
                   <button class="save-btn" on:click={saveGoal}>Save</button>
                 </div>
               {:else}
                 <div class="goal-target">
-                  <span class="goal-progress">{goal.current}/{goal.target} {goal.unit}</span>
+                  <span class="goal-progress">
+                    {#if goal.isTimeInput}
+                      {formatTimeDisplay(goal.current)}/{goal.displayTarget}
+                    {:else}
+                      {goal.current}/{goal.target} {goal.unit}
+                    {/if}
+                  </span>
                   <button class="edit-btn" on:click={() => startEditing(goal)}>
                     <Pencil size={14} />
                   </button>
@@ -814,5 +886,24 @@
     font-size: 0.875rem;
     z-index: 1000;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+
+  .time-input {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .time-input input {
+    width: 50px;
+    padding: 4px 8px;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    font-size: 0.875rem;
+  }
+
+  .time-input span {
+    color: #666;
+    font-size: 0.875rem;
   }
 </style> 
