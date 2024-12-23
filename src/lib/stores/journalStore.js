@@ -13,7 +13,11 @@ function createJournalStore() {
       evening: false
     },
     completedDays: 0,
-    dailyProgress: Array(7).fill(null).map(() => ({ morning: false, evening: false })),
+    dailyProgress: Array(7).fill(null).map(() => ({ 
+      morning: false, 
+      evening: false,
+      date: null 
+    })),
     totalEntries: 0
   });
 
@@ -22,6 +26,7 @@ function createJournalStore() {
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    console.log('Calculating progress for today:', today.toISOString().split('T')[0]);
     
     const reflectionsQuery = query(
       collection(db, 'reflections'),
@@ -32,7 +37,11 @@ function createJournalStore() {
     const snapshot = await getDocs(reflectionsQuery);
     let streak = 0;
     let completedDays = 0;
-    let dailyProgress = Array(7).fill(null).map(() => ({ morning: false, evening: false }));
+    let dailyProgress = Array(7).fill(null).map(() => ({ 
+      morning: false, 
+      evening: false,
+      date: null 
+    }));
 
     // Sort reflections by date
     const reflectionsByDate = new Map();
@@ -40,64 +49,65 @@ function createJournalStore() {
       const reflection = doc.data();
       const date = new Date(reflection.date.toDate());
       date.setHours(0, 0, 0, 0);
-      reflectionsByDate.set(date.getTime(), {
+      const dateStr = date.toISOString().split('T')[0];
+      console.log('Processing reflection for date:', dateStr, {
         morning: !!reflection.morning,
         evening: !!reflection.evening
       });
+      reflectionsByDate.set(dateStr, {
+        morning: !!reflection.morning,
+        evening: !!reflection.evening,
+        date: dateStr
+      });
     });
 
-    // Count completed days and update progress
-    const dates = Array.from(reflectionsByDate.entries())
-      .sort(([dateA], [dateB]) => dateB - dateA); // Sort by date descending
-
-    // Process all dates first to count completed days
-    dates.forEach(([timestamp, reflections]) => {
-      const date = new Date(timestamp);
-      if (date.getTime() !== today.getTime() && reflections.morning && reflections.evening && completedDays < 7) {
-        // Mark the next available day as completed
-        dailyProgress[completedDays] = {
-          morning: true,
-          evening: true
-        };
-        completedDays++;
-
-        // Calculate streak for yesterday
-        const prevDay = new Date(today);
-        prevDay.setDate(prevDay.getDate() - 1);
-        if (date.getTime() === prevDay.getTime()) {
-          streak += 1;
-        }
-      }
-    });
-
-    // Then handle today's progress (it will be placed after completed days)
-    const todayReflections = reflectionsByDate.get(today.getTime());
-    if (todayReflections) {
-      if (todayReflections.morning && todayReflections.evening) {
-        // Today is fully completed
-        dailyProgress[completedDays] = {
-          morning: true,
-          evening: true
-        };
-        completedDays++;
-        streak += 1;
-      } else if (todayReflections.morning) {
-        // Today has morning only - mark the next position as half complete
-        dailyProgress[completedDays] = {
-          morning: true,
-          evening: false
-        };
-        // Don't increment completedDays since it's not fully complete
-        streak += 0.5;
-      }
+    // Get the last 7 days
+    const days = [];
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date(today);
+      date.setDate(date.getDate() - i);
+      days.push(date.toISOString().split('T')[0]);
     }
+
+    // Fill in the progress for each day
+    days.forEach((dateStr, index) => {
+      const reflection = reflectionsByDate.get(dateStr);
+      if (reflection) {
+        dailyProgress[index] = {
+          morning: reflection.morning,
+          evening: reflection.evening,
+          date: dateStr
+        };
+        if (reflection.morning && reflection.evening) {
+          completedDays++;
+          // Calculate streak only for consecutive days up to today
+          if (index === days.length - 1 || // Today
+              (index === days.length - 2 && completedDays > 0)) { // Yesterday if we have a streak
+            streak += 1;
+          }
+        }
+      } else {
+        dailyProgress[index] = {
+          morning: false,
+          evening: false,
+          date: dateStr
+        };
+      }
+    });
+
+    console.log('Days being tracked:', days);
+    console.log('Final dailyProgress:', dailyProgress);
+    console.log('Completed days:', completedDays);
+    console.log('Streak:', streak);
 
     // Update streak in store and badge progress
     update(store => ({
       ...store,
       streak: {
         ...store.streak,
-        current: streak
+        current: streak,
+        morning: !!reflectionsByDate.get(today.toISOString().split('T')[0])?.morning,
+        evening: !!reflectionsByDate.get(today.toISOString().split('T')[0])?.evening
       },
       completedDays,
       dailyProgress
