@@ -41,6 +41,12 @@
       missed: 0
     };
 
+    // Get the date range for the last 7 days
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const sevenDaysAgo = new Date(today);
+    sevenDaysAgo.setDate(today.getDate() - 6); // -6 because we want to include today
+
     prayers.forEach(prayer => {
       const row = {
         name: prayer,
@@ -53,7 +59,7 @@
 
           // Get current time for comparison
           const now = new Date();
-          const today = new Date().toLocaleDateString('en-CA');
+          const todayStr = new Date().toLocaleDateString('en-CA');
           const prayerDateTime = getPrayerDateTime(day.date, 
             $prayerTimesStore.find(p => p.name === prayer)?.time || '00:00 AM'
           );
@@ -61,13 +67,22 @@
           let status = 'pending';
           if (prayerRecord) {
             status = prayerRecord.status;
-            // Count weekly stats
-            if (status === 'ontime') weeklyStats.ontime++;
-            else if (status === 'late') weeklyStats.late++;
-            else if (status === 'missed') weeklyStats.missed++;
-          } else if (day.date < today || (day.date === today && prayerDateTime < now)) {
+            // Only count stats if the prayer is within the last 7 days
+            const prayerDate = new Date(day.date);
+            prayerDate.setHours(0, 0, 0, 0);
+            if (prayerDate >= sevenDaysAgo && prayerDate <= today) {
+              if (status === 'ontime') weeklyStats.ontime++;
+              else if (status === 'late') weeklyStats.late++;
+              else if (status === 'missed') weeklyStats.missed++;
+            }
+          } else if (day.date < todayStr || (day.date === todayStr && prayerDateTime < now)) {
             status = 'missed';
-            weeklyStats.missed++;
+            // Only count missed if within the last 7 days
+            const prayerDate = new Date(day.date);
+            prayerDate.setHours(0, 0, 0, 0);
+            if (prayerDate >= sevenDaysAgo && prayerDate <= today) {
+              weeklyStats.missed++;
+            }
           }
 
           return {
