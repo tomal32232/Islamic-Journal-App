@@ -1,0 +1,97 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper function to check if the user is accessing their own data
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Reading sessions collection
+    match /readingSessions/{document=**} {
+      allow read: if isOwner(resource.data.userId);
+      allow create: if isOwner(request.resource.data.userId);
+      allow update: if isOwner(resource.data.userId);
+      allow delete: if isOwner(resource.data.userId);
+    }
+
+    // Reflections collection - more permissive rules for testing
+    match /reflections/{document=**} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    // Previous rules remain the same
+    match /bookmarks/{document=**} {
+      allow read: if isOwner(resource.data.userId);
+      allow create: if isOwner(request.resource.data.userId);
+      allow delete: if isOwner(resource.data.userId);
+    }
+
+    match /prayer_history/{document=**} {
+      allow read: if isOwner(resource.data.userId);
+      allow create: if isOwner(request.resource.data.userId);
+      allow update: if isOwner(resource.data.userId);
+    }
+
+    match /moods/{document=**} {
+      allow read: if isOwner(resource.data.userId);
+      allow create: if isOwner(request.resource.data.userId);
+    }
+
+    match /journal/{document=**} {
+      allow read: if isOwner(resource.data.userId);
+      allow create: if isOwner(request.resource.data.userId);
+    }
+
+    match /tasbih_sessions/{document=**} {
+      allow read: if isOwner(resource.data.userId);
+      allow create: if isOwner(request.resource.data.userId);
+    }
+
+    match /users/{userId}/achievements/{document=**} {
+      allow read: if isOwner(userId);
+      allow write: if isOwner(userId);
+    }
+
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    match /reflections/{reflectionId} {
+      allow read, write: if request.auth != null && 
+        (reflectionId.matches(request.auth.uid + '_.*') || 
+        resource.data.userId == request.auth.uid);
+    }
+    
+    match /prayerHistory/{prayerId} {
+      allow read, write: if request.auth != null && 
+        (prayerId.matches(request.auth.uid + '_.*') || 
+        resource.data.userId == request.auth.uid);
+    }
+    
+    match /tasbihHistory/{tasbihId} {
+      allow read, write: if request.auth != null && 
+        (tasbihId.matches(request.auth.uid + '_.*') || 
+        resource.data.userId == request.auth.uid);
+    }
+    
+    match /userGoals/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    match /badges/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    match /moodHistory/{moodId} {
+      allow read, write: if request.auth != null && 
+        (moodId.matches(request.auth.uid + '_.*') || 
+        resource.data.userId == request.auth.uid);
+    }
+  }
+}

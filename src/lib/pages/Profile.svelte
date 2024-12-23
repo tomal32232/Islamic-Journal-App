@@ -6,7 +6,9 @@
   import { Bell, Trophy, Target, Book, ChartBar, SignOut, CaretRight, ArrowRight, Mosque, Sun, BookBookmark, HandsPraying, Sparkle, Pencil, CalendarPlus } from 'phosphor-svelte';
   import Toast from '../components/Toast.svelte';
   import { currentPage } from '../stores/pageStore';
-  
+  import { goalStore } from '../stores/goalStore';
+  import { onMount } from 'svelte';
+
   const user = auth.currentUser;
   let prayerStats = { onTime: 0, late: 0, missed: 0, total: 0 };
   let earnedBadges = [];
@@ -112,10 +114,53 @@
 
   // Goals data
   $: goals = [
-    { name: 'Daily Prayers', target: 5, current: prayerStats.onTime },
-    { name: 'Quran Reading', target: 30, current: $badgeStore?.progress?.['daily_reading'] || 0, unit: 'minutes' },
-    { name: 'Dhikr Count', target: 100, current: $weeklyStatsStore?.dailyCounts?.[0]?.count || 0 }
+    { 
+      name: 'Daily Prayers', 
+      target: $goalStore.dailyPrayers, 
+      current: prayerStats.onTime,
+      type: 'dailyPrayers',
+      unit: ''
+    },
+    { 
+      name: 'Daily Quran Reading', 
+      target: $goalStore.dailyQuranReading, 
+      current: $badgeStore?.progress?.['daily_reading'] || 0, 
+      type: 'dailyQuranReading',
+      unit: 'minutes' 
+    },
+    { 
+      name: 'Daily Dhikr', 
+      target: $goalStore.dailyDhikr, 
+      current: $weeklyStatsStore?.dailyCounts?.[0]?.count || 0,
+      type: 'dailyDhikr',
+      unit: ''
+    }
   ];
+
+  let editingGoal = null;
+  let editValue = '';
+
+  function startEditing(goal) {
+    editingGoal = goal;
+    editValue = goal.target.toString();
+  }
+
+  async function saveGoal() {
+    if (!editingGoal) return;
+    
+    const value = parseInt(editValue);
+    if (isNaN(value) || value < 1) {
+      // Show error toast
+      return;
+    }
+    
+    await goalStore.updateGoal(editingGoal.type, value);
+    editingGoal = null;
+  }
+
+  onMount(async () => {
+    await goalStore.loadGoals();
+  });
 
   // Handle logout
   async function handleLogout() {
@@ -225,13 +270,30 @@
 
     <!-- Personal Goals Card -->
     <div class="card">
-      <h3><Target weight="fill" /> Personal Goals</h3>
+      <h3><Target weight="fill" /> Daily Goals</h3>
       <div class="goals-list">
         {#each goals as goal}
           <div class="goal-item">
             <div class="goal-info">
               <span class="goal-name">{goal.name}</span>
-              <span class="goal-progress">{goal.current}/{goal.target} {goal.unit || ''}</span>
+              {#if editingGoal?.type === goal.type}
+                <div class="edit-input">
+                  <input 
+                    type="number" 
+                    bind:value={editValue}
+                    min="1"
+                    on:keydown={(e) => e.key === 'Enter' && saveGoal()}
+                  >
+                  <button class="save-btn" on:click={saveGoal}>Save</button>
+                </div>
+              {:else}
+                <div class="goal-target">
+                  <span class="goal-progress">{goal.current}/{goal.target} {goal.unit}</span>
+                  <button class="edit-btn" on:click={() => startEditing(goal)}>
+                    <Pencil size={14} />
+                  </button>
+                </div>
+              {/if}
             </div>
             <div class="progress-bar">
               <div class="progress" style="width: {(goal.current / goal.target) * 100}%"></div>
@@ -662,5 +724,56 @@
     .achievement-icon {
       font-size: 1.25rem;
     }
+  }
+
+  .goal-target {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .edit-btn {
+    background: none;
+    border: none;
+    padding: 4px;
+    color: #666;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+  }
+
+  .edit-btn:hover {
+    background: rgba(33, 105, 116, 0.1);
+    color: #216974;
+  }
+
+  .edit-input {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .edit-input input {
+    width: 60px;
+    padding: 4px 8px;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    font-size: 0.875rem;
+  }
+
+  .save-btn {
+    background: #216974;
+    color: white;
+    border: none;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    cursor: pointer;
+  }
+
+  .save-btn:hover {
+    opacity: 0.9;
   }
 </style> 
