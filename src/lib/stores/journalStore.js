@@ -13,7 +13,7 @@ function createJournalStore() {
       evening: false
     },
     completedDays: 0,
-    dailyProgress: Array(7).fill({ morning: false, evening: false }),
+    dailyProgress: Array(7).fill(null).map(() => ({ morning: false, evening: false })),
     totalEntries: 0
   });
 
@@ -27,15 +27,12 @@ function createJournalStore() {
       collection(db, 'reflections'),
       where('userId', '==', auth.currentUser.uid),
       orderBy('date', 'desc')
-      // Limit to last 7 days
-      // limit(7)
     );
 
     const snapshot = await getDocs(reflectionsQuery);
     let streak = 0;
     let completedDays = 0;
-    let currentDate = today;
-    let dailyProgress = Array(7).fill({ morning: false, evening: false });
+    let dailyProgress = Array(7).fill(null).map(() => ({ morning: false, evening: false }));
 
     // Sort reflections by date
     const reflectionsByDate = new Map();
@@ -49,39 +46,32 @@ function createJournalStore() {
       });
     });
 
-    // Calculate streak and daily progress
-    let dayIndex = 0;
-    while (dayIndex < 7) {
-      const dateReflections = reflectionsByDate.get(currentDate.getTime());
-      if (dateReflections) {
-        dailyProgress[dayIndex] = {
-          morning: dateReflections.morning,
-          evening: dateReflections.evening
+    // Count completed days and update progress
+    const dates = Array.from(reflectionsByDate.entries())
+      .sort(([dateA], [dateB]) => dateB - dateA); // Sort by date descending
+
+    dates.forEach(([timestamp, reflections]) => {
+      if (reflections.morning && reflections.evening && completedDays < 7) {
+        // Mark the next available day as completed
+        dailyProgress[completedDays] = {
+          morning: true,
+          evening: true
         };
+        completedDays++;
 
-        if (dateReflections.morning && dateReflections.evening) {
-          completedDays++;
-        }
-
-        // For today, we only need either morning or evening
-        if (currentDate.getTime() === today.getTime()) {
-          if (dateReflections.morning || dateReflections.evening) {
-            streak += 0.5;
-          }
-        } 
-        // For past days, we need both morning and evening
-        else {
-          if (dateReflections.morning && dateReflections.evening) {
+        // Calculate streak
+        const date = new Date(timestamp);
+        if (date.getTime() === today.getTime()) {
+          streak += 1;
+        } else {
+          const prevDay = new Date(today);
+          prevDay.setDate(prevDay.getDate() - 1);
+          if (date.getTime() === prevDay.getTime()) {
             streak += 1;
-          } else {
-            break;
           }
         }
       }
-      
-      currentDate.setDate(currentDate.getDate() - 1);
-      dayIndex++;
-    }
+    });
 
     // Update streak in store and badge progress
     update(store => ({
