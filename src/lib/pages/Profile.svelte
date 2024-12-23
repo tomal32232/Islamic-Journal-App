@@ -104,18 +104,21 @@
 
   // Calculate prayer statistics when prayerHistoryStore changes
   $: if ($prayerHistoryStore?.history) {
+    const today = new Date().toLocaleDateString('en-CA');
+    const todaysPrayers = $prayerHistoryStore.history.filter(p => p.date === today);
+    
     prayerStats = {
-      total: $prayerHistoryStore.history.length || 0,
-      onTime: $prayerHistoryStore.history.filter(p => p.status === 'ontime').length || 0,
-      late: $prayerHistoryStore.history.filter(p => p.status === 'late').length || 0,
-      missed: $prayerHistoryStore.history.filter(p => p.status === 'missed').length || 0
+      total: todaysPrayers.length || 0,
+      onTime: todaysPrayers.filter(p => p.status === 'ontime').length || 0,
+      late: todaysPrayers.filter(p => p.status === 'late').length || 0,
+      missed: todaysPrayers.filter(p => p.status === 'missed').length || 0
     };
   }
 
   // Goals data
   $: goals = [
     { 
-      name: 'Daily Prayers', 
+      name: 'Daily Prayers (On Time)', 
       target: $goalStore.dailyPrayers, 
       current: prayerStats.onTime,
       type: 'dailyPrayers',
