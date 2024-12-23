@@ -128,25 +128,23 @@ export async function getTodayReadingTime() {
 // Helper function to format seconds into readable time
 export function formatReadingTime(seconds) {
   if (seconds < 60) {
-    return `${seconds} seconds`;
+    return `${seconds}s`;
   }
   
   const minutes = Math.floor(seconds / 60);
   const remainingSeconds = seconds % 60;
   
-  if (minutes < 60) {
-    return remainingSeconds > 0 
-      ? `${minutes} minutes ${remainingSeconds} seconds`
-      : `${minutes} minutes`;
+  // If over an hour
+  if (minutes >= 60) {
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+    return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
   }
   
-  const hours = Math.floor(minutes / 60);
-  const remainingMinutes = minutes % 60;
-  
-  let result = `${hours} hour${hours > 1 ? 's' : ''}`;
-  if (remainingMinutes > 0) {
-    result += ` ${remainingMinutes} minute${remainingMinutes > 1 ? 's' : ''}`;
+  // If under an hour
+  if (remainingSeconds > 0) {
+    return `${minutes}m ${remainingSeconds}s`;
   }
   
-  return result;
+  return `${minutes}m`;
 } 
