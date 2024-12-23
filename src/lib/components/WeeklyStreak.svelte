@@ -156,10 +156,10 @@
   .count {
     font-size: 0.75rem;
     font-weight: 500;
-    color: #666;
+    color: white;
   }
 
   .bar.today .count {
-    color: white;
+    color: #BE9F68;
   }
 </style> 
