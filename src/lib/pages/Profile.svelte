@@ -118,14 +118,13 @@
 
   // Calculate prayer statistics when prayerHistoryStore changes
   $: if ($prayerHistoryStore?.history) {
-    const today = new Date().toLocaleDateString('en-CA');
-    const todaysPrayers = $prayerHistoryStore.history.filter(p => p.date === today);
+    const allPrayers = $prayerHistoryStore.history;
     
     prayerStats = {
-      total: todaysPrayers.length || 0,
-      onTime: todaysPrayers.filter(p => p.status === 'ontime').length || 0,
-      late: todaysPrayers.filter(p => p.status === 'late').length || 0,
-      missed: todaysPrayers.filter(p => p.status === 'missed').length || 0
+      total: allPrayers.length || 0,
+      onTime: allPrayers.filter(p => p.status === 'ontime').length || 0,
+      late: allPrayers.filter(p => p.status === 'late').length || 0,
+      missed: allPrayers.filter(p => p.status === 'missed').length || 0
     };
   }
 
@@ -304,6 +303,10 @@
         <div class="stat-item">
           <span class="stat-value">{prayerStats.missed}</span>
           <span class="stat-label">Missed</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-value">{prayerStats.total}</span>
+          <span class="stat-label">Total</span>
         </div>
       </div>
     </div>
@@ -501,8 +504,9 @@
 
   .stats-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(2, 1fr);
     gap: 1rem;
+    margin-top: 1rem;
   }
 
   .stat-item {
