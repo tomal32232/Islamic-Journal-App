@@ -120,11 +120,15 @@
   $: if ($prayerHistoryStore?.history) {
     const allPrayers = $prayerHistoryStore.history;
     
+    const onTime = allPrayers.filter(p => p.status === 'ontime').length || 0;
+    const late = allPrayers.filter(p => p.status === 'late').length || 0;
+    const missed = allPrayers.filter(p => p.status === 'missed').length || 0;
+    
     prayerStats = {
-      total: allPrayers.length || 0,
-      onTime: allPrayers.filter(p => p.status === 'ontime').length || 0,
-      late: allPrayers.filter(p => p.status === 'late').length || 0,
-      missed: allPrayers.filter(p => p.status === 'missed').length || 0
+      onTime,
+      late,
+      missed,
+      total: onTime + late + missed // Calculate total as sum of individual counts
     };
   }
 
@@ -289,24 +293,43 @@
     </div>
 
     <!-- Prayer Statistics Card -->
-    <div class="card">
+    <div class="card prayer-stats">
       <h3><ChartBar weight="fill" /> Prayer Statistics</h3>
-      <div class="stats-grid">
-        <div class="stat-item">
-          <span class="stat-value">{prayerStats.onTime}</span>
-          <span class="stat-label">On Time</span>
+      <div class="stats-summary">
+        <div class="stat-row">
+          <div class="stat-label">On Time</div>
+          <div class="stat-details">
+            <span class="stat-number on-time">{prayerStats.onTime}</span>
+            <span class="stat-percentage">
+              {prayerStats.total ? Math.round((prayerStats.onTime / prayerStats.total) * 100) : 0}%
+            </span>
+          </div>
         </div>
-        <div class="stat-item">
-          <span class="stat-value">{prayerStats.late}</span>
-          <span class="stat-label">Late</span>
+        <div class="stat-row">
+          <div class="stat-label">Late</div>
+          <div class="stat-details">
+            <span class="stat-number late">{prayerStats.late}</span>
+            <span class="stat-percentage">
+              {prayerStats.total ? Math.round((prayerStats.late / prayerStats.total) * 100) : 0}%
+            </span>
+          </div>
         </div>
-        <div class="stat-item">
-          <span class="stat-value">{prayerStats.missed}</span>
-          <span class="stat-label">Missed</span>
+        <div class="stat-row">
+          <div class="stat-label">Missed</div>
+          <div class="stat-details">
+            <span class="stat-number missed">{prayerStats.missed}</span>
+            <span class="stat-percentage">
+              {prayerStats.total ? Math.round((prayerStats.missed / prayerStats.total) * 100) : 0}%
+            </span>
+          </div>
         </div>
-        <div class="stat-item">
-          <span class="stat-value">{prayerStats.total}</span>
-          <span class="stat-label">Total</span>
+        <div class="stat-divider"></div>
+        <div class="stat-row total">
+          <div class="stat-label">Total Prayers</div>
+          <div class="stat-details">
+            <span class="stat-number">{prayerStats.total}</span>
+            <span class="stat-percentage">100%</span>
+          </div>
         </div>
       </div>
     </div>
@@ -909,5 +932,122 @@
   .time-input span {
     color: #666;
     font-size: 0.875rem;
+  }
+
+  .prayer-stats {
+    text-align: center;
+  }
+
+  .chart-container {
+    display: flex;
+    justify-content: center;
+    margin: 1rem 0;
+    padding: 0 1rem;
+  }
+
+  .stats-line {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    margin-top: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .stat-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    color: #666;
+    padding: 0.25rem 0.5rem;
+    background: #f8fafc;
+    border-radius: 4px;
+  }
+
+  .stat-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+  }
+
+  .stat-dot.on-time {
+    background-color: rgba(33, 105, 116, 0.9);
+  }
+
+  .stat-dot.late {
+    background-color: rgba(190, 159, 104, 0.9);
+  }
+
+  .stat-dot.missed {
+    background-color: rgba(239, 68, 68, 0.85);
+  }
+
+  .prayer-stats {
+    padding: 1.5rem;
+  }
+
+  .stats-summary {
+    margin-top: 1rem;
+  }
+
+  .stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 0;
+    font-size: 0.95rem;
+  }
+
+  .stat-label {
+    color: #666;
+  }
+
+  .stat-details {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .stat-number {
+    font-weight: 500;
+    font-size: 1.1rem;
+  }
+
+  .stat-percentage {
+    color: #666;
+    font-size: 0.875rem;
+    min-width: 3rem;
+    text-align: right;
+  }
+
+  .stat-number.on-time {
+    color: #216974;
+  }
+
+  .stat-number.late {
+    color: #BE9F68;
+  }
+
+  .stat-number.missed {
+    color: #ef4444;
+  }
+
+  .stat-divider {
+    height: 1px;
+    background: #e5e7eb;
+    margin: 0.5rem 0;
+  }
+
+  .stat-row.total {
+    font-weight: 500;
+  }
+
+  .stat-row.total .stat-label {
+    color: #216974;
+  }
+
+  .stat-row.total .stat-number {
+    color: #216974;
+    font-size: 1.2rem;
   }
 </style> 
