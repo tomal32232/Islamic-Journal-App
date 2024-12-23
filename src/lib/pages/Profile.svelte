@@ -8,13 +8,24 @@
   import { currentPage } from '../stores/pageStore';
   import { goalStore } from '../stores/goalStore';
   import { onMount } from 'svelte';
+  import { fade } from 'svelte/transition';
 
   const user = auth.currentUser;
   let prayerStats = { onTime: 0, late: 0, missed: 0, total: 0 };
   let earnedBadges = [];
   let allBadges = badgeStore.getAllBadges();
   let activeTab = 'profile';
-  
+  let showToast = false;
+  let toastMessage = '';
+
+  function showErrorToast(message) {
+    toastMessage = message;
+    showToast = true;
+    setTimeout(() => {
+      showToast = false;
+    }, 3000);
+  }
+
   // Initialize badge store when component mounts
   $: if (user?.uid) {
     badgeStore.init(user.uid);
@@ -153,7 +164,12 @@
     
     const value = parseInt(editValue);
     if (isNaN(value) || value < 1) {
-      // Show error toast
+      showErrorToast('Please enter a valid number greater than 0');
+      return;
+    }
+
+    if (editingGoal.type === 'dailyPrayers' && value > 5) {
+      showErrorToast('Daily prayers goal cannot exceed 5');
       return;
     }
     
@@ -203,6 +219,12 @@
     return Trophy;
   }
 </script>
+
+{#if showToast}
+  <div class="toast" transition:fade>
+    {toastMessage}
+  </div>
+{/if}
 
 <Toast />
 
@@ -778,5 +800,19 @@
 
   .save-btn:hover {
     opacity: 0.9;
+  }
+
+  .toast {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #ef4444;
+    color: white;
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    z-index: 1000;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
   }
 </style> 
