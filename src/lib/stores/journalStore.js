@@ -50,8 +50,10 @@ function createJournalStore() {
     const dates = Array.from(reflectionsByDate.entries())
       .sort(([dateA], [dateB]) => dateB - dateA); // Sort by date descending
 
+    // Process all dates first to count completed days
     dates.forEach(([timestamp, reflections]) => {
-      if (reflections.morning && reflections.evening && completedDays < 7) {
+      const date = new Date(timestamp);
+      if (date.getTime() !== today.getTime() && reflections.morning && reflections.evening && completedDays < 7) {
         // Mark the next available day as completed
         dailyProgress[completedDays] = {
           morning: true,
@@ -59,19 +61,36 @@ function createJournalStore() {
         };
         completedDays++;
 
-        // Calculate streak
-        const date = new Date(timestamp);
-        if (date.getTime() === today.getTime()) {
+        // Calculate streak for yesterday
+        const prevDay = new Date(today);
+        prevDay.setDate(prevDay.getDate() - 1);
+        if (date.getTime() === prevDay.getTime()) {
           streak += 1;
-        } else {
-          const prevDay = new Date(today);
-          prevDay.setDate(prevDay.getDate() - 1);
-          if (date.getTime() === prevDay.getTime()) {
-            streak += 1;
-          }
         }
       }
     });
+
+    // Then handle today's progress (it will be placed after completed days)
+    const todayReflections = reflectionsByDate.get(today.getTime());
+    if (todayReflections) {
+      if (todayReflections.morning && todayReflections.evening) {
+        // Today is fully completed
+        dailyProgress[completedDays] = {
+          morning: true,
+          evening: true
+        };
+        completedDays++;
+        streak += 1;
+      } else if (todayReflections.morning) {
+        // Today has morning only - mark the next position as half complete
+        dailyProgress[completedDays] = {
+          morning: true,
+          evening: false
+        };
+        // Don't increment completedDays since it's not fully complete
+        streak += 0.5;
+      }
+    }
 
     // Update streak in store and badge progress
     update(store => ({
