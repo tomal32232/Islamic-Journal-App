@@ -456,38 +456,38 @@
           </div>
         </div>
 
+        <h3 class="section-title">Next Prayer</h3>
         <div class="upcoming-prayer">
-          <div class="prayer-card">
-            <h3 class="section-title">Next Prayer</h3>
-            {#if upcomingPrayer}
-              <div class="prayer-info">
-                <div class="prayer-header">
-                  <div class="left-section">
-                    <div class="prayer-icon">
-                      <svelte:component 
-                        this={iconMap.Mosque} 
-                        size={18} 
-                        weight="fill" 
-                        color="#216974" 
-                      />
-                    </div>
-                    <div class="name-time">
-                      <span class="prayer-name">{upcomingPrayer.name}</span>
-                      <span class="prayer-time">{upcomingPrayer.time}</span>
-                    </div>
+          {#if upcomingPrayer}
+            <div class="prayer-info-card">
+              <div class="prayer-header">
+                <div class="left-section">
+                  <div class="prayer-icon">
+                    <svelte:component 
+                      this={iconMap.Mosque} 
+                      size={18} 
+                      weight="fill" 
+                      color="#216974" 
+                    />
                   </div>
-                  {#if upcomingCountdown}
-                    <span class="countdown">{upcomingCountdown}</span>
-                  {/if}
+                  <div class="name-time">
+                    <span class="prayer-name">{upcomingPrayer.name}</span>
+                    <span class="prayer-time">{upcomingPrayer.time}</span>
+                  </div>
                 </div>
+                {#if upcomingCountdown}
+                  <span class="countdown">{upcomingCountdown}</span>
+                {/if}
               </div>
-            {:else}
+            </div>
+          {:else}
+            <div class="prayer-info-card">
               <div class="no-prayer-message">
                 <p>All prayers for today are complete. 🌙</p>
                 <p class="subtitle">Have a blessed rest of your day!</p>
               </div>
-            {/if}
-          </div>
+            </div>
+          {/if}
         </div>
 
         <div class="weekly-streak">
@@ -639,7 +639,7 @@
   }
 
   .upcoming-prayer {
-    margin-bottom: 0.5rem;
+    margin-bottom: 1rem;
   }
 
   .prayer-card {
@@ -891,6 +891,9 @@
     color: #666;
     margin-bottom: 0.375rem;
     font-weight: normal;
+    text-align: center;
+    width: 100%;
+    display: block;
   }
 
   .activities-row {
@@ -1067,6 +1070,24 @@
     margin-top: 0.5rem;
     color: #666;
     font-weight: normal;
+  }
+
+  .prayer-info-card {
+    background: white;
+    padding: 0.75rem;
+    border-radius: 12px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    border: 1px solid transparent;
+    background-image: linear-gradient(white, white), 
+                     linear-gradient(to bottom, 
+                       rgba(0, 0, 0, 0.01) 0%,
+                       rgba(0, 0, 0, 0.1) 100%);
+    background-origin: border-box;
+    background-clip: padding-box, border-box;
+  }
+
+  .upcoming-prayer {
+    margin-bottom: 1rem;
   }
 </style>
 
