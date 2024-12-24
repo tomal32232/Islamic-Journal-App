@@ -11,6 +11,12 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
+    // Daily Quotes collection - public read access
+    match /daily_quotes/{quoteId} {
+      allow read: if true;  // Anyone can read quotes
+      allow write: if isAuthenticated() && request.auth.token.admin == true;  // Only admins can write
+    }
+
     // Reading sessions collection
     match /readingSessions/{document=**} {
       allow read: if isOwner(resource.data.userId);
