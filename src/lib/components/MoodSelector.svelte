@@ -20,9 +20,20 @@
         <path d="M8 12H16"/>
         <path d="M12 8V16"/>
       </svg>`,
-      name: 'Peaceful',
+      name: 'Seeking Peace',
       description: 'Sabr',
-      value: 'peaceful'
+      value: 'seeking_peace'
+    },
+    {
+      icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M12 21C16.9706 21 21 16.9706 21 12C21 7.02944 16.9706 3 12 3C7.02944 3 3 7.02944 3 12C3 16.9706 7.02944 21 12 21Z"/>
+        <path d="M8 14C8 14 9.5 16 12 16C14.5 16 16 14 16 14"/>
+        <path d="M15 9H15.01"/>
+        <path d="M9 9H9.01"/>
+      </svg>`,
+      name: 'Hopeful',
+      description: 'InshaAllah',
+      value: 'hopeful'
     },
     {
       icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -38,13 +49,24 @@
     {
       icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M12 21C16.9706 21 21 16.9706 21 12C21 7.02944 16.9706 3 12 3C7.02944 3 3 7.02944 3 12C3 16.9706 7.02944 21 12 21Z"/>
-        <path d="M16 16C16 16 14.5 14 12 14C9.5 14 8 16 8 16"/>
+        <path d="M12 7V11"/>
+        <path d="M12 12L12 12.01"/>
+        <path d="M8 15H16"/>
+      </svg>`,
+      name: 'Reflecting',
+      description: 'SubhanAllah',
+      value: 'reflecting'
+    },
+    {
+      icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M12 21C16.9706 21 21 16.9706 21 12C21 7.02944 16.9706 3 12 3C7.02944 3 3 7.02944 3 12C3 16.9706 7.02944 21 12 21Z"/>
+        <path d="M8 14C8 14 9.5 16 12 16C14.5 16 16 14 16 14"/>
         <path d="M15 9H15.01"/>
         <path d="M9 9H9.01"/>
       </svg>`,
-      name: 'Struggling',
-      description: 'Astaghfirullah',
-      value: 'struggling'
+      name: 'Blessed',
+      description: 'MashaAllah',
+      value: 'blessed'
     }
   ];
 
@@ -106,23 +128,25 @@
   }
 
   .mood-options {
-    display: flex;
-    justify-content: space-around;
-    gap: 0.75rem;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(2, 1fr);
+    gap: 0.5rem;
+    padding: 0.25rem;
   }
 
   .mood-button {
     background: none;
     border: none;
-    padding: 0.75rem 0.5rem;
+    padding: 0.5rem 0.25rem;
     cursor: pointer;
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 0.25rem;
     transition: all 0.2s;
-    flex: 1;
     border-radius: 8px;
+    width: 100%;
   }
 
   .mood-button:hover {
@@ -131,10 +155,10 @@
   }
 
   .mood-icon {
-    width: 2rem;
-    height: 2rem;
+    width: 1.75rem;
+    height: 1.75rem;
     color: #4A5568;
-    margin-bottom: 0.25rem;
+    margin-bottom: 0.125rem;
   }
 
   .mood-icon :global(svg) {
@@ -143,14 +167,23 @@
   }
 
   .mood-name {
-    font-size: 0.8125rem;
+    font-size: 0.75rem;
     color: #2D3748;
     font-weight: 500;
+    text-align: center;
   }
 
   .mood-description {
-    font-size: 0.6875rem;
+    font-size: 0.625rem;
     color: #718096;
     font-weight: normal;
+    text-align: center;
+  }
+
+  @media (max-width: 360px) {
+    .mood-icon {
+      width: 1.5rem;
+      height: 1.5rem;
+    }
   }
 </style> 

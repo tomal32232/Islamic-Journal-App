@@ -1003,15 +1003,23 @@
     background-color: #4CAF50;
   }
 
-  .mood-dot.peaceful {
+  .mood-dot.seeking_peace {
     background-color: #2196F3;
+  }
+
+  .mood-dot.hopeful {
+    background-color: #9C27B0;
   }
 
   .mood-dot.anxious {
     background-color: #FFC107;
   }
 
-  .mood-dot.struggling {
+  .mood-dot.reflecting {
+    background-color: #607D8B;
+  }
+
+  .mood-dot.blessed {
     background-color: #E91E63;
   }
 
