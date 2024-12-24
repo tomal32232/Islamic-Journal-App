@@ -51,6 +51,31 @@ async function syncWithFirestore(sheetGuidance) {
   }
 }
 
+export async function fetchRandomGuidanceForMood(mood) {
+  try {
+    const guidanceRef = collection(db, 'moodGuidance');
+    const moodQuery = query(guidanceRef, where('mood', '==', mood.toLowerCase()));
+    const guidanceSnapshot = await getDocs(moodQuery);
+    
+    if (guidanceSnapshot.empty) {
+      console.log('No guidance found for mood:', mood);
+      return null;
+    }
+
+    // Convert to array and get a random entry
+    const guidanceArray = [];
+    guidanceSnapshot.forEach(doc => {
+      guidanceArray.push(doc.data());
+    });
+
+    const randomIndex = Math.floor(Math.random() * guidanceArray.length);
+    return guidanceArray[randomIndex];
+  } catch (error) {
+    console.error('Error fetching random guidance:', error);
+    return null;
+  }
+}
+
 export async function fetchMoodGuidance() {
   try {
     // First try to get guidance from Google Sheet

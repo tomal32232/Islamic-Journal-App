@@ -1,36 +1,37 @@
-import { writable } from 'svelte/store';
+import { writable, get } from 'svelte/store';
 import { db } from '../services/firebase';
 import { collection, addDoc, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
 import { auth } from '../services/firebase';
+import { fetchRandomGuidanceForMood } from '../services/moodGuidanceService';
 
 export const moodHistoryStore = writable([]);
 
 export async function saveMood(mood, guidance = null) {
   try {
     const user = auth.currentUser;
-    if (!user) return;
+    if (!user) {
+      throw new Error('User must be logged in to save mood');
+    }
+
+    // Fetch random guidance for this mood if not provided
+    const moodGuidance = guidance || await fetchRandomGuidanceForMood(mood.value);
 
     const moodData = {
       userId: user.uid,
       mood: mood.value,
       timestamp: new Date().toISOString(),
-      date: new Date().toLocaleDateString()
+      date: new Date().toLocaleDateString(),
+      guidance: moodGuidance
     };
 
-    // If guidance is provided, include it in the mood data
-    if (guidance) {
-      moodData.guidance = {
-        arabicVerse: guidance.arabicVerse,
-        translation: guidance.translation,
-        guidance: guidance.guidance
-      };
-    }
-
-    console.log('Saving mood data:', moodData);
     const docRef = await addDoc(collection(db, 'moods'), moodData);
     console.log('Mood saved with ID:', docRef.id);
-    await getMoodHistory();
-    return docRef;
+
+    // Update the store
+    const currentMoods = get(moodHistoryStore);
+    moodHistoryStore.set([...currentMoods, moodData]);
+
+    return docRef.id;
   } catch (error) {
     console.error('Error saving mood:', error);
     throw error;
