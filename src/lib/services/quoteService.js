@@ -17,18 +17,10 @@ function needsNewQuote() {
   const lastQuoteTime = new Date(timestamp);
   const currentTime = new Date();
 
-  // Check if it's a different day
-  if (lastQuoteTime.getDate() !== currentTime.getDate() ||
-      lastQuoteTime.getMonth() !== currentTime.getMonth() ||
-      lastQuoteTime.getFullYear() !== currentTime.getFullYear()) {
-    return true;
-  }
-
-  // Check if we've crossed the AM/PM boundary
-  const wasAM = lastQuoteTime.getHours() < 12;
-  const isAM = currentTime.getHours() < 12;
-  
-  return wasAM !== isAM;
+  // Only change quote if it's a different day
+  return lastQuoteTime.getDate() !== currentTime.getDate() ||
+         lastQuoteTime.getMonth() !== currentTime.getMonth() ||
+         lastQuoteTime.getFullYear() !== currentTime.getFullYear();
 }
 
 // Helper function to sync Google Sheets with Firestore
@@ -71,6 +63,17 @@ async function syncWithFirestore(sheetQuotes) {
 }
 
 export async function getRandomQuote() {
+  // Check if we have a valid cached quote
+  const savedQuote = localStorage.getItem('dailyQuote');
+  if (savedQuote && !needsNewQuote()) {
+    const { quote } = JSON.parse(savedQuote);
+    quoteStore.set({
+      ...quote,
+      loading: false
+    });
+    return quote;
+  }
+
   quoteStore.update(q => ({ ...q, loading: true }));
   
   try {
@@ -112,7 +115,7 @@ export async function getRandomQuote() {
       const randomIndex = Math.floor(Math.random() * sheetQuotes.length);
       const quote = sheetQuotes[randomIndex];
 
-      // Save to localStorage
+      // Save to localStorage with current timestamp
       localStorage.setItem('dailyQuote', JSON.stringify({
         quote,
         timestamp: new Date().toISOString()
