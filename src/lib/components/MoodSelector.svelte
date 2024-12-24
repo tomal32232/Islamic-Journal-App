@@ -10,12 +10,13 @@
     selectedMood = mood;
   }
 
-  function handleModalClose() {
+  function handleModalClose(guidance) {
     dispatch('select', {
       value: selectedMood.value,
       name: selectedMood.name,
       description: selectedMood.description,
-      icon: selectedMood.icon
+      icon: selectedMood.icon,
+      guidance: guidance
     });
     selectedMood = null;
     showSelector = false;

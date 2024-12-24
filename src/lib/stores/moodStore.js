@@ -5,7 +5,7 @@ import { auth } from '../services/firebase';
 
 export const moodHistoryStore = writable([]);
 
-export async function saveMood(mood) {
+export async function saveMood(mood, guidance = null) {
   try {
     const user = auth.currentUser;
     if (!user) return;
@@ -16,6 +16,15 @@ export async function saveMood(mood) {
       timestamp: new Date().toISOString(),
       date: new Date().toLocaleDateString()
     };
+
+    // If guidance is provided, include it in the mood data
+    if (guidance) {
+      moodData.guidance = {
+        arabicVerse: guidance.arabicVerse,
+        translation: guidance.translation,
+        guidance: guidance.guidance
+      };
+    }
 
     console.log('Saving mood data:', moodData);
     const docRef = await addDoc(collection(db, 'moods'), moodData);

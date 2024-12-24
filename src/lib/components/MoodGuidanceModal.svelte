@@ -54,6 +54,10 @@
     }
   }
 
+  function handleClose() {
+    onClose(guidance);
+  }
+
   $: if (mood) {
     loading = true;
     fetchRandomGuidance();
@@ -66,9 +70,9 @@
 </script>
 
 {#if mood}
-  <div class="modal-backdrop" on:click={onClose} transition:fade>
+  <div class="modal-backdrop" on:click={handleClose} transition:fade>
     <div class="modal-content" on:click|stopPropagation>
-      <button class="close-button" on:click={onClose}>×</button>
+      <button class="close-button" on:click={handleClose}>×</button>
       
       <h2 class="title">
         {#if mood.value === 'grateful'}
