@@ -17,6 +17,7 @@
   import MoodSelector from '../components/MoodSelector.svelte';
   import { moodHistoryStore, saveMood, getMoodHistory, getMoodForDate } from '../stores/moodStore';
   import { get } from 'svelte/store';
+  import MoodHistoryModal from '../components/MoodHistoryModal.svelte';
   const dispatch = createEventDispatcher();
   
   let currentPage = 'home';
@@ -98,6 +99,16 @@
   let showMoodSelector = false;
   let currentMood = null;
   let weekMoods = {};
+
+  let selectedHistoryMood = null;
+
+  function handleMoodHistoryClick(moodData) {
+    selectedHistoryMood = moodData;
+  }
+
+  function handleHistoryModalClose() {
+    selectedHistoryMood = null;
+  }
 
   const moods = [
     { 
@@ -270,7 +281,7 @@
     const selectedMood = event.detail;
     console.log('Selected mood:', selectedMood);
     try {
-      await saveMood(selectedMood);
+      await saveMood(selectedMood, selectedMood.guidance);
       // Use the local mood template to ensure we have the icon
       const matchingMood = moods.find(m => m.value === selectedMood.value);
       if (matchingMood) {
@@ -278,7 +289,8 @@
           value: selectedMood.value,
           name: matchingMood.name,
           icon: matchingMood.icon,
-          description: matchingMood.description
+          description: matchingMood.description,
+          guidance: selectedMood.guidance
         };
       }
       showMoodSelector = false;
@@ -429,13 +441,26 @@
               <span class="day">{day}</span>
               <span class="date-num">{date}</span>
               {#if weekMoods[fullDate]}
-                <div class="mood-indicator" title={weekMoods[fullDate].name}>
-                  <div class="mood-dot {weekMoods[fullDate].mood}"></div>
-                </div>
+                {@const matchingMood = moods.find(m => m.value === weekMoods[fullDate].mood)}
+                {#if matchingMood}
+                  <button 
+                    class="mood-icon-button" 
+                    on:click={() => handleMoodHistoryClick(weekMoods[fullDate])}
+                    title={matchingMood.name}
+                  >
+                    {@html matchingMood.icon}
+                  </button>
+                {/if}
               {/if}
             </div>
           {/each}
         </div>
+
+        <MoodHistoryModal 
+          moodData={selectedHistoryMood}
+          moods={moods}
+          onClose={handleHistoryModalClose}
+        />
 
         <div class="reading-stats">
           <h3 class="section-title">Today's Activities</h3>
@@ -1122,6 +1147,30 @@
 
   .upcoming-prayer {
     margin-bottom: 1rem;
+  }
+
+  .mood-icon-button {
+    width: 1.25rem;
+    height: 1.25rem;
+    padding: 0;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #216974;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s;
+  }
+
+  .mood-icon-button:hover {
+    transform: scale(1.1);
+    color: #184f57;
+  }
+
+  .mood-icon-button :global(svg) {
+    width: 100%;
+    height: 100%;
   }
 </style>
 
