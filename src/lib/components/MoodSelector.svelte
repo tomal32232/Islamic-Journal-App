@@ -1,6 +1,25 @@
 <script>
   import { createEventDispatcher } from 'svelte';
+  import MoodGuidanceModal from './MoodGuidanceModal.svelte';
   const dispatch = createEventDispatcher();
+
+  export let showSelector = true;
+  let selectedMood = null;
+
+  function handleMoodClick(mood) {
+    selectedMood = mood;
+  }
+
+  function handleModalClose() {
+    dispatch('select', {
+      value: selectedMood.value,
+      name: selectedMood.name,
+      description: selectedMood.description,
+      icon: selectedMood.icon
+    });
+    selectedMood = null;
+    showSelector = false;
+  }
 
   const moods = [
     { 
@@ -69,18 +88,6 @@
       value: 'blessed'
     }
   ];
-
-  export let showSelector = true;
-
-  function selectMood(mood) {
-    dispatch('select', {
-      value: mood.value,
-      name: mood.name,
-      description: mood.description,
-      icon: mood.icon
-    });
-    showSelector = false;
-  }
 </script>
 
 {#if showSelector}
@@ -90,7 +97,7 @@
       {#each moods as mood}
         <button 
           class="mood-button" 
-          on:click={() => selectMood(mood)}
+          on:click={() => handleMoodClick(mood)}
           title={mood.description}
         >
           <div class="mood-icon">
@@ -103,6 +110,11 @@
     </div>
   </div>
 {/if}
+
+<MoodGuidanceModal 
+  mood={selectedMood} 
+  onClose={handleModalClose}
+/>
 
 <style>
   .mood-selector {
