@@ -162,12 +162,23 @@ export async function updatePrayerStatuses() {
     // If today is the start date, only excuse prayers after the start prayer
     if (todayStr === activeExcusedPeriod.startDate) {
       if (currentPrayerIndex >= startPrayerIndex) {
-        console.log(`Marking ${prayer} as excused (start date)`);
-        await savePrayerStatus({
-          name: prayer,
-          date: todayStr,
-          status: 'excused'
-        });
+        if (now > prayerDateTime) {
+          // Only mark as excused if prayer time has passed
+          console.log(`Marking ${prayer} as excused (start date, past prayer)`);
+          await savePrayerStatus({
+            name: prayer,
+            date: todayStr,
+            status: 'excused'
+          });
+        } else {
+          // Keep upcoming status for future prayers
+          console.log(`Keeping ${prayer} as upcoming (future prayer)`);
+          await savePrayerStatus({
+            name: prayer,
+            date: todayStr,
+            status: 'upcoming'
+          });
+        }
       } else if (now < prayerDateTime) {
         // Keep upcoming status for prayers before start prayer
         console.log(`Keeping ${prayer} as upcoming (before start prayer)`);
@@ -178,13 +189,22 @@ export async function updatePrayerStatuses() {
         });
       }
     } else {
-      // For other days during the period, mark all as excused
-      console.log(`Marking ${prayer} as excused (during period)`);
-      await savePrayerStatus({
-        name: prayer,
-        date: todayStr,
-        status: 'excused'
-      });
+      // For other days during the period, mark all past prayers as excused
+      if (now > prayerDateTime) {
+        console.log(`Marking ${prayer} as excused (during period, past prayer)`);
+        await savePrayerStatus({
+          name: prayer,
+          date: todayStr,
+          status: 'excused'
+        });
+      } else {
+        console.log(`Keeping ${prayer} as upcoming (future prayer)`);
+        await savePrayerStatus({
+          name: prayer,
+          date: todayStr,
+          status: 'upcoming'
+        });
+      }
     }
   }
 }
