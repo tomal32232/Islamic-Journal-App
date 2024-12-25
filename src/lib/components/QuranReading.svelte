@@ -4,12 +4,10 @@
   import { quranStore, fetchSurahList, fetchSurahDetails, saveReadingProgress, loadReadingProgress, saveBookmark, removeBookmark, loadBookmarks, playAudio, pauseAudio, setReciter, RECITERS, toggleAutoPlay } from '../services/quranService';
   import { startReadingSession, endReadingSession } from '../services/readingTimeService';
   import { BookmarkSimple, Play, Pause, SpeakerHigh, Repeat, Star } from 'phosphor-svelte';
-  import { getBookmarks, saveBookmark as saveFirebaseBookmark, removeBookmark as removeFirebaseBookmark } from '../services/bookmarkService';
+  import { getBookmarks, saveBookmark as saveFirebaseBookmark, removeBookmark as removeFirebaseBookmark, bookmarksStore } from '../services/bookmarkService';
   import { addFavorite, removeFavorite, getFavorites, isFavorite, favoritesStore } from '../services/favoriteService';
   
   let selectedSurah = null;
-  let bookmarkedVerses = [];
-  let favoriteVerses = [];
   let selectedReciter = RECITERS[0].id;
   let versesContainer;
   let currentSessionId = null;
@@ -18,8 +16,9 @@
   // Subscribe to quranStore
   $: ({ currentSurah, currentVerse, surahList, currentSurahDetails, loading, error, audioPlaying, autoPlay } = $quranStore);
 
-  // Subscribe to favorites store
+  // Subscribe to favorites and bookmarks stores
   $: favoriteVerses = $favoritesStore;
+  $: bookmarkedVerses = $bookmarksStore;
 
   async function handleSurahSelect(event) {
     const surahNumber = parseInt(event.target.value);
@@ -91,7 +90,7 @@
   async function toggleBookmark(verseNumber) {
     const surahName = currentSurahDetails?.englishName;
     const verseText = currentSurahDetails?.verses[verseNumber - 1]?.arabic;
-    const exists = bookmarkedVerses.some(b => b.surahNumber === selectedSurah && b.verseNumber === verseNumber);
+    const exists = isVerseBookmarked(verseNumber);
     
     try {
       console.log('Toggling bookmark for verse:', verseNumber, 'Current state:', exists);
@@ -101,11 +100,6 @@
       } else {
         await saveFirebaseBookmark(selectedSurah, verseNumber, surahName, verseText);
       }
-      
-      // Refresh bookmarks list
-      const updatedBookmarks = await getBookmarks();
-      console.log('Updated bookmarks:', updatedBookmarks);
-      bookmarkedVerses = updatedBookmarks;
       
       // Update verse selection state
       if (exists) {
@@ -123,7 +117,10 @@
   }
 
   function isVerseBookmarked(verseNumber) {
-    return bookmarkedVerses.some(b => b.surahNumber === selectedSurah && b.verseNumber === verseNumber);
+    return bookmarkedVerses?.some(b => 
+      parseInt(b.surahNumber) === parseInt(selectedSurah) && 
+      parseInt(b.verseNumber) === parseInt(verseNumber)
+    ) || false;
   }
 
   function handleReciterChange(event) {

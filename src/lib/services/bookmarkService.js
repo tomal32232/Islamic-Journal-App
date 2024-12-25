@@ -1,58 +1,47 @@
-import { auth, db } from '../firebase';
-import { 
-  collection, 
-  addDoc, 
-  query, 
-  where, 
-  getDocs, 
-  deleteDoc,
-  orderBy,
-  Timestamp 
-} from 'firebase/firestore';
+import { db } from '../firebase';
+import { collection, addDoc, query, where, getDocs, deleteDoc } from 'firebase/firestore';
+import { auth } from '../firebase';
+import { writable } from 'svelte/store';
+
+export const bookmarksStore = writable([]);
 
 export async function saveBookmark(surahNumber, verseNumber, surahName, verseText) {
-  const user = auth.currentUser;
-  if (!user) return;
-
   try {
-    // Check if bookmark already exists
-    const bookmarksRef = collection(db, 'bookmarks');
-    const q = query(
-      bookmarksRef,
-      where('userId', '==', user.uid),
-      where('surahNumber', '==', surahNumber),
-      where('verseNumber', '==', verseNumber)
-    );
-    
-    const querySnapshot = await getDocs(q);
-    if (!querySnapshot.empty) {
-      console.log('Bookmark already exists');
-      return;
+    const user = auth.currentUser;
+    if (!user) {
+      throw new Error('User must be logged in to add bookmarks');
     }
 
-    // Add new bookmark
-    const bookmark = {
+    const bookmarkData = {
       userId: user.uid,
       surahNumber,
       verseNumber,
       surahName,
       verseText,
-      timestamp: Timestamp.now()
+      timestamp: new Date().toISOString()
     };
 
-    await addDoc(collection(db, 'bookmarks'), bookmark);
-    console.log('Bookmark saved successfully');
+    const docRef = await addDoc(collection(db, 'bookmarks'), bookmarkData);
+    console.log('Bookmark added with ID:', docRef.id);
+    
+    // Update store
+    const updatedBookmarks = await getBookmarks();
+    bookmarksStore.set(updatedBookmarks);
+    
+    return docRef.id;
   } catch (error) {
-    console.error('Error saving bookmark:', error);
+    console.error('Error adding bookmark:', error);
     throw error;
   }
 }
 
 export async function removeBookmark(surahNumber, verseNumber) {
-  const user = auth.currentUser;
-  if (!user) return;
-
   try {
+    const user = auth.currentUser;
+    if (!user) {
+      throw new Error('User must be logged in to remove bookmarks');
+    }
+
     const bookmarksRef = collection(db, 'bookmarks');
     const q = query(
       bookmarksRef,
@@ -60,12 +49,14 @@ export async function removeBookmark(surahNumber, verseNumber) {
       where('surahNumber', '==', surahNumber),
       where('verseNumber', '==', verseNumber)
     );
-    
+
     const querySnapshot = await getDocs(q);
-    if (!querySnapshot.empty) {
-      await deleteDoc(querySnapshot.docs[0].ref);
-      console.log('Bookmark removed successfully');
-    }
+    const deletePromises = querySnapshot.docs.map(doc => deleteDoc(doc.ref));
+    await Promise.all(deletePromises);
+    
+    // Update store
+    const updatedBookmarks = await getBookmarks();
+    bookmarksStore.set(updatedBookmarks);
   } catch (error) {
     console.error('Error removing bookmark:', error);
     throw error;
@@ -73,24 +64,27 @@ export async function removeBookmark(surahNumber, verseNumber) {
 }
 
 export async function getBookmarks() {
-  const user = auth.currentUser;
-  if (!user) return [];
-
   try {
+    const user = auth.currentUser;
+    if (!user) return [];
+
     const bookmarksRef = collection(db, 'bookmarks');
     const q = query(
       bookmarksRef,
-      where('userId', '==', user.uid),
-      orderBy('timestamp', 'desc')
+      where('userId', '==', user.uid)
     );
-    
+
     const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({
+    const bookmarks = querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
     }));
+    
+    // Update store
+    bookmarksStore.set(bookmarks);
+    return bookmarks;
   } catch (error) {
     console.error('Error getting bookmarks:', error);
-    throw error;
+    return [];
   }
 } 
