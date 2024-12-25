@@ -7,7 +7,16 @@
   import Tasbih from './Tasbih.svelte';
   import WeeklyStreak from '../components/WeeklyStreak.svelte';
   import Prayer from './Prayer.svelte';
-  import { savePrayerStatus, getPrayerHistory, prayerHistoryStore, convertPrayerTimeToDate, updatePrayerStatuses } from '../stores/prayerHistoryStore';
+  import { 
+    savePrayerStatus, 
+    getPrayerHistory, 
+    prayerHistoryStore, 
+    convertPrayerTimeToDate, 
+    updatePrayerStatuses,
+    saveExcusedPeriod,
+    endExcusedPeriod,
+    getActiveExcusedPeriod 
+  } from '../stores/prayerHistoryStore';
   import WeeklyPrayerHistory from '../components/WeeklyPrayerHistory.svelte';
   import { createEventDispatcher } from 'svelte';
   import Journal from './Journal.svelte';
@@ -339,18 +348,39 @@
     }
   }
 
+  let isExcusedPeriodActive = false;
+  let activeExcusedPeriod = null;
+
+  async function toggleExcusedPeriod() {
+    const today = new Date().toLocaleDateString('en-CA');
+    if (!isExcusedPeriodActive) {
+      // Start a new excused period
+      await saveExcusedPeriod(today, null, 'Fajr', null);
+    } else if (activeExcusedPeriod?.id) {
+      // End the current excused period
+      await endExcusedPeriod(activeExcusedPeriod.id, today, 'Isha');
+    }
+    await updateExcusedStatus();
+  }
+
+  async function updateExcusedStatus() {
+    activeExcusedPeriod = await getActiveExcusedPeriod();
+    isExcusedPeriodActive = !!activeExcusedPeriod;
+  }
+
   onMount(async () => {
-    auth.onAuthStateChanged(async (user) => {
+    const cleanup = auth.onAuthStateChanged(async (user) => {
       userName = capitalizeFirstLetter(user?.displayName?.split(' ')[0]) || 'Guest';
       if (user) {
         console.log('User authenticated:', user.uid);
         await fetchPrayerTimes();
         await getPrayerHistory();
-        await loadWeekMoods(); // This will handle mood selector visibility
+        await loadWeekMoods();
+        await updateExcusedStatus();
         updatePrayerStatus();
       }
     });
-    
+
     await getRandomQuote();
     await getWeeklyStats();
     
@@ -361,6 +391,7 @@
     todayReadingTime = await getTodayReadingTime();
     
     return () => {
+      cleanup();
       clearInterval(prayerInterval);
       clearInterval(countdownInterval);
       clearInterval(notificationInterval);
@@ -414,7 +445,7 @@
     prayerDate.setHours(hour, parseInt(minutes), 0);
     
     const now = new Date();
-    const diff = prayerDate.getTime() - now.getTime();
+    const diff = Number(prayerDate.getTime()) - Number(now.getTime());
     
     if (diff <= 0) return '';
     
@@ -535,38 +566,42 @@
           </div>
         </div>
 
-        <h3 class="section-title">Next Prayer</h3>
-        <div class="upcoming-prayer">
-          {#if upcomingPrayer}
-            <div class="prayer-info-card">
-              <div class="prayer-header">
-                <div class="left-section">
-                  <div class="prayer-icon">
-                    <svelte:component 
-                      this={iconMap.Mosque} 
-                      size={18} 
-                      weight="fill" 
-                      color="#216974" 
-                    />
-                  </div>
-                  <div class="name-time">
-                    <span class="prayer-name">{upcomingPrayer.name}</span>
-                    <span class="prayer-time">{upcomingPrayer.time}</span>
-                  </div>
+        <div class="next-prayer-card">
+          <h3 class="section-title">Next Prayer</h3>
+          <div class="next-prayer-content">
+            {#if isExcusedPeriodActive}
+              <div class="excused-message">
+                <p>You are currently excused from prayers.</p>
+                <label class="toggle-switch">
+                  <input
+                    type="checkbox"
+                    checked={isExcusedPeriodActive}
+                    on:change={toggleExcusedPeriod}
+                  />
+                  <span class="slider"></span>
+                </label>
+              </div>
+            {:else if upcomingPrayer}
+              <div class="prayer-info">
+                <div class="prayer-name">
+                  <svelte:component this={iconMap[upcomingPrayer.icon]} size={20} weight={upcomingPrayer.weight} />
+                  <h4>{upcomingPrayer.name}</h4>
+                  <span class="prayer-time">{upcomingPrayer.time}</span>
                 </div>
-                {#if upcomingCountdown}
-                  <span class="countdown">{upcomingCountdown}</span>
-                {/if}
+                <div class="prayer-right">
+                  <div class="countdown">{upcomingCountdown}</div>
+                  <label class="toggle-switch">
+                    <input
+                      type="checkbox"
+                      checked={isExcusedPeriodActive}
+                      on:change={toggleExcusedPeriod}
+                    />
+                    <span class="slider"></span>
+                  </label>
+                </div>
               </div>
-            </div>
-          {:else}
-            <div class="prayer-info-card">
-              <div class="no-prayer-message">
-                <p>All prayers for today are complete. 🌙</p>
-                <p class="subtitle">Have a blessed rest of your day!</p>
-              </div>
-            </div>
-          {/if}
+            {/if}
+          </div>
         </div>
 
         <div class="weekly-streak">
@@ -1199,6 +1234,113 @@
   .mood-icon-button :global(svg) {
     width: 100%;
     height: 100%;
+  }
+
+  .next-prayer-card {
+    margin-bottom: 1rem;
+  }
+
+  .next-prayer-content {
+    background: white;
+    border-radius: 12px;
+    padding: 1rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+
+  .excused-message {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem;
+    color: #666;
+  }
+
+  .prayer-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem;
+  }
+
+  .prayer-name {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    color: #216974;
+  }
+
+  .prayer-name h4 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 500;
+  }
+
+  .prayer-time {
+    color: #216974;
+    font-weight: 500;
+  }
+
+  .prayer-right {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .countdown {
+    color: #E09453;
+    font-weight: 500;
+  }
+
+  .section-title {
+    font-size: 1rem;
+    color: #216974;
+    margin-bottom: 0.75rem;
+    font-weight: 500;
+  }
+
+  .toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 48px;
+    height: 24px;
+  }
+
+  .toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+
+  .slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: .4s;
+    border-radius: 24px;
+  }
+
+  .slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+  }
+
+  input:checked + .slider {
+    background-color: #216974;
+  }
+
+  input:checked + .slider:before {
+    transform: translateX(24px);
   }
 </style>
 
