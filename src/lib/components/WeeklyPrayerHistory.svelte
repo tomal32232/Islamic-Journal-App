@@ -169,6 +169,10 @@
       <div class="status-dot missed"></div>
       <span>Missed</span>
     </div>
+    <div class="legend-item">
+      <div class="status-dot excused"></div>
+      <span>Excused</span>
+    </div>
   </div>
 </div>
 
@@ -365,5 +369,10 @@
     .stat-label {
       font-size: 0.75rem;
     }
+  }
+
+  .status-dot.excused {
+    background: #9CA3AF;
+    border-color: #9CA3AF;
   }
 </style>

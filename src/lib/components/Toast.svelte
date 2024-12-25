@@ -1,102 +1,75 @@
 <script>
-  import { toastStore } from '../stores/badgeStore';
-  import { fly } from 'svelte/transition';
-  import { Trophy } from 'phosphor-svelte';
+import { toast } from '../stores/toastStore';
+import { fade } from 'svelte/transition';
+import { X } from 'phosphor-svelte';
+
+function getTypeStyles(type) {
+  switch (type) {
+    case 'success':
+      return 'bg-green-50 text-green-800 border-green-200';
+    case 'error':
+      return 'bg-red-50 text-red-800 border-red-200';
+    case 'warning':
+      return 'bg-yellow-50 text-yellow-800 border-yellow-200';
+    default:
+      return 'bg-blue-50 text-blue-800 border-blue-200';
+  }
+}
 </script>
 
-{#if $toastStore.length > 0}
-  <div class="toast-container">
-    {#each $toastStore as toast (toast)}
-      <div 
-        class="toast" 
-        class:badge={toast.type === 'badge'}
-        transition:fly={{ y: 50, duration: 300 }}
+{#if $toast.visible}
+  <div 
+    class="toast-container"
+    transition:fade={{ duration: 200 }}
+  >
+    <div class="toast {getTypeStyles($toast.type)}">
+      <span>{$toast.message}</span>
+      <button 
+        class="close-button"
+        on:click={() => toast.hide()}
       >
-        {#if toast.type === 'badge'}
-          <div class="badge-toast">
-            <div class="badge-icon">
-              <Trophy weight="fill" />
-            </div>
-            <div class="badge-content">
-              <h4>{toast.title}</h4>
-              <p>{toast.message}</p>
-            </div>
-            {#if toast.badge?.image}
-              <div class="badge-image">
-                {toast.badge.image}
-              </div>
-            {/if}
-          </div>
-        {:else}
-          <p>{toast.message}</p>
-        {/if}
-      </div>
-    {/each}
+        <X size={16} weight="bold" />
+      </button>
+    </div>
   </div>
 {/if}
 
 <style>
   .toast-container {
     position: fixed;
-    bottom: 80px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 1000;
+    top: 1rem;
+    right: 1rem;
+    z-index: 50;
     display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
+    align-items: center;
     pointer-events: none;
   }
 
   .toast {
-    background: white;
-    color: #216974;
-    padding: 1rem;
-    border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-    min-width: 300px;
-    max-width: 90vw;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    border-radius: 6px;
+    border: 1px solid;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     pointer-events: auto;
   }
 
-  .toast.badge {
-    background: #216974;
-    color: white;
-  }
-
-  .badge-toast {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-  }
-
-  .badge-icon {
-    font-size: 1.5rem;
+  .close-button {
     display: flex;
     align-items: center;
     justify-content: center;
+    padding: 0.25rem;
+    border-radius: 4px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    opacity: 0.6;
+    transition: opacity 0.2s;
   }
 
-  .badge-content {
-    flex: 1;
-  }
-
-  .badge-content h4 {
-    margin: 0;
-    font-size: 1rem;
-    font-weight: 600;
-  }
-
-  .badge-content p {
-    margin: 0.25rem 0 0;
-    font-size: 0.875rem;
-    opacity: 0.9;
-  }
-
-  .badge-image {
-    font-size: 1.5rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+  .close-button:hover {
+    opacity: 1;
   }
 </style> 

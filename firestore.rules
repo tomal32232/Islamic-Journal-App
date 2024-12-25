@@ -112,5 +112,13 @@ service cloud.firestore {
         (moodId.matches(request.auth.uid + '_.*') || 
         resource.data.userId == request.auth.uid);
     }
+
+    // Add rules for excused periods collection
+    match /excused_periods/{periodId} {
+      allow read: if isOwner(resource.data.userId);
+      allow create: if isOwner(request.resource.data.userId);
+      allow update: if isOwner(resource.data.userId);
+      allow delete: if isOwner(resource.data.userId);
+    }
   }
 }

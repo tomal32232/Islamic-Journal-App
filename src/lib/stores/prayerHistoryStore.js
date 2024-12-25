@@ -118,9 +118,6 @@ export async function updatePrayerStatuses() {
 
   const now = new Date();
   const today = new Date().toLocaleDateString('en-CA');
-  console.log('=== Checking Past Prayers ===');
-  console.log('Current Date:', now);
-  console.log('Today in en-CA format:', today);
 
   const historyQuery = query(
     collection(db, 'prayer_history'),
@@ -130,32 +127,25 @@ export async function updatePrayerStatuses() {
 
   const querySnapshot = await getDocs(historyQuery);
   const updatePromises = [];
-  
-  console.log('\nFound prayers to check:', querySnapshot.size);
-  
-  querySnapshot.forEach((doc) => {
+
+  for (const doc of querySnapshot.docs) {
     const prayer = doc.data();
     const prayerDate = new Date(prayer.date);
     const prayerDateStr = prayerDate.toLocaleDateString('en-CA');
-    
-    // console.log('\nPrayer Details:');
-    // console.log('- Name:', prayer.prayerName);
-    // console.log('- Date:', prayerDateStr);
-    // console.log('- Time:', prayer.time);
-    // console.log('- Status:', prayer.status);
-    // console.log('Is before today?', prayerDateStr < today);
 
     if (prayerDateStr < today) {
-      console.log('→ Marking as missed:', prayer.prayerName);
+      // Check if the date was excused
+      const isExcused = await isDateExcused(prayerDateStr);
+      
       updatePromises.push(
         setDoc(doc.ref, {
           ...prayer,
-          status: 'missed',
+          status: isExcused ? 'excused' : 'missed',
           timestamp: Timestamp.now()
         }, { merge: true })
       );
     }
-  });
+  }
 
   if (updatePromises.length > 0) {
     await Promise.all(updatePromises);
@@ -347,4 +337,51 @@ export function getPrayerDateTime(date, time) {
   
   prayerDate.setHours(hour, parseInt(minutes), 0);
   return prayerDate;
+}
+
+// Add new function to save excused period
+export async function saveExcusedPeriod(startDate, endDate) {
+  const user = auth.currentUser;
+  if (!user) return;
+
+  const excusedPeriodRef = doc(db, 'excused_periods', `${user.uid}-${startDate}`);
+  await setDoc(excusedPeriodRef, {
+    userId: user.uid,
+    startDate,
+    endDate,
+    timestamp: Timestamp.now()
+  });
+
+  // Mark all prayers in this period as excused
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  const prayers = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
+
+  for (let d = start; d <= end; d.setDate(d.getDate() + 1)) {
+    const dateStr = d.toLocaleDateString('en-CA');
+    for (const prayerName of prayers) {
+      await savePrayerStatus({
+        name: prayerName,
+        date: dateStr,
+        status: 'excused'
+      });
+    }
+  }
+}
+
+// Add function to check if a date is within an excused period
+export async function isDateExcused(date) {
+  const user = auth.currentUser;
+  if (!user) return false;
+
+  const excusedPeriodsRef = collection(db, 'excused_periods');
+  const q = query(
+    excusedPeriodsRef,
+    where('userId', '==', user.uid),
+    where('startDate', '<=', date),
+    where('endDate', '>=', date)
+  );
+
+  const querySnapshot = await getDocs(q);
+  return !querySnapshot.empty;
 } 

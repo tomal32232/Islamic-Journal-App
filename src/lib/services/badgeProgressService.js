@@ -16,8 +16,9 @@ export function updatePrayerProgress() {
     const dayPrayers = history.filter(p => p.date === dateStr);
     
     // Check if all 5 prayers were completed for this day
+    // Consider both completed and excused prayers
     const completedAll = dayPrayers.length === 5 && 
-      dayPrayers.every(p => p.status === 'ontime' || p.status === 'late');
+      dayPrayers.every(p => p.status === 'ontime' || p.status === 'late' || p.status === 'excused');
     
     if (!completedAll) break;
     streak++;
@@ -31,19 +32,13 @@ export function updatePrayerProgress() {
   let fajrStreak = 0;
   currentDate = new Date(today);
   
-  console.log('=== Calculating Fajr Streak ===');
-  console.log('Today:', today);
-  console.log('Prayer History:', history);
-  
   // Skip today if Fajr hasn't been marked yet
   const todayFajr = history.find(p => p.date === today && p.prayerName === 'Fajr');
-  console.log('Today\'s Fajr prayer:', todayFajr);
   
-  if (!todayFajr || todayFajr.status !== 'ontime') {
-    console.log('Skipping today as Fajr is not marked as on time');
+  if (!todayFajr || (todayFajr.status !== 'ontime' && todayFajr.status !== 'excused')) {
     currentDate.setDate(currentDate.getDate() - 1);
   }
-  
+
   while (true) {
     const dateStr = currentDate.toLocaleDateString('en-CA');
     const fajrPrayer = history.find(p => 
@@ -51,24 +46,16 @@ export function updatePrayerProgress() {
       p.prayerName === 'Fajr'
     );
     
-    console.log('\nChecking date:', dateStr);
-    console.log('Found Fajr prayer:', fajrPrayer);
-    
-    // Break if no Fajr prayer or not prayed on time
-    if (!fajrPrayer || fajrPrayer.status !== 'ontime') {
-      console.log('Breaking streak:', !fajrPrayer ? 'No Fajr prayer found' : `Status is ${fajrPrayer.status}`);
+    // Break if no Fajr prayer or not prayed on time (unless excused)
+    if (!fajrPrayer || (fajrPrayer.status !== 'ontime' && fajrPrayer.status !== 'excused')) {
       break;
     }
     
-    console.log('Adding to streak - prayer was on time');
     fajrStreak++;
     currentDate.setDate(currentDate.getDate() - 1);
   }
   
-  console.log('\nFinal Fajr streak:', fajrStreak);
-  
   // Update Fajr streak progress with the correct badge type
-  console.log('Updating badge progress for ontime_fajr:', fajrStreak);
   badgeStore.updateProgress('ontime_fajr', fajrStreak);
 }
 

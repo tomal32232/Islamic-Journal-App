@@ -10,6 +10,7 @@
   import { onMount } from 'svelte';
   import { fade } from 'svelte/transition';
   import { getTodayReadingTime } from '../services/readingTimeService';
+  import ExcusedPeriodManager from '../components/ExcusedPeriodManager.svelte';
 
   const user = auth.currentUser;
   let prayerStats = { onTime: 0, late: 0, missed: 0, total: 0 };
@@ -475,6 +476,8 @@
     </button>
   </div>
 </main>
+
+<ExcusedPeriodManager />
 
 <style>
   .profile-container {
