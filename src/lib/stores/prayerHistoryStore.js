@@ -7,7 +7,9 @@ import {
   query, 
   where, 
   getDocs,
-  Timestamp 
+  getDoc,
+  Timestamp,
+  orderBy 
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { prayerTimesStore } from './prayerTimes';
@@ -116,40 +118,51 @@ export async function updatePrayerStatuses() {
   const user = auth.currentUser;
   if (!user) return;
 
-  const now = new Date();
-  const today = new Date().toLocaleDateString('en-CA');
+  const today = new Date();
+  const prayerTimes = await getPrayerTimes(today);
+  if (!prayerTimes) return;
 
-  const historyQuery = query(
-    collection(db, 'prayer_history'),
-    where('userId', '==', user.uid),
-    where('status', 'in', ['pending', 'upcoming'])
-  );
+  const prayers = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
+  const todayStr = today.toLocaleDateString('en-CA');
 
-  const querySnapshot = await getDocs(historyQuery);
-  const updatePromises = [];
+  for (const prayer of prayers) {
+    const prayerTime = prayerTimes[prayer.toLowerCase()];
+    if (!prayerTime) continue;
 
-  for (const doc of querySnapshot.docs) {
-    const prayer = doc.data();
-    const prayerDate = new Date(prayer.date);
-    const prayerDateStr = prayerDate.toLocaleDateString('en-CA');
-
-    if (prayerDateStr < today) {
-      // Check if the date was excused
-      const isExcused = await isDateExcused(prayerDateStr);
-      
-      updatePromises.push(
-        setDoc(doc.ref, {
-          ...prayer,
-          status: isExcused ? 'excused' : 'missed',
-          timestamp: Timestamp.now()
-        }, { merge: true })
-      );
+    // Check if prayer should be marked as excused
+    const isExcused = await shouldMarkPrayerExcused(todayStr, prayer);
+    if (isExcused) {
+      await savePrayerStatus({
+        name: prayer,
+        date: todayStr,
+        status: 'excused'
+      });
+      continue;
     }
-  }
 
-  if (updatePromises.length > 0) {
-    await Promise.all(updatePromises);
-    await getPrayerHistory();
+    // Rest of the existing status update logic...
+    const prayerDateTime = getPrayerDateTime(todayStr, prayerTime);
+    const now = new Date();
+
+    if (now < prayerDateTime) {
+      // Prayer time hasn't come yet
+      await savePrayerStatus({
+        name: prayer,
+        date: todayStr,
+        status: 'upcoming'
+      });
+    } else {
+      // Check if prayer was already marked
+      const existingStatus = await getPrayerStatus(prayer, todayStr);
+      if (!existingStatus || existingStatus === 'upcoming') {
+        // Prayer time has passed without being marked
+        await savePrayerStatus({
+          name: prayer,
+          date: todayStr,
+          status: 'missed'
+        });
+      }
+    }
   }
 }
 
@@ -341,43 +354,92 @@ export function getPrayerDateTime(date, time) {
 
 // Update function to save excused period with prayer-specific timing
 export async function saveExcusedPeriod(startDate, endDate, startPrayer, endPrayer) {
+  console.log('=== Saving Excused Period ===');
+  console.log('Start Date:', startDate);
+  console.log('End Date:', endDate);
+  console.log('Start Prayer:', startPrayer);
+  console.log('End Prayer:', endPrayer);
+
   const user = auth.currentUser;
-  if (!user) return;
+  if (!user) {
+    console.log('No user logged in');
+    return;
+  }
 
-  const excusedPeriodRef = doc(db, 'excused_periods', `${user.uid}-${startDate}`);
-  await setDoc(excusedPeriodRef, {
-    userId: user.uid,
-    startDate,
-    endDate,
-    startPrayer,
-    endPrayer,
-    timestamp: Timestamp.now()
-  });
+  // Create a unique ID for the period using timestamp
+  const periodId = `${user.uid}-${Date.now()}`;
+  const excusedPeriodRef = doc(db, 'excused_periods', periodId);
+  console.log('Saving to Firestore ref:', excusedPeriodRef.path);
 
-  // Mark prayers as excused based on the specified time range
-  const prayers = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-  const startPrayerIndex = prayers.indexOf(startPrayer);
-  const endPrayerIndex = prayers.indexOf(endPrayer);
+  try {
+    await setDoc(excusedPeriodRef, {
+      userId: user.uid,
+      startDate,
+      endDate,
+      startPrayer,
+      endPrayer,
+      status: 'ongoing', // Add status field
+      timestamp: Timestamp.now()
+    });
+    console.log('Successfully saved excused period to Firestore');
 
-  for (let d = start; d <= end; d.setDate(d.getDate() + 1)) {
-    const dateStr = d.toLocaleDateString('en-CA');
-    const isStartDate = dateStr === startDate;
-    const isEndDate = dateStr === endDate;
+    // If end date is provided, mark prayers as excused for the period
+    if (endDate && endPrayer) {
+      console.log('Marking prayers as excused for date range');
+      const prayers = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      const startPrayerIndex = prayers.indexOf(startPrayer);
+      const endPrayerIndex = prayers.indexOf(endPrayer);
 
-    for (let i = 0; i < prayers.length; i++) {
-      // Skip prayers before startPrayer on start date
-      if (isStartDate && i < startPrayerIndex) continue;
-      // Skip prayers after endPrayer on end date
-      if (isEndDate && i > endPrayerIndex) continue;
+      for (let d = start; d <= end; d.setDate(d.getDate() + 1)) {
+        const dateStr = d.toLocaleDateString('en-CA');
+        const isStartDate = dateStr === startDate;
+        const isEndDate = dateStr === endDate;
+        console.log('Processing date:', dateStr);
 
-      await savePrayerStatus({
-        name: prayers[i],
-        date: dateStr,
-        status: 'excused'
-      });
+        for (let i = 0; i < prayers.length; i++) {
+          // Skip prayers before startPrayer on start date
+          if (isStartDate && i < startPrayerIndex) {
+            console.log(`Skipping ${prayers[i]} on start date`);
+            continue;
+          }
+          // Skip prayers after endPrayer on end date
+          if (isEndDate && i > endPrayerIndex) {
+            console.log(`Skipping ${prayers[i]} on end date`);
+            continue;
+          }
+
+          console.log(`Marking ${prayers[i]} as excused for ${dateStr}`);
+          await savePrayerStatus({
+            name: prayers[i],
+            date: dateStr,
+            status: 'excused'
+          });
+        }
+      }
+    } else {
+      // If no end date, just mark prayers from start date and prayer
+      console.log('Marking prayers as excused from start time (ongoing period)');
+      const prayers = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
+      const startPrayerIndex = prayers.indexOf(startPrayer);
+      const today = new Date().toLocaleDateString('en-CA');
+
+      if (startDate === today) {
+        console.log('Marking today\'s remaining prayers as excused');
+        for (let i = startPrayerIndex; i < prayers.length; i++) {
+          console.log(`Marking ${prayers[i]} as excused`);
+          await savePrayerStatus({
+            name: prayers[i],
+            date: startDate,
+            status: 'excused'
+          });
+        }
+      }
     }
+  } catch (error) {
+    console.error('Error saving excused period:', error);
+    throw error;
   }
 }
 
@@ -390,10 +452,241 @@ export async function isDateExcused(date) {
   const q = query(
     excusedPeriodsRef,
     where('userId', '==', user.uid),
-    where('startDate', '<=', date),
-    where('endDate', '>=', date)
+    where('startDate', '<=', date)
   );
 
   const querySnapshot = await getDocs(q);
-  return !querySnapshot.empty;
+  if (querySnapshot.empty) return false;
+
+  // Check each period
+  for (const doc of querySnapshot.docs) {
+    const period = doc.data();
+    
+    // If period has no end date, it's active and date is after start
+    if (!period.endDate) return true;
+    
+    // If date is between start and end dates
+    if (date >= period.startDate && date <= period.endDate) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+// Get active excused period
+export async function getActiveExcusedPeriod() {
+  const user = auth.currentUser;
+  if (!user) return null;
+
+  const excusedPeriodsRef = collection(db, 'excused_periods');
+  const q = query(
+    excusedPeriodsRef,
+    where('userId', '==', user.uid),
+    where('status', '==', 'ongoing') // Query by status instead of endDate
+  );
+
+  const querySnapshot = await getDocs(q);
+  if (querySnapshot.empty) return null;
+
+  const doc = querySnapshot.docs[0];
+  return {
+    id: doc.id,
+    ...doc.data()
+  };
+}
+
+// End an active excused period
+export async function endExcusedPeriod(periodId, endDate, endPrayer) {
+  console.log('=== Ending Excused Period ===');
+  console.log('Period ID:', periodId);
+  console.log('End Date:', endDate);
+  console.log('End Prayer:', endPrayer);
+
+  const user = auth.currentUser;
+  if (!user) {
+    console.log('No user logged in');
+    return;
+  }
+
+  const excusedPeriodRef = doc(db, 'excused_periods', periodId);
+  console.log('Updating Firestore ref:', excusedPeriodRef.path);
+
+  try {
+    await setDoc(excusedPeriodRef, {
+      endDate,
+      endPrayer,
+      status: 'completed', // Update status to completed
+      timestamp: Timestamp.now()
+    }, { merge: true });
+    console.log('Successfully updated excused period in Firestore');
+
+    // Mark prayers as excused up to the end time
+    const docSnap = await getDoc(excusedPeriodRef);
+    if (!docSnap.exists()) {
+      console.error('Period document not found');
+      return;
+    }
+
+    const period = docSnap.data();
+    if (!period.startDate || !period.startPrayer) {
+      console.error('Invalid period data:', period);
+      return;
+    }
+    console.log('Retrieved period data:', period);
+
+    const prayers = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
+    const start = new Date(period.startDate);
+    const end = new Date(endDate);
+    const startPrayerIndex = prayers.indexOf(period.startPrayer);
+    const endPrayerIndex = prayers.indexOf(endPrayer);
+
+    console.log('Marking prayers as excused from', start, 'to', end);
+
+    for (let d = start; d <= end; d.setDate(d.getDate() + 1)) {
+      const dateStr = d.toLocaleDateString('en-CA');
+      const isStartDate = dateStr === period.startDate;
+      const isEndDate = dateStr === endDate;
+      console.log('Processing date:', dateStr);
+
+      for (let i = 0; i < prayers.length; i++) {
+        // Skip prayers before startPrayer on start date
+        if (isStartDate && i < startPrayerIndex) {
+          console.log(`Skipping ${prayers[i]} on start date`);
+          continue;
+        }
+        // Skip prayers after endPrayer on end date
+        if (isEndDate && i > endPrayerIndex) {
+          console.log(`Skipping ${prayers[i]} on end date`);
+          continue;
+        }
+
+        console.log(`Marking ${prayers[i]} as excused for ${dateStr}`);
+        await savePrayerStatus({
+          name: prayers[i],
+          date: dateStr,
+          status: 'excused'
+        });
+      }
+    }
+  } catch (error) {
+    console.error('Error ending excused period:', error);
+    throw error;
+  }
+}
+
+// Add function to check if a prayer should be marked as excused
+export async function shouldMarkPrayerExcused(date, prayerName) {
+  console.log('=== Checking if prayer should be excused ===');
+  console.log('Date:', date);
+  console.log('Prayer:', prayerName);
+
+  const excusedPeriods = await getActiveExcusedPeriods();
+  console.log('Active excused periods:', excusedPeriods);
+
+  if (!excusedPeriods.length) {
+    console.log('No active excused periods found');
+    return false;
+  }
+
+  const prayerDateTime = getPrayerDateTime(date, prayerName);
+  console.log('Prayer datetime:', prayerDateTime);
+  
+  for (const period of excusedPeriods) {
+    console.log('Checking period:', period);
+    // Type check the period object
+    if (!period.startDate || !period.startPrayer) {
+      console.log('Invalid period object:', period);
+      continue;
+    }
+
+    const startDateTime = getPrayerDateTime(period.startDate, period.startPrayer);
+    console.log('Period start datetime:', startDateTime);
+    
+    // If period has no end date, it's ongoing
+    if (!period.endDate) {
+      const shouldExcuse = prayerDateTime >= startDateTime;
+      console.log('Ongoing period - Should excuse?', shouldExcuse);
+      return shouldExcuse;
+    }
+    
+    // If period has end date, check if prayer is within range
+    if (!period.endPrayer) {
+      console.log('Invalid period object - missing endPrayer:', period);
+      continue;
+    }
+
+    const endDateTime = getPrayerDateTime(period.endDate, period.endPrayer);
+    console.log('Period end datetime:', endDateTime);
+    const shouldExcuse = prayerDateTime >= startDateTime && prayerDateTime <= endDateTime;
+    console.log('Fixed period - Should excuse?', shouldExcuse);
+    return shouldExcuse;
+  }
+  
+  console.log('No matching excused period found');
+  return false;
+}
+
+// Add this function to get all active excused periods
+async function getActiveExcusedPeriods() {
+  console.log('=== Getting Active Excused Periods ===');
+  const user = auth.currentUser;
+  if (!user) {
+    console.log('No user logged in');
+    return [];
+  }
+
+  const excusedPeriodsRef = collection(db, 'excused_periods');
+  const q = query(
+    excusedPeriodsRef,
+    where('userId', '==', user.uid),
+    orderBy('startDate', 'desc')
+  );
+
+  try {
+    const querySnapshot = await getDocs(q);
+    const periods = querySnapshot.docs
+      .map(doc => {
+        const data = doc.data();
+        // Ensure the object has the required properties
+        return {
+          id: doc.id,
+          userId: data.userId,
+          startDate: data.startDate,
+          endDate: data.endDate || null,
+          startPrayer: data.startPrayer,
+          endPrayer: data.endPrayer || null,
+          timestamp: data.timestamp
+        };
+      })
+      .filter(period => !period.endDate); // Only return active periods
+    
+    console.log('Found active periods:', periods);
+    return periods;
+  } catch (error) {
+    console.error('Error getting active excused periods:', error);
+    return [];
+  }
+}
+
+// Add these helper functions
+async function getPrayerTimes(date) {
+  return get(prayerTimesStore);
+}
+
+async function getPrayerStatus(prayerName, date) {
+  const user = auth.currentUser;
+  if (!user) return null;
+
+  const prayerId = `${date}-${prayerName.toLowerCase()}`;
+  const prayerQuery = query(
+    collection(db, 'prayer_history'),
+    where('userId', '==', user.uid),
+    where('prayerId', '==', prayerId)
+  );
+
+  const querySnapshot = await getDocs(prayerQuery);
+  if (querySnapshot.empty) return null;
+
+  return querySnapshot.docs[0].data().status;
 } 
