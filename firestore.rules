@@ -44,6 +44,13 @@ service cloud.firestore {
       allow delete: if isOwner(resource.data.userId);
     }
 
+    // Favorites collection
+    match /favorites/{document=**} {
+      allow read: if isOwner(resource.data.userId);
+      allow create: if isOwner(request.resource.data.userId);
+      allow delete: if isOwner(resource.data.userId);
+    }
+
     match /prayer_history/{document=**} {
       allow read: if isOwner(resource.data.userId);
       allow create: if isOwner(request.resource.data.userId);

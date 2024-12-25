@@ -3,11 +3,13 @@
   import { get } from 'svelte/store';
   import { quranStore, fetchSurahList, fetchSurahDetails, saveReadingProgress, loadReadingProgress, saveBookmark, removeBookmark, loadBookmarks, playAudio, pauseAudio, setReciter, RECITERS, toggleAutoPlay } from '../services/quranService';
   import { startReadingSession, endReadingSession } from '../services/readingTimeService';
-  import { BookmarkSimple, Play, Pause, SpeakerHigh, Repeat } from 'phosphor-svelte';
+  import { BookmarkSimple, Play, Pause, SpeakerHigh, Repeat, Star } from 'phosphor-svelte';
   import { getBookmarks, saveBookmark as saveFirebaseBookmark, removeBookmark as removeFirebaseBookmark } from '../services/bookmarkService';
+  import { addFavorite, removeFavorite, getFavorites, isFavorite } from '../services/favoriteService';
   
   let selectedSurah = null;
   let bookmarkedVerses = [];
+  let favoriteVerses = [];
   let selectedReciter = RECITERS[0].id;
   let versesContainer;
   let currentSessionId = null;
@@ -152,6 +154,29 @@
     toggleAutoPlay();
   }
 
+  async function toggleFavorite(verseNumber) {
+    const surahName = currentSurahDetails?.englishName;
+    const verseText = currentSurahDetails?.verses[verseNumber - 1]?.arabic;
+    const exists = favoriteVerses.some(f => f.surahNumber === selectedSurah && f.verseNumber === verseNumber);
+    
+    try {
+      if (exists) {
+        await removeFavorite(selectedSurah, verseNumber);
+      } else {
+        await addFavorite(selectedSurah, verseNumber, surahName, verseText);
+      }
+      
+      // Refresh favorites list
+      favoriteVerses = await getFavorites();
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+    }
+  }
+
+  function isVerseFavorite(verseNumber) {
+    return favoriteVerses.some(f => f.surahNumber === selectedSurah && f.verseNumber === verseNumber);
+  }
+
   onMount(async () => {
     // Load surah list
     await fetchSurahList();
@@ -177,6 +202,13 @@
       bookmarkedVerses = await getBookmarks();
     } catch (error) {
       console.error('Error loading bookmarks:', error);
+    }
+    
+    // Load favorites from Firebase
+    try {
+      favoriteVerses = await getFavorites();
+    } catch (error) {
+      console.error('Error loading favorites:', error);
     }
   });
 
@@ -314,6 +346,15 @@
                     <BookmarkSimple 
                       size={20} 
                       weight={isVerseBookmarked(verse.number) ? "fill" : "regular"}
+                    />
+                  </button>
+                  <button 
+                    class="favorite-button {isVerseFavorite(verse.number) ? 'active' : ''}"
+                    on:click|stopPropagation={() => toggleFavorite(verse.number)}
+                  >
+                    <Star 
+                      size={20} 
+                      weight={isVerseFavorite(verse.number) ? "fill" : "regular"}
                     />
                   </button>
                 </div>
@@ -619,7 +660,8 @@
   }
 
   .audio-button,
-  .bookmark-button {
+  .bookmark-button,
+  .favorite-button {
     width: 32px;
     height: 32px;
     background: none;
@@ -644,6 +686,14 @@
 
   .bookmark-button.active {
     color: #E09453 !important;
+  }
+
+  .favorite-button:hover {
+    color: #FFD700;
+  }
+
+  .favorite-button.active {
+    color: #FFD700 !important;
   }
 
   .verse-text {
