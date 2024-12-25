@@ -5,29 +5,35 @@ import { toast } from '../stores/toastStore';
 
 let startDate = '';
 let endDate = '';
+let startPrayer = 'Fajr';
+let endPrayer = 'Isha';
 let isSubmitting = false;
 
+const prayers = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
+
 async function handleSubmit() {
-  if (!startDate || !endDate) {
-    toast.show('Please select both start and end dates', 'error');
+  if (!startDate || !endDate || !startPrayer || !endPrayer) {
+    toast.show('Please select all fields', 'error');
     return;
   }
 
   const start = new Date(startDate);
   const end = new Date(endDate);
 
-  if (end < start) {
-    toast.show('End date cannot be before start date', 'error');
+  if (end < start || (start.getTime() === end.getTime() && prayers.indexOf(endPrayer) < prayers.indexOf(startPrayer))) {
+    toast.show('End time cannot be before start time', 'error');
     return;
   }
 
   isSubmitting = true;
   try {
-    await saveExcusedPeriod(startDate, endDate);
+    await saveExcusedPeriod(startDate, endDate, startPrayer, endPrayer);
     await getPrayerHistory();
     toast.show('Excused period saved successfully', 'success');
     startDate = '';
     endDate = '';
+    startPrayer = 'Fajr';
+    endPrayer = 'Isha';
   } catch (error) {
     console.error('Error saving excused period:', error);
     toast.show('Failed to save excused period', 'error');
@@ -45,27 +51,39 @@ async function handleSubmit() {
   </p>
 
   <form on:submit|preventDefault={handleSubmit} class="excused-form">
-    <div class="date-inputs">
+    <div class="period-inputs">
       <div class="input-group">
-        <label for="start-date">Start Date</label>
-        <input 
-          type="date" 
-          id="start-date"
-          bind:value={startDate}
-          max={new Date().toLocaleDateString('en-CA')}
-          required
-        />
+        <label>Start Time</label>
+        <div class="datetime-input">
+          <input 
+            type="date" 
+            bind:value={startDate}
+            max={new Date().toLocaleDateString('en-CA')}
+            required
+          />
+          <select bind:value={startPrayer} required>
+            {#each prayers as prayer}
+              <option value={prayer}>{prayer}</option>
+            {/each}
+          </select>
+        </div>
       </div>
 
       <div class="input-group">
-        <label for="end-date">End Date</label>
-        <input 
-          type="date" 
-          id="end-date"
-          bind:value={endDate}
-          max={new Date().toLocaleDateString('en-CA')}
-          required
-        />
+        <label>End Time</label>
+        <div class="datetime-input">
+          <input 
+            type="date" 
+            bind:value={endDate}
+            max={new Date().toLocaleDateString('en-CA')}
+            required
+          />
+          <select bind:value={endPrayer} required>
+            {#each prayers as prayer}
+              <option value={prayer}>{prayer}</option>
+            {/each}
+          </select>
+        </div>
       </div>
     </div>
 
@@ -106,7 +124,7 @@ async function handleSubmit() {
     gap: 1rem;
   }
 
-  .date-inputs {
+  .period-inputs {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 1rem;
@@ -118,16 +136,27 @@ async function handleSubmit() {
     gap: 0.5rem;
   }
 
+  .datetime-input {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 0.5rem;
+  }
+
   label {
     font-size: 0.875rem;
     color: #4B5563;
   }
 
-  input[type="date"] {
+  input[type="date"], select {
     padding: 0.5rem;
     border: 1px solid #E5E7EB;
     border-radius: 6px;
     font-size: 0.875rem;
+    background: white;
+  }
+
+  select {
+    min-width: 90px;
   }
 
   .submit-button {
@@ -151,7 +180,7 @@ async function handleSubmit() {
   }
 
   @media (max-width: 640px) {
-    .date-inputs {
+    .period-inputs {
       grid-template-columns: 1fr;
     }
   }

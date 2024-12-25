@@ -339,8 +339,8 @@ export function getPrayerDateTime(date, time) {
   return prayerDate;
 }
 
-// Add new function to save excused period
-export async function saveExcusedPeriod(startDate, endDate) {
+// Update function to save excused period with prayer-specific timing
+export async function saveExcusedPeriod(startDate, endDate, startPrayer, endPrayer) {
   const user = auth.currentUser;
   if (!user) return;
 
@@ -349,19 +349,31 @@ export async function saveExcusedPeriod(startDate, endDate) {
     userId: user.uid,
     startDate,
     endDate,
+    startPrayer,
+    endPrayer,
     timestamp: Timestamp.now()
   });
 
-  // Mark all prayers in this period as excused
+  // Mark prayers as excused based on the specified time range
+  const prayers = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
   const start = new Date(startDate);
   const end = new Date(endDate);
-  const prayers = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
+  const startPrayerIndex = prayers.indexOf(startPrayer);
+  const endPrayerIndex = prayers.indexOf(endPrayer);
 
   for (let d = start; d <= end; d.setDate(d.getDate() + 1)) {
     const dateStr = d.toLocaleDateString('en-CA');
-    for (const prayerName of prayers) {
+    const isStartDate = dateStr === startDate;
+    const isEndDate = dateStr === endDate;
+
+    for (let i = 0; i < prayers.length; i++) {
+      // Skip prayers before startPrayer on start date
+      if (isStartDate && i < startPrayerIndex) continue;
+      // Skip prayers after endPrayer on end date
+      if (isEndDate && i > endPrayerIndex) continue;
+
       await savePrayerStatus({
-        name: prayerName,
+        name: prayers[i],
         date: dateStr,
         status: 'excused'
       });
