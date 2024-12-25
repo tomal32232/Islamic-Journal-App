@@ -1,6 +1,11 @@
 <script>
   import { onMount } from 'svelte';
-  import { prayerHistoryStore, getPrayerHistory, getPrayerDateTime } from '../stores/prayerHistoryStore';
+  import { 
+    prayerHistoryStore, 
+    getPrayerHistory, 
+    getPrayerDateTime,
+    shouldMarkPrayerExcused 
+  } from '../stores/prayerHistoryStore';
   import { prayerTimesStore } from '../stores/prayerTimes';
   import { iconMap } from '../utils/icons';
 
@@ -29,7 +34,7 @@
     return days;
   }
 
-  function generatePrayerGrid() {
+  async function generatePrayerGrid() {
     const days = getCurrentWeekDays();
     const prayers = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
     const grid = [];
@@ -38,7 +43,8 @@
     let weeklyStats = {
       ontime: 0,
       late: 0,
-      missed: 0
+      missed: 0,
+      excused: 0
     };
 
     // Get the date range for the last 7 days
@@ -47,53 +53,66 @@
     const sevenDaysAgo = new Date(today);
     sevenDaysAgo.setDate(today.getDate() - 6); // -6 because we want to include today
 
-    prayers.forEach(prayer => {
+    for (const prayer of prayers) {
       const row = {
         name: prayer,
         icon: $prayerTimesStore.find(p => p.name === prayer)?.icon || 'Sun',
         weight: $prayerTimesStore.find(p => p.name === prayer)?.weight || 'regular',
-        days: days.map(day => {
-          const prayerRecord = $prayerHistoryStore.history.find(
-            h => h.date === day.date && h.prayerName === prayer
-          );
+        days: []
+      };
 
-          // Get current time for comparison
-          const now = new Date();
-          const todayStr = new Date().toLocaleDateString('en-CA');
-          const prayerDateTime = getPrayerDateTime(day.date, 
-            $prayerTimesStore.find(p => p.name === prayer)?.time || '00:00 AM'
-          );
+      for (const day of days) {
+        const prayerRecord = $prayerHistoryStore.history.find(
+          h => h.date === day.date && h.prayerName === prayer
+        );
+
+        // Get current time for comparison
+        const now = new Date();
+        const todayStr = new Date().toLocaleDateString('en-CA');
+        const prayerDateTime = getPrayerDateTime(day.date, 
+          $prayerTimesStore.find(p => p.name === prayer)?.time || '00:00 AM'
+        );
+        
+        let status = 'pending';
+        const prayerDate = new Date(day.date);
+        prayerDate.setHours(0, 0, 0, 0);
+
+        if (prayerRecord) {
+          status = prayerRecord.status;
+          // Only count stats if the prayer is within the last 7 days
+          if (prayerDate >= sevenDaysAgo && prayerDate <= today) {
+            if (status === 'ontime') weeklyStats.ontime++;
+            else if (status === 'late') weeklyStats.late++;
+            else if (status === 'missed') weeklyStats.missed++;
+            else if (status === 'excused') weeklyStats.excused++;
+          }
+        } else if (day.date < todayStr || (day.date === todayStr && prayerDateTime < now)) {
+          // Check if the prayer should be excused before marking as missed
+          const isExcused = await shouldMarkPrayerExcused(day.date, prayer);
+          console.log(`Checking excused for ${prayer} on ${day.date}: ${isExcused}`);
           
-          let status = 'pending';
-          if (prayerRecord) {
-            status = prayerRecord.status;
-            // Only count stats if the prayer is within the last 7 days
-            const prayerDate = new Date(day.date);
-            prayerDate.setHours(0, 0, 0, 0);
+          if (isExcused) {
+            status = 'excused';
             if (prayerDate >= sevenDaysAgo && prayerDate <= today) {
-              if (status === 'ontime') weeklyStats.ontime++;
-              else if (status === 'late') weeklyStats.late++;
-              else if (status === 'missed') weeklyStats.missed++;
+              weeklyStats.excused++;
             }
-          } else if (day.date < todayStr || (day.date === todayStr && prayerDateTime < now)) {
+          } else {
             status = 'missed';
             // Only count missed if within the last 7 days
-            const prayerDate = new Date(day.date);
-            prayerDate.setHours(0, 0, 0, 0);
             if (prayerDate >= sevenDaysAgo && prayerDate <= today) {
               weeklyStats.missed++;
             }
           }
+        }
 
-          return {
-            date: day.date,
-            status,
-            isToday: day.isToday
-          };
-        })
-      };
+        row.days.push({
+          date: day.date,
+          status,
+          isToday: day.isToday
+        });
+      }
       grid.push(row);
-    });
+    }
 
     return { days, grid, weeklyStats };
   }
@@ -102,14 +121,21 @@
     console.log('WeeklyPrayerHistory mounted');
     await getPrayerHistory();
     console.log('Prayer history:', $prayerHistoryStore);
+    await updateGrid();
   });
 
+  async function updateGrid() {
+    if ($prayerHistoryStore.history) {
+      console.log('Generating grid with history:', $prayerHistoryStore.history);
+      const gridData = await generatePrayerGrid();
+      weeklyGrid = gridData.grid;
+      weeklyStats = gridData.weeklyStats;
+      console.log('Generated grid:', weeklyGrid);
+    }
+  }
+
   $: if ($prayerHistoryStore.history) {
-    console.log('Generating grid with history:', $prayerHistoryStore.history);
-    const gridData = generatePrayerGrid();
-    weeklyGrid = gridData.grid;
-    weeklyStats = gridData.weeklyStats;
-    console.log('Generated grid:', weeklyGrid);
+    updateGrid();
   }
 </script>
 
@@ -153,6 +179,10 @@
     <div class="stat-item">
       <span class="stat-number">{weeklyStats.missed}</span>
       <span class="stat-label">Missed</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-number">{weeklyStats.excused}</span>
+      <span class="stat-label">Excused</span>
     </div>
   </div>
 
@@ -305,8 +335,8 @@
   }
 
   .weekly-stats {
-    display: flex;
-    justify-content: space-around;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
     padding: 0.75rem;
     margin: 0.5rem 0;
     background: #f8f8f8;
@@ -358,8 +388,9 @@
     }
 
     .weekly-stats {
-      padding: 0.75rem;
-      margin: 0.75rem 0;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.75rem;
+      padding: 0.5rem;
     }
 
     .stat-number {

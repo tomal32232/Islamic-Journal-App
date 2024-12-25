@@ -581,50 +581,88 @@ export async function shouldMarkPrayerExcused(date, prayerName) {
   console.log('Date:', date);
   console.log('Prayer:', prayerName);
 
-  const excusedPeriods = await getActiveExcusedPeriods();
-  console.log('Active excused periods:', excusedPeriods);
-
-  if (!excusedPeriods.length) {
-    console.log('No active excused periods found');
+  const user = auth.currentUser;
+  if (!user) {
+    console.log('No user logged in');
     return false;
   }
 
-  const prayerDateTime = getPrayerDateTime(date, prayerName);
-  console.log('Prayer datetime:', prayerDateTime);
-  
-  for (const period of excusedPeriods) {
-    console.log('Checking period:', period);
-    // Type check the period object
-    if (!period.startDate || !period.startPrayer) {
-      console.log('Invalid period object:', period);
-      continue;
-    }
+  // Query excused periods that might contain this date
+  const excusedPeriodsRef = collection(db, 'excused_periods');
+  const q = query(
+    excusedPeriodsRef,
+    where('userId', '==', user.uid),
+    where('status', '==', 'ongoing')
+  );
 
-    const startDateTime = getPrayerDateTime(period.startDate, period.startPrayer);
-    console.log('Period start datetime:', startDateTime);
-    
-    // If period has no end date, it's ongoing
-    if (!period.endDate) {
-      const shouldExcuse = prayerDateTime >= startDateTime;
-      console.log('Ongoing period - Should excuse?', shouldExcuse);
-      return shouldExcuse;
-    }
-    
-    // If period has end date, check if prayer is within range
-    if (!period.endPrayer) {
-      console.log('Invalid period object - missing endPrayer:', period);
-      continue;
-    }
+  try {
+    const querySnapshot = await getDocs(q);
+    console.log('Found excused periods:', querySnapshot.size);
 
-    const endDateTime = getPrayerDateTime(period.endDate, period.endPrayer);
-    console.log('Period end datetime:', endDateTime);
-    const shouldExcuse = prayerDateTime >= startDateTime && prayerDateTime <= endDateTime;
-    console.log('Fixed period - Should excuse?', shouldExcuse);
-    return shouldExcuse;
+    for (const doc of querySnapshot.docs) {
+      const period = doc.data();
+      console.log('Checking period:', period);
+
+      // For ongoing periods
+      if (period.status === 'ongoing') {
+        const periodStart = new Date(period.startDate);
+        const prayerDate = new Date(date);
+        
+        // Set both to midnight for date comparison
+        periodStart.setHours(0, 0, 0, 0);
+        prayerDate.setHours(0, 0, 0, 0);
+
+        // If prayer date is after or equal to period start date
+        if (prayerDate >= periodStart) {
+          console.log('Prayer is within ongoing period');
+          // If it's the start date, check if prayer is after start prayer
+          if (period.startDate === date) {
+            const prayers = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
+            const startPrayerIndex = prayers.indexOf(period.startPrayer);
+            const currentPrayerIndex = prayers.indexOf(prayerName);
+            return currentPrayerIndex >= startPrayerIndex;
+          }
+          return true;
+        }
+      }
+      // For completed periods
+      else if (period.status === 'completed') {
+        const periodStart = new Date(period.startDate);
+        const periodEnd = new Date(period.endDate);
+        const prayerDate = new Date(date);
+        
+        // Set all to midnight for date comparison
+        periodStart.setHours(0, 0, 0, 0);
+        periodEnd.setHours(0, 0, 0, 0);
+        prayerDate.setHours(0, 0, 0, 0);
+
+        // Check if prayer date is within period range
+        if (prayerDate >= periodStart && prayerDate <= periodEnd) {
+          // If it's the start date, check if prayer is after start prayer
+          if (period.startDate === date) {
+            const prayers = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
+            const startPrayerIndex = prayers.indexOf(period.startPrayer);
+            const currentPrayerIndex = prayers.indexOf(prayerName);
+            return currentPrayerIndex >= startPrayerIndex;
+          }
+          // If it's the end date, check if prayer is before end prayer
+          if (period.endDate === date) {
+            const prayers = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
+            const endPrayerIndex = prayers.indexOf(period.endPrayer);
+            const currentPrayerIndex = prayers.indexOf(prayerName);
+            return currentPrayerIndex <= endPrayerIndex;
+          }
+          return true;
+        }
+      }
+    }
+    
+    console.log('No matching excused period found');
+    return false;
+  } catch (error) {
+    console.error('Error checking excused status:', error);
+    return false;
   }
-  
-  console.log('No matching excused period found');
-  return false;
 }
 
 // Add this function to get all active excused periods
