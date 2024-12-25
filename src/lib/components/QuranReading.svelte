@@ -343,9 +343,12 @@
                     class="favorite-button {isVerseFavorite(verse.number) ? 'active' : ''}"
                     on:click|stopPropagation={() => toggleFavorite(verse.number)}
                   >
-                    <Star 
-                      size={20} 
+                    <Star
+                      size={20}
                       weight={isVerseFavorite(verse.number) ? "fill" : "regular"}
+                      class="verse-icon favorite-icon"
+                      style={isVerseFavorite(verse.number) ? "color: #D4AF37;" : ""}
+                      on:click={() => toggleFavorite(verse.number)}
                     />
                   </button>
                 </div>
