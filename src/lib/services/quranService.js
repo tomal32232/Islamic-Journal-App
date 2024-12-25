@@ -9,8 +9,9 @@ export const quranStore = writable({
   error: null,
   audioPlaying: false,
   currentAudio: null,
-  currentReciter: 'ar.alafasy', // Default reciter (Mishary Rashid Alafasy)
-  autoPlay: true // Add autoPlay flag
+  currentReciter: 'ar.alafasy',
+  autoPlay: true,
+  completeQuran: null
 });
 
 const BASE_URL = 'https://api.alquran.cloud/v1';
@@ -24,10 +25,144 @@ export const RECITERS = [
   { id: 'ar.muhammadayyoub', name: 'Muhammad Ayyoub' }
 ];
 
+// Function to fetch and store complete Quran
+export async function fetchCompleteQuran() {
+  quranStore.update(s => ({ ...s, loading: true, error: null }));
+
+  try {
+    // First check if we already have the complete Quran in localStorage
+    const cachedQuran = localStorage.getItem('completeQuran');
+    if (cachedQuran) {
+      const parsedQuran = JSON.parse(cachedQuran);
+      quranStore.update(s => ({
+        ...s,
+        completeQuran: parsedQuran,
+        loading: false
+      }));
+      return parsedQuran;
+    }
+
+    // If not in cache, fetch from API
+    const response = await fetch(`${BASE_URL}/quran/ar.alafasy`);
+    const data = await response.json();
+    
+    if (data.code === 200) {
+      // Process the data to organize by surah
+      const quranData = {};
+      data.data.surahs.forEach(surah => {
+        quranData[surah.number] = {
+          ...surah,
+          verses: surah.ayahs.map(ayah => ({
+            number: ayah.numberInSurah,
+            arabic: ayah.text,
+            audio: ayah.audio,
+            translation: '' // We'll fetch translations separately
+          }))
+        };
+      });
+
+      // Store in localStorage for future use
+      localStorage.setItem('completeQuran', JSON.stringify(quranData));
+      
+      quranStore.update(s => ({
+        ...s,
+        completeQuran: quranData,
+        loading: false
+      }));
+      
+      return quranData;
+    } else {
+      throw new Error('Failed to fetch complete Quran');
+    }
+  } catch (error) {
+    console.error('Error fetching complete Quran:', error);
+    quranStore.update(s => ({
+      ...s,
+      loading: false,
+      error: 'Failed to load Quran data. Please try again.'
+    }));
+    return null;
+  }
+}
+
+// Modified fetchSurahDetails to use local data when available
+export async function fetchSurahDetails(surahNumber) {
+  quranStore.update(s => ({ ...s, loading: true, error: null }));
+
+  try {
+    const state = get(quranStore);
+    
+    // Check if we have the complete Quran data
+    if (state.completeQuran && state.completeQuran[surahNumber]) {
+      quranStore.update(s => ({
+        ...s,
+        currentSurahDetails: state.completeQuran[surahNumber],
+        currentSurah: surahNumber,
+        loading: false
+      }));
+      return;
+    }
+
+    // If not in local state, fetch from API
+    const response = await fetch(`${BASE_URL}/surah/${surahNumber}/ar.alafasy`);
+    const data = await response.json();
+    
+    if (data.code === 200) {
+      const surahDetails = {
+        ...data.data,
+        verses: data.data.ayahs.map(ayah => ({
+          number: ayah.numberInSurah,
+          arabic: ayah.text,
+          audio: ayah.audio,
+          translation: '' // We'll add translations later
+        }))
+      };
+
+      quranStore.update(s => ({
+        ...s,
+        currentSurahDetails: surahDetails,
+        currentSurah: surahNumber,
+        loading: false
+      }));
+    } else {
+      throw new Error('Failed to fetch surah details');
+    }
+  } catch (error) {
+    console.error('Error fetching surah details:', error);
+    quranStore.update(s => ({
+      ...s,
+      loading: false,
+      error: 'Failed to load Surah details. Please try again.'
+    }));
+  }
+}
+
+// Modified fetchSurahList to use local data when available
 export async function fetchSurahList() {
   quranStore.update(s => ({ ...s, loading: true, error: null }));
 
   try {
+    const state = get(quranStore);
+    
+    // If we have complete Quran data, use it to create the surah list
+    if (state.completeQuran) {
+      const surahList = Object.values(state.completeQuran).map(surah => ({
+        number: surah.number,
+        name: surah.name,
+        englishName: surah.englishName,
+        englishNameTranslation: surah.englishNameTranslation,
+        numberOfAyahs: surah.numberOfAyahs
+      }));
+
+      quranStore.update(s => ({
+        ...s,
+        surahList,
+        loading: false
+      }));
+      return;
+    }
+
+    // If not in local state, fetch from API
     const response = await fetch(`${BASE_URL}/surah`);
     const data = await response.json();
     
@@ -41,58 +176,11 @@ export async function fetchSurahList() {
       throw new Error('Failed to fetch surah list');
     }
   } catch (error) {
+    console.error('Error fetching surah list:', error);
     quranStore.update(s => ({
       ...s,
       loading: false,
       error: 'Failed to load Surah list. Please try again.'
-    }));
-  }
-}
-
-export async function fetchSurahDetails(surahNumber) {
-  const currentState = get(quranStore);
-  quranStore.update(s => ({ ...s, loading: true, error: null }));
-
-  try {
-    // Fetch both Arabic and English translations
-    const [arabicResponse, translationResponse, audioResponse] = await Promise.all([
-      fetch(`${BASE_URL}/surah/${surahNumber}`),
-      fetch(`${BASE_URL}/surah/${surahNumber}/en.asad`),
-      fetch(`${BASE_URL}/surah/${surahNumber}/${currentState.currentReciter}`)
-    ]);
-
-    const arabicData = await arabicResponse.json();
-    const translationData = await translationResponse.json();
-    const audioData = await audioResponse.json();
-
-    if (arabicData.code === 200 && translationData.code === 200 && audioData.code === 200) {
-      // Combine Arabic, English translations, and audio
-      const verses = arabicData.data.ayahs.map((ayah, index) => ({
-        number: ayah.numberInSurah,
-        arabic: ayah.text,
-        translation: translationData.data.ayahs[index].text,
-        audio: audioData.data.ayahs[index].audio
-      }));
-
-      quranStore.update(s => ({
-        ...s,
-        currentSurahDetails: {
-          number: arabicData.data.number,
-          name: arabicData.data.name,
-          englishName: arabicData.data.englishName,
-          verses
-        },
-        loading: false
-      }));
-    } else {
-      throw new Error('Failed to fetch surah details');
-    }
-  } catch (error) {
-    console.error('Error fetching surah details:', error);
-    quranStore.update(s => ({
-      ...s,
-      loading: false,
-      error: 'Failed to load Surah details. Please try again.'
     }));
   }
 }

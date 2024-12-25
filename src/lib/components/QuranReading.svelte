@@ -1,7 +1,7 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
   import { get } from 'svelte/store';
-  import { quranStore, fetchSurahList, fetchSurahDetails, saveReadingProgress, loadReadingProgress, saveBookmark, removeBookmark, loadBookmarks, playAudio, pauseAudio, setReciter, RECITERS, toggleAutoPlay } from '../services/quranService';
+  import { quranStore, fetchSurahList, fetchSurahDetails, saveReadingProgress, loadReadingProgress, saveBookmark, removeBookmark, loadBookmarks, playAudio, pauseAudio, setReciter, RECITERS, toggleAutoPlay, fetchCompleteQuran } from '../services/quranService';
   import { startReadingSession, endReadingSession } from '../services/readingTimeService';
   import { BookmarkSimple, Play, Pause, SpeakerHigh, Repeat, Star } from 'phosphor-svelte';
   import { getBookmarks, saveBookmark as saveFirebaseBookmark, removeBookmark as removeFirebaseBookmark, bookmarksStore } from '../services/bookmarkService';
@@ -12,13 +12,53 @@
   let versesContainer;
   let currentSessionId = null;
   let selectedBookmark = null;
+  let isInitialized = false;
+  let isLoading = true;
   
   // Subscribe to quranStore
   $: ({ currentSurah, currentVerse, surahList, currentSurahDetails, loading, error, audioPlaying, autoPlay } = $quranStore);
 
-  // Subscribe to favorites and bookmarks stores
-  $: favoriteVerses = $favoritesStore;
-  $: bookmarkedVerses = $bookmarksStore;
+  // Subscribe to favorites and bookmarks stores with explicit type checking
+  $: favoriteVerses = Array.isArray($favoritesStore) ? $favoritesStore : [];
+  $: bookmarkedVerses = Array.isArray($bookmarksStore) ? $bookmarksStore : [];
+
+  // Add reactive statement for favorites state
+  $: console.log('Favorites store updated:', favoriteVerses);
+
+  // Add reactive statement to update favorites when surah changes
+  $: if (selectedSurah && currentSurahDetails && isInitialized) {
+    getFavorites(); // Refresh favorites when surah changes
+  }
+
+  // Add reactive statement for initialization
+  $: if (currentSurahDetails && !isInitialized) {
+    initializeData();
+  }
+
+  async function initializeData() {
+    try {
+      isLoading = true;
+      console.log('Initializing data...');
+      
+      // Load bookmarks and favorites first
+      const [bookmarks, favorites] = await Promise.all([
+        getBookmarks(),
+        getFavorites()
+      ]);
+      
+      console.log('Loaded data:', { bookmarks, favorites });
+      
+      // Update stores
+      bookmarkedVerses = bookmarks || [];
+      favoritesStore.set(favorites || []);
+      
+      isInitialized = true;
+      isLoading = false;
+    } catch (error) {
+      console.error('Error initializing data:', error);
+      isLoading = false;
+    }
+  }
 
   async function handleSurahSelect(event) {
     const surahNumber = parseInt(event.target.value);
@@ -141,62 +181,106 @@
   }
 
   function isVerseFavorite(verseNumber) {
-    return favoriteVerses?.some(f => 
+    if (!favoriteVerses || !selectedSurah) return false;
+    
+    const isFav = favoriteVerses.some(f => 
       parseInt(f.surahNumber) === parseInt(selectedSurah) && 
       parseInt(f.verseNumber) === parseInt(verseNumber)
-    ) || false;
+    );
+    
+    console.log('Checking favorite state:', {
+      verseNumber,
+      surah: selectedSurah,
+      favoriteCount: favoriteVerses.length,
+      isFavorite: isFav
+    });
+    
+    return isFav;
   }
 
   async function toggleFavorite(verseNumber) {
+    if (!selectedSurah || !currentSurahDetails) return;
+    
     const surahName = currentSurahDetails?.englishName;
     const verseText = currentSurahDetails?.verses[verseNumber - 1]?.arabic;
     const exists = isVerseFavorite(verseNumber);
     
     try {
-      console.log('Toggling favorite for verse:', verseNumber, 'Current state:', exists);
-      
       if (exists) {
+        // Update store first for immediate UI response
+        favoritesStore.update(favorites => {
+          const updated = (favorites || []).filter(f => 
+            !(parseInt(f.surahNumber) === parseInt(selectedSurah) && 
+              parseInt(f.verseNumber) === parseInt(verseNumber))
+          );
+          console.log('Store updated for removal, new state:', updated);
+          return updated;
+        });
+        
+        // Then update Firebase
         await removeFavorite(selectedSurah, verseNumber);
       } else {
+        const newFavorite = {
+          surahNumber: selectedSurah,
+          verseNumber,
+          surahName,
+          verseText,
+          timestamp: new Date().toISOString()
+        };
+        
+        // Update store first for immediate UI response
+        favoritesStore.update(favorites => {
+          const updated = [...(favorites || []), newFavorite];
+          console.log('Store updated for addition, new state:', updated);
+          return updated;
+        });
+        
+        // Then update Firebase
         await addFavorite(selectedSurah, verseNumber, surahName, verseText);
       }
     } catch (error) {
       console.error('Error toggling favorite:', error);
+      // Refresh from Firebase on error
+      const updatedFavorites = await getFavorites();
+      favoritesStore.set(updatedFavorites || []);
     }
   }
 
   onMount(async () => {
-    // Load surah list
-    await fetchSurahList();
-    
-    // Load reading progress
-    const progress = loadReadingProgress();
-    if (progress) {
-      selectedSurah = progress.surah;
-      await fetchSurahDetails(progress.surah);
+    try {
+      isLoading = true;
+      console.log('Starting mount process...');
       
-      // Get the current state after fetching details
-      const state = get(quranStore);
-      if (state.currentSurahDetails) {
-        currentSessionId = await startReadingSession(
-          progress.surah,
-          state.currentSurahDetails.englishName
-        );
+      // Initialize bookmarks and favorites first
+      await initializeData();
+      
+      // Then fetch the complete Quran
+      await fetchCompleteQuran();
+      
+      // Then fetch the surah list (it will use local data if available)
+      await fetchSurahList();
+      
+      // Load reading progress
+      const progress = loadReadingProgress();
+      if (progress) {
+        selectedSurah = progress.surah;
+        await fetchSurahDetails(progress.surah);
+        
+        // Get the current state after fetching details
+        const state = get(quranStore);
+        if (state.currentSurahDetails) {
+          currentSessionId = await startReadingSession(
+            progress.surah,
+            state.currentSurahDetails.englishName
+          );
+        }
       }
-    }
-    
-    // Load bookmarks from Firebase
-    try {
-      bookmarkedVerses = await getBookmarks();
+      
+      isLoading = false;
+      console.log('Mount process completed');
     } catch (error) {
-      console.error('Error loading bookmarks:', error);
-    }
-    
-    // Load favorites from Firebase
-    try {
-      await getFavorites();
-    } catch (error) {
-      console.error('Error loading favorites:', error);
+      console.error('Error during initialization:', error);
+      isLoading = false;
     }
   });
 
@@ -237,7 +321,7 @@
           class="surah-select" 
           value={selectedSurah} 
           on:change={handleSurahSelect}
-          disabled={loading}
+          disabled={loading || isLoading}
         >
           <option value="">Select a Surah</option>
           {#each surahList as surah}
@@ -252,7 +336,7 @@
         <select 
           class="bookmark-select" 
           on:change={handleBookmarkSelect}
-          disabled={loading}
+          disabled={loading || isLoading}
         >
           <option value="" disabled selected>Go to Bookmark</option>
           {#if bookmarkedVerses.length === 0}
@@ -273,7 +357,7 @@
             class="reciter-select" 
             value={selectedReciter} 
             on:change={handleReciterChange}
-            disabled={loading}
+            disabled={loading || isLoading}
           >
             {#each RECITERS as reciter}
               <option value={reciter.id}>{reciter.name}</option>
@@ -292,7 +376,7 @@
   </div>
 
   <div class="reading-section">
-    {#if loading}
+    {#if loading || isLoading}
       <div class="loading">Loading...</div>
     {:else if error}
       <div class="error">{error}</div>
@@ -344,8 +428,6 @@
                       size={20}
                       weight={isVerseFavorite(verse.number) ? "fill" : "regular"}
                       class="verse-icon favorite-icon"
-                      style={isVerseFavorite(verse.number) ? "color: #D4AF37;" : ""}
-                      on:click={() => toggleFavorite(verse.number)}
                     />
                   </button>
                 </div>
@@ -772,5 +854,9 @@
     background: #f8f8f8;
     border-radius: 6px;
     font-size: 0.875rem;
+  }
+
+  .favorite-button.active :global(.favorite-icon) {
+    color: #FFD700 !important;
   }
 </style> 
