@@ -45,7 +45,7 @@
     const today = new Date().toISOString().split('T')[0];
     if ($prayerHistoryStore?.history) {
       const todayPrayers = $prayerHistoryStore.history.filter(p => 
-        p.date === today && (p.status === 'ontime' || p.status === 'late')
+        p.date === today && (p.status === 'ontime' || p.status === 'late' || p.status === 'excused')
       );
       completedPrayersToday = todayPrayers.length;
     }
@@ -182,7 +182,7 @@
     const today = new Date().toISOString().split('T')[0];
     if ($prayerHistoryStore?.history) {
       const todayPrayers = $prayerHistoryStore.history.filter(p => 
-        p.date === today && (p.status === 'ontime' || p.status === 'late')
+        p.date === today && (p.status === 'ontime' || p.status === 'late' || p.status === 'excused')
       );
       completedPrayersToday = todayPrayers.length;
     }
@@ -399,6 +399,34 @@
 
     return () => clearInterval(timeInterval);
   });
+
+  function calculateCountdown(prayerTime) {
+    if (!prayerTime) return '';
+    
+    const [time, period] = prayerTime.split(' ');
+    const [hours, minutes] = time.split(':');
+    const prayerDate = new Date();
+    
+    let hour = parseInt(hours);
+    if (period === 'PM' && hour !== 12) hour += 12;
+    if (period === 'AM' && hour === 12) hour = 0;
+    
+    prayerDate.setHours(hour, parseInt(minutes), 0);
+    
+    const now = new Date();
+    const diff = prayerDate.getTime() - now.getTime();
+    
+    if (diff <= 0) return '';
+    
+    const hrs = Math.floor(diff / (1000 * 60 * 60));
+    const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    
+    if (hrs > 0) {
+      return `${hrs}h ${mins}m`;
+    } else {
+      return `${mins}m`;
+    }
+  }
 </script>
 
 <main class="home-container">

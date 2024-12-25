@@ -329,7 +329,7 @@ export async function getPrayerHistory() {
   const historyQuery = query(
     collection(db, 'prayer_history'),
     where('userId', '==', user.uid),
-    where('status', 'in', ['pending', 'missed', 'ontime', 'late'])
+    where('status', 'in', ['pending', 'missed', 'ontime', 'late', 'excused'])
   );
 
   const querySnapshot = await getDocs(historyQuery);

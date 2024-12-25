@@ -39,6 +39,10 @@
     const prayers = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
     const grid = [];
     
+    console.log('=== Starting Grid Generation ===');
+    console.log('Prayer History Store:', $prayerHistoryStore);
+    console.log('Days to process:', days);
+    
     // Add weekly stats object
     let weeklyStats = {
       ontime: 0,
@@ -54,6 +58,7 @@
     sevenDaysAgo.setDate(today.getDate() - 6); // -6 because we want to include today
 
     for (const prayer of prayers) {
+      console.log(`\nProcessing prayer: ${prayer}`);
       const row = {
         name: prayer,
         icon: $prayerTimesStore.find(p => p.name === prayer)?.icon || 'Sun',
@@ -62,9 +67,11 @@
       };
 
       for (const day of days) {
+        console.log(`\nChecking ${prayer} for ${day.date}`);
         const prayerRecord = $prayerHistoryStore.history.find(
           h => h.date === day.date && h.prayerName === prayer
         );
+        console.log('Found prayer record:', prayerRecord);
 
         // Get current time for comparison
         const now = new Date();
@@ -78,7 +85,10 @@
         prayerDate.setHours(0, 0, 0, 0);
 
         if (prayerRecord) {
+          // Use the status from the database record
           status = prayerRecord.status;
+          console.log(`Found record for ${prayer} on ${day.date}: ${status}`);
+          
           // Only count stats if the prayer is within the last 7 days
           if (prayerDate >= sevenDaysAgo && prayerDate <= today) {
             if (status === 'ontime') weeklyStats.ontime++;
@@ -89,7 +99,7 @@
         } else if (day.date < todayStr || (day.date === todayStr && prayerDateTime < now)) {
           // Check if the prayer should be excused before marking as missed
           const isExcused = await shouldMarkPrayerExcused(day.date, prayer);
-          console.log(`Checking excused for ${prayer} on ${day.date}: ${isExcused}`);
+          console.log(`No record found. Checking if should be excused: ${isExcused}`);
           
           if (isExcused) {
             status = 'excused';
@@ -105,6 +115,7 @@
           }
         }
 
+        console.log(`Final status for ${prayer} on ${day.date}: ${status}`);
         row.days.push({
           date: day.date,
           status,
@@ -114,6 +125,9 @@
       grid.push(row);
     }
 
+    console.log('\n=== Grid Generation Complete ===');
+    console.log('Weekly stats:', weeklyStats);
+    console.log('Generated grid:', grid);
     return { days, grid, weeklyStats };
   }
 

@@ -30,7 +30,7 @@
     
     prayerDate.setHours(hour, parseInt(minutes), 0);
     
-    const diff = prayerDate - now;
+    const diff = prayerDate.getTime() - now.getTime();
     if (diff < 0) return null;
     
     const hrs = Math.floor(diff / (1000 * 60 * 60));
@@ -100,7 +100,13 @@
 
       {#if prayer.status}
         <div class="prayer-status {prayer.status}">
-          {prayer.status === 'ontime' ? 'Prayed on time' : 'Prayed late'}
+          {#if prayer.status === 'ontime'}
+            Prayed on time
+          {:else if prayer.status === 'late'}
+            Prayed late
+          {:else if prayer.status === 'excused'}
+            Excused
+          {/if}
         </div>
       {:else if prayer === currentPrayer || getTimeRemaining(prayer.time) === null}
         <div class="prayer-actions">
@@ -208,5 +214,10 @@
   .prayer-status.late {
     background: rgba(224, 148, 83, 0.1);
     color: #E09453;
+  }
+
+  .prayer-status.excused {
+    background: rgba(156, 163, 175, 0.1);
+    color: #6B7280;
   }
 </style> 
