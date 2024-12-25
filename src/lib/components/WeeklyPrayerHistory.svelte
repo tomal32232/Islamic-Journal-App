@@ -349,29 +349,28 @@
   }
 
   .weekly-stats {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    padding: 0.75rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 1rem;
     margin: 0.5rem 0;
-    background: #f8f8f8;
+    font-size: 0.8rem;
     border-radius: 8px;
-    gap: 1rem;
+    background: #f5f5f5;
   }
 
   .stat-item {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.25rem;
   }
 
   .stat-number {
-    font-size: 1rem;
-    font-weight: 500;
+    font-weight: 600;
     color: #216974;
   }
 
   .stat-label {
-    font-size: 0.75rem;
     color: #666;
   }
 
