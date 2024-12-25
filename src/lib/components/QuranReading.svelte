@@ -5,7 +5,7 @@
   import { startReadingSession, endReadingSession } from '../services/readingTimeService';
   import { BookmarkSimple, Play, Pause, SpeakerHigh, Repeat, Star } from 'phosphor-svelte';
   import { getBookmarks, saveBookmark as saveFirebaseBookmark, removeBookmark as removeFirebaseBookmark } from '../services/bookmarkService';
-  import { addFavorite, removeFavorite, getFavorites, isFavorite } from '../services/favoriteService';
+  import { addFavorite, removeFavorite, getFavorites, isFavorite, favoritesStore } from '../services/favoriteService';
   
   let selectedSurah = null;
   let bookmarkedVerses = [];
@@ -17,6 +17,9 @@
   
   // Subscribe to quranStore
   $: ({ currentSurah, currentVerse, surahList, currentSurahDetails, loading, error, audioPlaying, autoPlay } = $quranStore);
+
+  // Subscribe to favorites store
+  $: favoriteVerses = $favoritesStore;
 
   async function handleSurahSelect(event) {
     const surahNumber = parseInt(event.target.value);
@@ -91,6 +94,8 @@
     const exists = bookmarkedVerses.some(b => b.surahNumber === selectedSurah && b.verseNumber === verseNumber);
     
     try {
+      console.log('Toggling bookmark for verse:', verseNumber, 'Current state:', exists);
+      
       if (exists) {
         await removeFirebaseBookmark(selectedSurah, verseNumber);
       } else {
@@ -98,7 +103,9 @@
       }
       
       // Refresh bookmarks list
-      bookmarkedVerses = await getBookmarks();
+      const updatedBookmarks = await getBookmarks();
+      console.log('Updated bookmarks:', updatedBookmarks);
+      bookmarkedVerses = updatedBookmarks;
       
       // Update verse selection state
       if (exists) {
@@ -109,24 +116,6 @@
       } else {
         // When adding a bookmark, select the verse
         quranStore.update(s => ({ ...s, currentVerse: verseNumber }));
-        
-        // Scroll to the bookmarked verse
-        setTimeout(() => {
-          const verseElement = document.getElementById(`verse-${verseNumber}`);
-          if (verseElement) {
-            const containerHeight = versesContainer.offsetHeight;
-            const verseTop = verseElement.offsetTop;
-            const verseHeight = verseElement.offsetHeight;
-            
-            const offset = 80;
-            const scrollPosition = verseTop - (containerHeight / 2) + (verseHeight / 2) + offset;
-            
-            versesContainer.scrollTo({
-              top: scrollPosition,
-              behavior: 'smooth'
-            });
-          }
-        }, 100);
       }
     } catch (error) {
       console.error('Error toggling bookmark:', error);
@@ -154,27 +143,29 @@
     toggleAutoPlay();
   }
 
+  function isVerseFavorite(verseNumber) {
+    return favoriteVerses?.some(f => 
+      parseInt(f.surahNumber) === parseInt(selectedSurah) && 
+      parseInt(f.verseNumber) === parseInt(verseNumber)
+    ) || false;
+  }
+
   async function toggleFavorite(verseNumber) {
     const surahName = currentSurahDetails?.englishName;
     const verseText = currentSurahDetails?.verses[verseNumber - 1]?.arabic;
-    const exists = favoriteVerses.some(f => f.surahNumber === selectedSurah && f.verseNumber === verseNumber);
+    const exists = isVerseFavorite(verseNumber);
     
     try {
+      console.log('Toggling favorite for verse:', verseNumber, 'Current state:', exists);
+      
       if (exists) {
         await removeFavorite(selectedSurah, verseNumber);
       } else {
         await addFavorite(selectedSurah, verseNumber, surahName, verseText);
       }
-      
-      // Refresh favorites list
-      favoriteVerses = await getFavorites();
     } catch (error) {
       console.error('Error toggling favorite:', error);
     }
-  }
-
-  function isVerseFavorite(verseNumber) {
-    return favoriteVerses.some(f => f.surahNumber === selectedSurah && f.verseNumber === verseNumber);
   }
 
   onMount(async () => {
@@ -206,7 +197,7 @@
     
     // Load favorites from Firebase
     try {
-      favoriteVerses = await getFavorites();
+      await getFavorites();
     } catch (error) {
       console.error('Error loading favorites:', error);
     }
