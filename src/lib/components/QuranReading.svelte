@@ -219,8 +219,14 @@
         
         // Then update Firebase
         await removeFavorite(selectedSurah, verseNumber);
+        
+        // Force a refresh of the favorites store
+        const updatedFavorites = await getFavorites();
+        favoritesStore.set(updatedFavorites || []);
       } else {
         const newFavorite = {
+          id: Date.now().toString(), // Add temporary ID for optimistic update
+          userId: "current", // Will be replaced by Firebase
           surahNumber: selectedSurah,
           verseNumber,
           surahName,
@@ -237,7 +243,20 @@
         
         // Then update Firebase
         await addFavorite(selectedSurah, verseNumber, surahName, verseText);
+        
+        // Force a refresh of the favorites store
+        const updatedFavorites = await getFavorites();
+        favoritesStore.set(updatedFavorites || []);
       }
+
+      // Force a re-render of the current verse
+      quranStore.update(s => ({
+        ...s,
+        currentSurahDetails: {
+          ...s.currentSurahDetails,
+          verses: [...s.currentSurahDetails.verses]
+        }
+      }));
     } catch (error) {
       console.error('Error toggling favorite:', error);
       // Refresh from Firebase on error
