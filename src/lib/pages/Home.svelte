@@ -27,6 +27,7 @@
   import { moodHistoryStore, saveMood, getMoodHistory, getMoodForDate } from '../stores/moodStore';
   import { get } from 'svelte/store';
   import MoodHistoryModal from '../components/MoodHistoryModal.svelte';
+  import { Lock } from 'phosphor-svelte';
   const dispatch = createEventDispatcher();
   
   let currentPage = 'home';
@@ -368,6 +369,11 @@
     isExcusedPeriodActive = !!activeExcusedPeriod;
   }
 
+  async function checkExcusedStatus() {
+    const activeExcusedPeriod = await getActiveExcusedPeriod();
+    isExcusedPeriodActive = !!activeExcusedPeriod;
+  }
+
   onMount(async () => {
     const cleanup = auth.onAuthStateChanged(async (user) => {
       userName = capitalizeFirstLetter(user?.displayName?.split(' ')[0]) || 'Guest';
@@ -389,6 +395,8 @@
     const notificationInterval = setInterval(checkPrayerNotifications, 60000);
     
     todayReadingTime = await getTodayReadingTime();
+    
+    await checkExcusedStatus();
     
     return () => {
       cleanup();
@@ -526,10 +534,14 @@
           <div class="activities-row">
             <div class="activity-card">
               <div class="activity-icon prayer">
-                <svelte:component this={iconMap.Mosque} size={18} weight="fill" color="#216974" />
+                {#if isExcusedPeriodActive}
+                  <Lock size={18} weight="fill" color="#9CA3AF" />
+                {:else}
+                  <svelte:component this={iconMap.Mosque} size={18} weight="fill" color="#216974" />
+                {/if}
               </div>
               <div class="activity-info">
-                <span class="activity-value">{completedPrayersToday}/5</span>
+                <span class="activity-value {isExcusedPeriodActive ? 'excused' : ''}">{isExcusedPeriodActive ? 'Excused' : `${completedPrayersToday}/5`}</span>
                 <span class="activity-label">Prayer</span>
               </div>
             </div>
@@ -1341,6 +1353,21 @@
 
   input:checked + .slider:before {
     transform: translateX(24px);
+  }
+
+  .activity-value.excused {
+    color: #9CA3AF;
+    font-style: italic;
+  }
+
+  .activity-icon.prayer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    background: rgba(33, 105, 116, 0.1);
   }
 </style>
 
