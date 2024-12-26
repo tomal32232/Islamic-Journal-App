@@ -302,48 +302,6 @@
       </div>
     </div>
 
-    <!-- Prayer Statistics Card -->
-    <div class="card prayer-stats">
-      <h3><ChartBar weight="fill" /> Prayer Statistics</h3>
-      <div class="stats-summary">
-        <div class="stat-row">
-          <div class="stat-label">On Time</div>
-          <div class="stat-details">
-            <span class="stat-number on-time">{prayerStats.onTime}</span>
-            <span class="stat-percentage">
-              {prayerStats.total ? Math.round((prayerStats.onTime / prayerStats.total) * 100) : 0}%
-            </span>
-          </div>
-        </div>
-        <div class="stat-row">
-          <div class="stat-label">Late</div>
-          <div class="stat-details">
-            <span class="stat-number late">{prayerStats.late}</span>
-            <span class="stat-percentage">
-              {prayerStats.total ? Math.round((prayerStats.late / prayerStats.total) * 100) : 0}%
-            </span>
-          </div>
-        </div>
-        <div class="stat-row">
-          <div class="stat-label">Missed</div>
-          <div class="stat-details">
-            <span class="stat-number missed">{prayerStats.missed}</span>
-            <span class="stat-percentage">
-              {prayerStats.total ? Math.round((prayerStats.missed / prayerStats.total) * 100) : 0}%
-            </span>
-          </div>
-        </div>
-        <div class="stat-divider"></div>
-        <div class="stat-row total">
-          <div class="stat-label">Total Prayers</div>
-          <div class="stat-details">
-            <span class="stat-number">{prayerStats.total}</span>
-            <span class="stat-percentage">100%</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
     <!-- Achievement Badges Card -->
     <div class="badges-section">
       <div class="section-header">
@@ -373,67 +331,6 @@
         <span>View All Badges</span>
         <ArrowRight weight="bold" />
       </button>
-    </div>
-
-    <!-- Personal Goals Card -->
-    <div class="card">
-      <h3><Target weight="fill" /> Daily Goals</h3>
-      <div class="goals-list">
-        {#each goals as goal}
-          <div class="goal-item">
-            <div class="goal-info">
-              <span class="goal-name">{goal.name}</span>
-              {#if editingGoal?.type === goal.type}
-                <div class="edit-input">
-                  {#if goal.isTimeInput}
-                    <div class="time-input">
-                      <input 
-                        type="number" 
-                        bind:value={editHours}
-                        min="0"
-                        placeholder="Hours"
-                      >
-                      <span>h</span>
-                      <input 
-                        type="number" 
-                        bind:value={editMinutes}
-                        min="0"
-                        max="59"
-                        placeholder="Minutes"
-                      >
-                      <span>m</span>
-                    </div>
-                  {:else}
-                    <input 
-                      type="number" 
-                      bind:value={editValue}
-                      min="1"
-                      on:keydown={(e) => e.key === 'Enter' && saveGoal()}
-                    >
-                  {/if}
-                  <button class="save-btn" on:click={saveGoal}>Save</button>
-                </div>
-              {:else}
-                <div class="goal-target">
-                  <span class="goal-progress">
-                    {#if goal.isTimeInput}
-                      {formatTimeDisplay(goal.current)}/{goal.displayTarget}
-                    {:else}
-                      {goal.current}/{goal.target} {goal.unit}
-                    {/if}
-                  </span>
-                  <button class="edit-btn" on:click={() => startEditing(goal)}>
-                    <Pencil size={14} />
-                  </button>
-                </div>
-              {/if}
-            </div>
-            <div class="progress-bar">
-              <div class="progress" style="width: {(goal.current / goal.target) * 100}%"></div>
-            </div>
-          </div>
-        {/each}
-      </div>
     </div>
 
     <!-- Favorite Verses Card -->
@@ -469,15 +366,16 @@
       </div>
     </div>
 
-    <!-- Sign Out Button -->
+    <!-- Excused Period Manager -->
+    <ExcusedPeriodManager />
+
+    <!-- Sign Out Button - Now at the very bottom -->
     <button class="sign-out-button" on:click={handleLogout}>
       <SignOut weight="bold" />
       Sign Out
     </button>
   </div>
 </main>
-
-<ExcusedPeriodManager />
 
 <style>
   .profile-container {
@@ -832,7 +730,8 @@
     font-weight: 500;
     cursor: pointer;
     transition: all 0.2s ease;
-    margin-top: 1rem;
+    margin-top: 2rem;
+    margin-bottom: 1rem;
   }
 
   .sign-out-button:hover {
