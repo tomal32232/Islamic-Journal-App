@@ -162,61 +162,63 @@ function resetManualForm() {
     {/if}
   </div>
 
-  <div class="manual-section">
-    <button 
-      class="manual-button" 
-      on:click={() => showManualForm = !showManualForm}
-      disabled={isSubmitting}
-    >
-      {showManualForm ? 'Hide manual entry' : 'Add time manually'}
-    </button>
+  {#if !isToggled}
+    <div class="manual-section">
+      <button 
+        class="manual-button" 
+        on:click={() => showManualForm = !showManualForm}
+        disabled={isSubmitting}
+      >
+        {showManualForm ? 'Hide manual entry' : 'Add time manually'}
+      </button>
 
-    {#if showManualForm}
-      <form on:submit|preventDefault={handleManualSubmit} class="manual-form">
-        <div class="input-group">
-          <label>Start Time</label>
-          <div class="datetime-input">
-            <input 
-              type="date" 
-              bind:value={startDate}
-              max={new Date().toLocaleDateString('en-CA')}
-              required
-            />
-            <select bind:value={startPrayer} required>
-              {#each prayers as prayer}
-                <option value={prayer}>{prayer}</option>
-              {/each}
-            </select>
+      {#if showManualForm}
+        <form on:submit|preventDefault={handleManualSubmit} class="manual-form">
+          <div class="input-group">
+            <label>Start Time</label>
+            <div class="datetime-input">
+              <input 
+                type="date" 
+                bind:value={startDate}
+                max={new Date().toLocaleDateString('en-CA')}
+                required
+              />
+              <select bind:value={startPrayer} required>
+                {#each prayers as prayer}
+                  <option value={prayer}>{prayer}</option>
+                {/each}
+              </select>
+            </div>
           </div>
-        </div>
 
-        <div class="input-group">
-          <label>End Time (Optional)</label>
-          <div class="datetime-input">
-            <input 
-              type="date" 
-              bind:value={endDate}
-              min={startDate}
-              max={new Date().toLocaleDateString('en-CA')}
-            />
-            <select bind:value={endPrayer}>
-              {#each prayers as prayer}
-                <option value={prayer}>{prayer}</option>
-              {/each}
-            </select>
+          <div class="input-group">
+            <label>End Time (Optional)</label>
+            <div class="datetime-input">
+              <input 
+                type="date" 
+                bind:value={endDate}
+                min={startDate}
+                max={new Date().toLocaleDateString('en-CA')}
+              />
+              <select bind:value={endPrayer}>
+                {#each prayers as prayer}
+                  <option value={prayer}>{prayer}</option>
+                {/each}
+              </select>
+            </div>
           </div>
-        </div>
 
-        <button 
-          type="submit" 
-          class="submit-button" 
-          disabled={isSubmitting}
-        >
-          {isSubmitting ? 'Saving...' : 'Save Period'}
-        </button>
-      </form>
-    {/if}
-  </div>
+          <button 
+            type="submit" 
+            class="submit-button" 
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? 'Saving...' : 'Save Period'}
+          </button>
+        </form>
+      {/if}
+    </div>
+  {/if}
 </div>
 
 <style>
