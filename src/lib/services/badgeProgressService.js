@@ -46,13 +46,16 @@ export function updatePrayerProgress() {
       p.prayerName === 'Fajr'
     );
     
-    // Break if no Fajr prayer or not prayed on time (unless excused)
-    if (!fajrPrayer || (fajrPrayer.status !== 'ontime' && fajrPrayer.status !== 'excused')) {
+    // Break if no Fajr prayer found
+    if (!fajrPrayer) break;
+    
+    // Count both ontime and excused prayers for the streak
+    if (fajrPrayer.status === 'ontime' || fajrPrayer.status === 'excused') {
+      fajrStreak++;
+      currentDate.setDate(currentDate.getDate() - 1);
+    } else {
       break;
     }
-    
-    fajrStreak++;
-    currentDate.setDate(currentDate.getDate() - 1);
   }
   
   // Update Fajr streak progress with the correct badge type
