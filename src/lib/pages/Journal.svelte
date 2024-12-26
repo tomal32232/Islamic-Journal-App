@@ -26,8 +26,9 @@
 
   function getChallengeMessage() {
     const completedDays = $journalStore.completedDays;
+    const totalCompletedDays = Math.min(completedDays, 7); // Cap at 7 for the challenge
 
-    switch(completedDays) {
+    switch(totalCompletedDays) {
       case 0:
         return "Ready to begin your journaling journey? Let's take the first step together!";
       case 1:
@@ -231,6 +232,21 @@
     }
   });
 
+  // Add this function to handle progress updates
+  async function updateProgress() {
+    if (!auth.currentUser) return;
+    await journalStore.calculateProgress();
+  }
+
+  // Call updateProgress when the component mounts and when auth state changes
+  $: if (auth.currentUser) {
+    updateProgress();
+  }
+
+  // Add this computed value with proper reactivity
+  $: challengeMessage = getChallengeMessage();
+  $: console.log('Challenge message updated:', challengeMessage, 'Completed days:', $journalStore.completedDays);
+
   async function saveMorningReflection() {
     await journalStore.saveMorningReflection(morningReflection);
     selectedReflection = null;
@@ -240,9 +256,6 @@
     await journalStore.saveEveningReflection(eveningReflection);
     selectedReflection = null;
   }
-
-  // Add this computed value
-  $: challengeMessage = getChallengeMessage();
 </script>
 
 <div class="journal-container">

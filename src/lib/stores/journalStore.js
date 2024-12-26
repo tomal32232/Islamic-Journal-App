@@ -4,6 +4,7 @@ import { collection, addDoc, query, where, getDocs, orderBy, doc, getDoc, setDoc
 import { updateJournalProgress, updateJournalStreak } from '../services/badgeProgressService';
 
 function createJournalStore() {
+  const CACHE_KEY = 'journal_progress';
   const { subscribe, set, update } = writable({
     todayMorningReflection: null,
     todayEveningReflection: null,
@@ -20,6 +21,17 @@ function createJournalStore() {
     })),
     totalEntries: 0
   });
+
+  // Load cached progress if available
+  try {
+    const cachedProgress = localStorage.getItem(CACHE_KEY);
+    if (cachedProgress) {
+      const parsed = JSON.parse(cachedProgress);
+      set(parsed);
+    }
+  } catch (error) {
+    console.error('Error loading cached progress:', error);
+  }
 
   async function calculateProgress() {
     if (!auth.currentUser) return 0;
@@ -68,6 +80,14 @@ function createJournalStore() {
       date.setDate(date.getDate() - i);
       days.push(date.toISOString().split('T')[0]);
     }
+
+    // Count total completed days (both morning and evening) from all reflections
+    let totalCompletedDays = 0;
+    reflectionsByDate.forEach((reflection) => {
+      if (reflection.morning && reflection.evening) {
+        totalCompletedDays++;
+      }
+    });
 
     // Fill in the progress for each day
     days.forEach((dateStr, index) => {
@@ -128,28 +148,39 @@ function createJournalStore() {
 
     console.log('Days being tracked:', days);
     console.log('Final dailyProgress:', sortedProgress);
-    console.log('Completed days:', completedDays);
+    console.log('Total completed days:', totalCompletedDays);
     console.log('Streak:', streak);
 
     // Update streak in store and badge progress
-    update(store => ({
-      ...store,
-      streak: {
-        ...store.streak,
-        current: streak,
-        morning: !!reflectionsByDate.get(today.toISOString().split('T')[0])?.morning,
-        evening: !!reflectionsByDate.get(today.toISOString().split('T')[0])?.evening
-      },
-      completedDays,
-      dailyProgress: sortedProgress
-    }));
+    update(store => {
+      const newStore = {
+        ...store,
+        streak: {
+          ...store.streak,
+          current: streak,
+          morning: !!reflectionsByDate.get(today.toISOString().split('T')[0])?.morning,
+          evening: !!reflectionsByDate.get(today.toISOString().split('T')[0])?.evening
+        },
+        completedDays: totalCompletedDays,
+        dailyProgress: sortedProgress,
+        totalEntries: snapshot.docs.length
+      };
+
+      try {
+        localStorage.setItem(CACHE_KEY, JSON.stringify(newStore));
+      } catch (error) {
+        console.error('Error caching progress:', error);
+      }
+
+      return newStore;
+    });
     
     updateJournalStreak(Math.floor(streak));
-    return streak;
   }
 
   return {
     subscribe,
+    calculateProgress,
     
     saveMorningReflection: async (reflection) => {
       const today = new Date();
