@@ -143,7 +143,7 @@ function resetManualForm() {
 
   <div class="toggle-section">
     <label class="toggle-container">
-      <span class="toggle-label">I'm on my period</span>
+      <span class="toggle-label">I'm on my excused period</span>
       <div class="toggle-wrapper">
         <input 
           type="checkbox"
