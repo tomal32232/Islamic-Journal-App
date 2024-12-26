@@ -162,46 +162,45 @@ export async function updatePrayerStatuses() {
     // If today is the start date, only excuse prayers after the start prayer
     if (todayStr === activeExcusedPeriod.startDate) {
       if (currentPrayerIndex >= startPrayerIndex) {
-        if (now > prayerDateTime) {
-          // Only mark as excused if prayer time has passed
-          console.log(`Marking ${prayer} as excused (start date, past prayer)`);
+        if (now > prayerDateTime && ['pending', 'upcoming'].includes(existingStatus)) {
+          // Automatically mark as excused if prayer time has passed and status is pending or upcoming
+          console.log(`Automatically marking ${prayer} as excused (start date, past prayer)`);
           await savePrayerStatus({
             name: prayer,
             date: todayStr,
+            time: prayerTime,
             status: 'excused'
           });
-        } else {
+        } else if (now < prayerDateTime) {
           // Keep upcoming status for future prayers
           console.log(`Keeping ${prayer} as upcoming (future prayer)`);
           await savePrayerStatus({
             name: prayer,
             date: todayStr,
+            time: prayerTime,
             status: 'upcoming'
           });
         }
-      } else if (now < prayerDateTime) {
-        // Keep upcoming status for prayers before start prayer
-        console.log(`Keeping ${prayer} as upcoming (before start prayer)`);
-        await savePrayerStatus({
-          name: prayer,
-          date: todayStr,
-          status: 'upcoming'
-        });
+      } else {
+        // For prayers before start prayer, use normal status update
+        await updateNormalPrayerStatus(prayer, todayStr, prayerTimes);
       }
     } else {
       // For other days during the period, mark all past prayers as excused
-      if (now > prayerDateTime) {
-        console.log(`Marking ${prayer} as excused (during period, past prayer)`);
+      if (now > prayerDateTime && ['pending', 'upcoming'].includes(existingStatus)) {
+        console.log(`Automatically marking ${prayer} as excused (during period, past prayer)`);
         await savePrayerStatus({
           name: prayer,
           date: todayStr,
+          time: prayerTime,
           status: 'excused'
         });
-      } else {
+      } else if (now < prayerDateTime) {
         console.log(`Keeping ${prayer} as upcoming (future prayer)`);
         await savePrayerStatus({
           name: prayer,
           date: todayStr,
+          time: prayerTime,
           status: 'upcoming'
         });
       }
@@ -343,19 +342,24 @@ export async function getPrayerHistory() {
   const user = auth.currentUser;
   if (!user) return { history: [], pendingByDate: {}, missedByDate: {} };
 
+  // Update prayer statuses first
   await updatePrayerStatuses();
 
   const today = new Date().toLocaleDateString('en-CA');
   const historyQuery = query(
     collection(db, 'prayer_history'),
     where('userId', '==', user.uid),
-    where('status', 'in', ['pending', 'missed', 'ontime', 'late', 'excused'])
+    where('status', 'in', ['pending', 'missed', 'ontime', 'late', 'excused', 'upcoming'])
   );
 
   const querySnapshot = await getDocs(historyQuery);
   const history = [];
   const pendingByDate = {};
   const missedByDate = {};
+
+  // Get active excused period first
+  const activeExcusedPeriod = await getActiveExcusedPeriod();
+  const prayers = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
 
   querySnapshot.forEach(doc => {
     const prayer = doc.data();
@@ -364,16 +368,35 @@ export async function getPrayerHistory() {
     const prayerDateTime = getPrayerDateTime(prayer.date, prayer.time);
     const now = new Date();
 
-    // Only add to pending if status is 'pending' and prayer time has passed
-    if (prayer.status === 'pending' && prayerDateTime < now) {
-      const date = prayer.date;
-      if (!pendingByDate[date]) {
-        pendingByDate[date] = {
-          isToday: date === today,
-          prayers: []
-        };
+    // Only add to pending if:
+    // 1. Status is 'pending' or 'upcoming'
+    // 2. Prayer time has passed
+    // 3. Not in an excused period OR before start prayer in excused period
+    if ((prayer.status === 'pending' || prayer.status === 'upcoming') && prayerDateTime < now) {
+      // Check if this prayer should be excused
+      const shouldExcuse = activeExcusedPeriod && 
+        prayer.date >= activeExcusedPeriod.startDate &&
+        (prayer.date !== activeExcusedPeriod.startDate || 
+         prayers.indexOf(prayer.prayerName) >= prayers.indexOf(activeExcusedPeriod.startPrayer));
+
+      if (!shouldExcuse) {
+        const date = prayer.date;
+        if (!pendingByDate[date]) {
+          pendingByDate[date] = {
+            isToday: date === today,
+            prayers: []
+          };
+        }
+        pendingByDate[date].prayers.push(prayer);
+      } else {
+        // If prayer should be excused, update its status
+        savePrayerStatus({
+          name: prayer.prayerName,
+          date: prayer.date,
+          time: prayer.time,
+          status: 'excused'
+        });
       }
-      pendingByDate[date].prayers.push(prayer);
     }
 
     // Add to missed if status is 'missed'
