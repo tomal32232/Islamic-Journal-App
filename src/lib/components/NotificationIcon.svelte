@@ -13,12 +13,12 @@
   }
 </script>
 
+{#if pendingCount > 0}
 <button class="notification-icon" on:click={handleClick} aria-label="Notifications">
   <Bell weight="fill" color="#E09453" size={24} />
-  {#if pendingCount > 0}
-    <span class="badge">{pendingCount}</span>
-  {/if}
+  <span class="badge">{pendingCount}</span>
 </button>
+{/if}
 
 <style>
   .notification-icon {
