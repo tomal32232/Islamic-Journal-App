@@ -11,6 +11,7 @@
   import { fade } from 'svelte/transition';
   import { getTodayReadingTime } from '../services/readingTimeService';
   import ExcusedPeriodManager from '../components/ExcusedPeriodManager.svelte';
+  import { favoritesStore, getFavorites } from '../services/favoriteService';
 
   const user = auth.currentUser;
   let prayerStats = { onTime: 0, late: 0, missed: 0, total: 0 };
@@ -21,6 +22,10 @@
   let toastMessage = '';
   let todayReadingTime = 0;
   let todayDhikrCount = 0;
+  let isLoadingFavorites = false;
+
+  // Subscribe to favorites store
+  $: favoriteVerses = $favoritesStore || [];
 
   function showErrorToast(message) {
     toastMessage = message;
@@ -238,6 +243,11 @@
   onMount(async () => {
     await goalStore.loadGoals();
     await updateTodayReadingTime();
+    
+    // Load favorite verses
+    isLoadingFavorites = true;
+    await getFavorites();
+    isLoadingFavorites = false;
   });
 
   // Handle logout
@@ -249,12 +259,6 @@
       console.error("Error signing out:", error);
     }
   }
-
-  // Favorite verses (to be implemented)
-  const favoriteVerses = [
-    { surah: 'Al-Fatiha', verse: 1, text: 'In the name of Allah, the Most Gracious, the Most Merciful' },
-    { surah: 'Al-Baqarah', verse: 255, text: 'Allah - there is no deity except Him, the Ever-Living, the Self-Sustaining' }
-  ];
 
   export let navigateTo;
 
@@ -336,17 +340,26 @@
     <!-- Favorite Verses Card -->
     <div class="card">
       <h3><Book weight="fill" /> Favorite Verses</h3>
-      <div class="verses-list">
-        {#each favoriteVerses as verse}
-          <div class="verse-item">
-            <div class="verse-header">
-              <span class="surah-name">{verse.surah}</span>
-              <span class="verse-number">Verse {verse.verse}</span>
+      {#if isLoadingFavorites}
+        <div class="loading-state">Loading favorite verses...</div>
+      {:else if favoriteVerses.length === 0}
+        <div class="empty-state">
+          <p>No favorite verses yet</p>
+          <p class="empty-state-subtitle">Mark verses as favorites while reading Quran to see them here</p>
+        </div>
+      {:else}
+        <div class="verses-list">
+          {#each favoriteVerses as verse}
+            <div class="verse-item">
+              <div class="verse-header">
+                <span class="surah-name">{verse.surahName}</span>
+                <span class="verse-number">Verse {verse.verseNumber}</span>
+              </div>
+              <p class="verse-text arabic">{verse.verseText}</p>
             </div>
-            <p class="verse-text">{verse.text}</p>
-          </div>
-        {/each}
-      </div>
+          {/each}
+        </div>
+      {/if}
     </div>
 
     <!-- Reminders Settings Card -->
@@ -960,5 +973,39 @@
   .stat-row.total .stat-number {
     color: #216974;
     font-size: 1.2rem;
+  }
+
+  .loading-state {
+    text-align: center;
+    padding: 1rem;
+    color: #666;
+    font-size: 0.875rem;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 2rem 1rem;
+    background: #f8f8f8;
+    border-radius: 8px;
+    color: #666;
+  }
+
+  .empty-state p {
+    margin: 0;
+    font-size: 0.875rem;
+  }
+
+  .empty-state-subtitle {
+    margin-top: 0.5rem !important;
+    color: #888;
+    font-size: 0.8125rem !important;
+  }
+
+  .verse-text.arabic {
+    font-size: 1.25rem;
+    text-align: right;
+    margin-bottom: 0;
+    font-family: "Traditional Arabic", serif;
+    direction: rtl;
   }
 </style> 
