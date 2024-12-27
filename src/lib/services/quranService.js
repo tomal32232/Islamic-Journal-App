@@ -42,8 +42,15 @@ export async function fetchCompleteQuran() {
       return parsedQuran;
     }
 
-    // If not in cache, fetch from API
-    const response = await fetch(`${BASE_URL}/quran/ar.alafasy`);
+    // If not in cache, fetch from API with timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
+    const response = await fetch(`${BASE_URL}/quran/ar.alafasy`, {
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    
     const data = await response.json();
     
     if (data.code === 200) {
@@ -62,7 +69,11 @@ export async function fetchCompleteQuran() {
       });
 
       // Store in localStorage for future use
-      localStorage.setItem('completeQuran', JSON.stringify(quranData));
+      try {
+        localStorage.setItem('completeQuran', JSON.stringify(quranData));
+      } catch (e) {
+        console.warn('Failed to cache complete Quran:', e);
+      }
       
       quranStore.update(s => ({
         ...s,
@@ -75,12 +86,21 @@ export async function fetchCompleteQuran() {
       throw new Error('Failed to fetch complete Quran');
     }
   } catch (error) {
-    console.error('Error fetching complete Quran:', error);
-    quranStore.update(s => ({
-      ...s,
-      loading: false,
-      error: 'Failed to load Quran data. Please try again.'
-    }));
+    if (error.name === 'AbortError') {
+      console.error('Quran fetch timeout');
+      quranStore.update(s => ({
+        ...s,
+        loading: false,
+        error: 'Request timed out. Please check your connection and try again.'
+      }));
+    } else {
+      console.error('Error fetching complete Quran:', error);
+      quranStore.update(s => ({
+        ...s,
+        loading: false,
+        error: 'Failed to load Quran data. Please try again.'
+      }));
+    }
     return null;
   }
 }
@@ -94,7 +114,14 @@ async function fetchTranslations(surahNumber) {
       return JSON.parse(cachedTranslations);
     }
 
-    const response = await fetch(`${BASE_URL}/surah/${surahNumber}/en.sahih`);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+    const response = await fetch(`${BASE_URL}/surah/${surahNumber}/en.sahih`, {
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    
     const data = await response.json();
     
     if (data.code === 200) {
@@ -104,11 +131,19 @@ async function fetchTranslations(surahNumber) {
       }));
       
       // Cache the translations
-      localStorage.setItem(`translations_${surahNumber}`, JSON.stringify(translations));
+      try {
+        localStorage.setItem(`translations_${surahNumber}`, JSON.stringify(translations));
+      } catch (e) {
+        console.warn('Failed to cache translations:', e);
+      }
       return translations;
     }
     return null;
   } catch (error) {
+    if (error.name === 'AbortError') {
+      console.error('Translations fetch timeout');
+      throw new Error('Request timed out. Please check your connection and try again.');
+    }
     console.error('Error fetching translations:', error);
     return null;
   }
@@ -128,6 +163,7 @@ export async function fetchSurahDetails(surahNumber) {
         ...s,
         currentSurahDetails: state.completeQuran[surahNumber],
         currentSurah: surahNumber,
+        currentVerse: null, // Reset current verse when changing surah
         loading: false
       }));
 
@@ -193,6 +229,7 @@ export async function fetchSurahDetails(surahNumber) {
         ...s,
         currentSurahDetails: surahDetails,
         currentSurah: surahNumber,
+        currentVerse: null, // Reset current verse when changing surah
         loading: false
       }));
     } else {

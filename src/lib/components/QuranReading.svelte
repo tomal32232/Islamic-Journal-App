@@ -13,7 +13,9 @@
   let currentSessionId = null;
   let selectedBookmark = null;
   let isInitialized = false;
-  let isLoading = true;
+  let isLoadingBookmarks = false;
+  let isLoadingQuran = false;
+  let isLoadingSurah = false;
   
   // Subscribe to quranStore
   $: ({ currentSurah, currentVerse, surahList, currentSurahDetails, loading, error, audioPlaying, autoPlay } = $quranStore);
@@ -37,8 +39,8 @@
 
   async function initializeData() {
     try {
-      isLoading = true;
-      console.log('Initializing data...');
+      isLoadingBookmarks = true;
+      console.log('Loading bookmarks and favorites...');
       
       // Load bookmarks and favorites first
       const [bookmarks, favorites] = await Promise.all([
@@ -53,10 +55,10 @@
       favoritesStore.set(favorites || []);
       
       isInitialized = true;
-      isLoading = false;
+      isLoadingBookmarks = false;
     } catch (error) {
       console.error('Error initializing data:', error);
-      isLoading = false;
+      isLoadingBookmarks = false;
     }
   }
 
@@ -69,10 +71,10 @@
         currentSessionId = null;
       }
 
-      // Reset current verse when changing surah
+      // Reset current verse and selected surah when changing surah
       quranStore.update(s => ({ ...s, currentVerse: null }));
-      await fetchSurahDetails(surahNumber);
       selectedSurah = surahNumber;
+      await fetchSurahDetails(surahNumber);
 
       // Get the current state after fetching details
       const state = get(quranStore);
@@ -157,10 +159,12 @@
   }
 
   function isVerseBookmarked(verseNumber) {
-    return bookmarkedVerses?.some(b => 
+    if (!bookmarkedVerses || !selectedSurah) return false;
+    
+    return bookmarkedVerses.some(b => 
       parseInt(b.surahNumber) === parseInt(selectedSurah) && 
       parseInt(b.verseNumber) === parseInt(verseNumber)
-    ) || false;
+    );
   }
 
   function handleReciterChange(event) {
@@ -183,19 +187,10 @@
   function isVerseFavorite(verseNumber) {
     if (!favoriteVerses || !selectedSurah) return false;
     
-    const isFav = favoriteVerses.some(f => 
+    return favoriteVerses.some(f => 
       parseInt(f.surahNumber) === parseInt(selectedSurah) && 
       parseInt(f.verseNumber) === parseInt(verseNumber)
     );
-    
-    console.log('Checking favorite state:', {
-      verseNumber,
-      surah: selectedSurah,
-      favoriteCount: favoriteVerses.length,
-      isFavorite: isFav
-    });
-    
-    return isFav;
   }
 
   async function toggleFavorite(verseNumber) {
@@ -267,14 +262,19 @@
 
   onMount(async () => {
     try {
-      isLoading = true;
       console.log('Starting mount process...');
       
       // Initialize bookmarks and favorites first
       await initializeData();
       
-      // Then fetch the complete Quran
-      await fetchCompleteQuran();
+      // Check if we have cached Quran data
+      const cachedQuran = localStorage.getItem('completeQuran');
+      if (!cachedQuran) {
+        // Only fetch complete Quran if not cached
+        isLoadingQuran = true;
+        await fetchCompleteQuran();
+        isLoadingQuran = false;
+      }
       
       // Then fetch the surah list (it will use local data if available)
       await fetchSurahList();
@@ -283,7 +283,9 @@
       const progress = loadReadingProgress();
       if (progress) {
         selectedSurah = progress.surah;
+        isLoadingSurah = true;
         await fetchSurahDetails(progress.surah);
+        isLoadingSurah = false;
         
         // Get the current state after fetching details
         const state = get(quranStore);
@@ -295,11 +297,11 @@
         }
       }
       
-      isLoading = false;
       console.log('Mount process completed');
     } catch (error) {
       console.error('Error during initialization:', error);
-      isLoading = false;
+      isLoadingQuran = false;
+      isLoadingSurah = false;
     }
   });
 
@@ -335,27 +337,31 @@
 <div class="quran-container">
   <div class="header-section">
     <div class="controls-section">
-      <div class="select-wrapper">
-        <select 
-          class="surah-select" 
-          value={selectedSurah} 
-          on:change={handleSurahSelect}
-          disabled={loading || isLoading}
-        >
-          <option value="">Select a Surah</option>
-          {#each surahList as surah}
-            <option value={surah.number}>
-              {surah.number}. {surah.englishName} ({surah.name})
-            </option>
-          {/each}
-        </select>
-      </div>
+      {#if isLoadingQuran}
+        <div class="loading-indicator">Loading Quran data...</div>
+      {:else}
+        <div class="select-wrapper">
+          <select 
+            class="surah-select" 
+            value={selectedSurah} 
+            on:change={handleSurahSelect}
+            disabled={loading || isLoadingSurah}
+          >
+            <option value="">Select a Surah</option>
+            {#each surahList as surah}
+              <option value={surah.number}>
+                {surah.number}. {surah.englishName} ({surah.name})
+              </option>
+            {/each}
+          </select>
+        </div>
+      {/if}
 
       <div class="select-wrapper">
         <select 
           class="bookmark-select" 
           on:change={handleBookmarkSelect}
-          disabled={loading || isLoading}
+          disabled={loading || isLoadingSurah}
         >
           <option value="" disabled selected>Go to Bookmark</option>
           {#if bookmarkedVerses.length === 0}
@@ -376,7 +382,7 @@
             class="reciter-select" 
             value={selectedReciter} 
             on:change={handleReciterChange}
-            disabled={loading || isLoading}
+            disabled={loading || isLoadingSurah}
           >
             {#each RECITERS as reciter}
               <option value={reciter.id}>{reciter.name}</option>
@@ -395,8 +401,8 @@
   </div>
 
   <div class="reading-section">
-    {#if loading || isLoading}
-      <div class="loading">Loading...</div>
+    {#if isLoadingSurah}
+      <div class="loading">Loading Surah...</div>
     {:else if error}
       <div class="error">{error}</div>
     {:else if currentSurahDetails}
@@ -585,12 +591,6 @@
     -moz-appearance: none;
   }
 
-  .surah-select:hover,
-  .reciter-select:hover,
-  .bookmark-select:hover {
-    border-color: #216974;
-  }
-
   .surah-select:focus,
   .reciter-select:focus,
   .bookmark-select:focus {
@@ -767,9 +767,11 @@
     justify-content: center;
   }
 
-  .audio-button:hover,
-  .audio-button.playing {
-    color: #216974;
+  .audio-button:focus,
+  .bookmark-button:focus,
+  .favorite-button:focus {
+    outline: none;
+    box-shadow: none;
   }
 
   .bookmark-button:hover {
@@ -877,5 +879,30 @@
 
   .favorite-button.active :global(.favorite-icon) {
     color: #FFD700 !important;
+  }
+
+  .loading-indicator {
+    text-align: center;
+    padding: 0.75rem;
+    background: #f8f8f8;
+    border-radius: 8px;
+    color: #666;
+    width: 100%;
+    font-size: 0.875rem;
+  }
+
+  .audio-button:focus,
+  .bookmark-button:focus,
+  .favorite-button:focus {
+    outline: none;
+    box-shadow: none;
+  }
+
+  /* Remove focus visible outline */
+  .audio-button:focus-visible,
+  .bookmark-button:focus-visible,
+  .favorite-button:focus-visible {
+    outline: none;
+    box-shadow: none;
   }
 </style> 
