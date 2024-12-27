@@ -8,6 +8,7 @@
   } from '../stores/prayerHistoryStore';
   import { prayerTimesStore } from '../stores/prayerTimes';
   import { iconMap } from '../utils/icons';
+  import { auth } from '../firebase';
 
   let weeklyGrid = [];
   let weeklyStats = {
@@ -56,6 +57,12 @@
     today.setHours(0, 0, 0, 0);
     const sevenDaysAgo = new Date(today);
     sevenDaysAgo.setDate(today.getDate() - 6); // -6 because we want to include today
+
+    // Get user's account creation date
+    const user = auth.currentUser;
+    const accountCreationDate = new Date(user.metadata.creationTime);
+    accountCreationDate.setHours(0, 0, 0, 0);
+    console.log('Account creation date:', accountCreationDate);
 
     for (const prayer of prayers) {
       console.log(`\nProcessing prayer: ${prayer}`);
@@ -107,17 +114,23 @@
               weeklyStats.excused++;
             }
           } else {
-            // Only mark as missed if it's today or yesterday
+            // Only mark as missed if it's today or yesterday and after account creation
             const yesterday = new Date();
             yesterday.setDate(yesterday.getDate() - 1);
             yesterday.setHours(0, 0, 0, 0);
             
-            if (prayerDate >= yesterday) {
-              status = 'missed';
-              if (prayerDate >= sevenDaysAgo && prayerDate <= today) {
-                weeklyStats.missed++;
+            // Check if the prayer date is after account creation
+            if (prayerDate >= accountCreationDate) {
+              if (prayerDate >= yesterday) {
+                status = 'missed';
+                if (prayerDate >= sevenDaysAgo && prayerDate <= today) {
+                  weeklyStats.missed++;
+                }
+              } else {
+                status = 'pending';
               }
             } else {
+              // If prayer is before account creation, mark as pending
               status = 'pending';
             }
           }
