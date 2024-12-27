@@ -85,6 +85,35 @@ export async function fetchCompleteQuran() {
   }
 }
 
+// Function to fetch translations for a surah
+async function fetchTranslations(surahNumber) {
+  try {
+    // Check cache first
+    const cachedTranslations = localStorage.getItem(`translations_${surahNumber}`);
+    if (cachedTranslations) {
+      return JSON.parse(cachedTranslations);
+    }
+
+    const response = await fetch(`${BASE_URL}/surah/${surahNumber}/en.sahih`);
+    const data = await response.json();
+    
+    if (data.code === 200) {
+      const translations = data.data.ayahs.map(ayah => ({
+        number: ayah.numberInSurah,
+        translation: ayah.text
+      }));
+      
+      // Cache the translations
+      localStorage.setItem(`translations_${surahNumber}`, JSON.stringify(translations));
+      return translations;
+    }
+    return null;
+  } catch (error) {
+    console.error('Error fetching translations:', error);
+    return null;
+  }
+}
+
 // Modified fetchSurahDetails to use local data when available
 export async function fetchSurahDetails(surahNumber) {
   quranStore.update(s => ({ ...s, loading: true, error: null }));
@@ -94,28 +123,70 @@ export async function fetchSurahDetails(surahNumber) {
     
     // Check if we have the complete Quran data
     if (state.completeQuran && state.completeQuran[surahNumber]) {
+      // Show Arabic text immediately while fetching translations
       quranStore.update(s => ({
         ...s,
         currentSurahDetails: state.completeQuran[surahNumber],
         currentSurah: surahNumber,
         loading: false
       }));
+
+      // Fetch translations asynchronously
+      const translations = await fetchTranslations(surahNumber);
+      
+      if (translations) {
+        // Update verses with translations
+        const updatedVerses = state.completeQuran[surahNumber].verses.map(verse => {
+          const translation = translations.find(t => t.number === verse.number);
+          return {
+            ...verse,
+            translation: translation?.translation || ''
+          };
+        });
+
+        quranStore.update(s => ({
+          ...s,
+          currentSurahDetails: {
+            ...state.completeQuran[surahNumber],
+            verses: updatedVerses
+          }
+        }));
+      }
       return;
     }
 
     // If not in local state, fetch from API
-    const response = await fetch(`${BASE_URL}/surah/${surahNumber}/ar.alafasy`);
-    const data = await response.json();
+    const [surahResponse, translationsResponse] = await Promise.all([
+      fetch(`${BASE_URL}/surah/${surahNumber}/ar.alafasy`),
+      fetch(`${BASE_URL}/surah/${surahNumber}/en.sahih`)
+    ]);
     
-    if (data.code === 200) {
+    const [surahData, translationsData] = await Promise.all([
+      surahResponse.json(),
+      translationsResponse.json()
+    ]);
+    
+    if (surahData.code === 200 && translationsData.code === 200) {
+      // Cache translations
+      const translations = translationsData.data.ayahs.map(ayah => ({
+        number: ayah.numberInSurah,
+        translation: ayah.text
+      }));
+      localStorage.setItem(`translations_${surahNumber}`, JSON.stringify(translations));
+
       const surahDetails = {
-        ...data.data,
-        verses: data.data.ayahs.map(ayah => ({
-          number: ayah.numberInSurah,
-          arabic: ayah.text,
-          audio: ayah.audio,
-          translation: '' // We'll add translations later
-        }))
+        ...surahData.data,
+        verses: surahData.data.ayahs.map(ayah => {
+          const translation = translationsData.data.ayahs.find(
+            t => t.numberInSurah === ayah.numberInSurah
+          );
+          return {
+            number: ayah.numberInSurah,
+            arabic: ayah.text,
+            audio: ayah.audio,
+            translation: translation?.text || ''
+          };
+        })
       };
 
       quranStore.update(s => ({
