@@ -34,23 +34,71 @@ export async function getCurrentLocation() {
       
       // Get position using Capacitor with more options
       console.log('Getting position...');
-      const position = await Geolocation.getCurrentPosition({
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0,
-        requireAltitude: false
-      });
       
-      console.log('Position received:', position);
-      
-      if (!position || !position.coords) {
-        throw new Error('No location data received');
+      // First try with high accuracy and longer timeout
+      try {
+        console.log('Attempting high accuracy location...');
+        const position = await Geolocation.getCurrentPosition({
+          enableHighAccuracy: true,
+          timeout: 30000, // 30 seconds timeout for GPS fix
+          maximumAge: 0,
+          requireAltitude: false
+        });
+        
+        console.log('High accuracy position received:', position);
+        console.log('Location accuracy (meters):', position.coords.accuracy);
+        
+        // If accuracy is poor (> 100 meters), try again
+        if (position.coords.accuracy > 100) {
+          console.log('Location accuracy too low, waiting for better fix...');
+          // Wait 2 seconds and try again
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          const secondAttempt = await Geolocation.getCurrentPosition({
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 0,
+            requireAltitude: false
+          });
+          console.log('Second attempt position:', secondAttempt);
+          console.log('Second attempt accuracy (meters):', secondAttempt.coords.accuracy);
+          
+          // Use the more accurate position
+          if (secondAttempt.coords.accuracy < position.coords.accuracy) {
+            position = secondAttempt;
+          }
+        }
+        
+        if (!position || !position.coords) {
+          throw new Error('No location data received');
+        }
+        
+        return {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy
+        };
+      } catch (highAccuracyError) {
+        console.log('High accuracy location failed, falling back to low accuracy:', highAccuracyError);
+        // Fall back to low accuracy if high accuracy fails
+        const position = await Geolocation.getCurrentPosition({
+          enableHighAccuracy: false,
+          timeout: 10000,
+          maximumAge: 0,
+          requireAltitude: false
+        });
+        
+        console.log('Low accuracy position received:', position);
+        
+        if (!position || !position.coords) {
+          throw new Error('No location data received');
+        }
+        
+        return {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy
+        };
       }
-      
-      return {
-        latitude: position.coords.latitude,
-        longitude: position.coords.longitude
-      };
     } else {
       // Web platform
       return new Promise((resolve, reject) => {
@@ -61,15 +109,19 @@ export async function getCurrentLocation() {
         
         const options = {
           enableHighAccuracy: true,
-          timeout: 10000,
+          timeout: 30000,
           maximumAge: 0
         };
         
         navigator.geolocation.getCurrentPosition(
-          (position) => resolve({
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude
-          }),
+          (position) => {
+            console.log('Web position received:', position);
+            resolve({
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+              accuracy: position.coords.accuracy
+            });
+          },
           (error) => {
             console.error('Web geolocation error:', error);
             reject(new Error(getGeolocationErrorMessage(error)));
@@ -107,6 +159,7 @@ export async function fetchPrayerTimes() {
     console.log('Fetching location...');
     const coords = await getCurrentLocation();
     console.log('Location received:', coords);
+    console.log('Location accuracy (meters):', coords.accuracy);
     
     // Get location name
     console.log('Fetching location name...');
