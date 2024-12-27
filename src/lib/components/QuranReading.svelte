@@ -198,6 +198,7 @@
     
     const surahName = currentSurahDetails?.englishName;
     const verseText = currentSurahDetails?.verses[verseNumber - 1]?.arabic;
+    const translation = currentSurahDetails?.verses[verseNumber - 1]?.translation;
     const exists = isVerseFavorite(verseNumber);
     
     try {
@@ -226,6 +227,7 @@
           verseNumber,
           surahName,
           verseText,
+          translation,
           timestamp: new Date().toISOString()
         };
         
@@ -237,7 +239,7 @@
         });
         
         // Then update Firebase
-        await addFavorite(selectedSurah, verseNumber, surahName, verseText);
+        await addFavorite(selectedSurah, verseNumber, surahName, verseText, translation);
         
         // Force a refresh of the favorites store
         const updatedFavorites = await getFavorites();

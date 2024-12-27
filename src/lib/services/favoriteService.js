@@ -5,7 +5,7 @@ import { writable } from 'svelte/store';
 
 export const favoritesStore = writable([]);
 
-export async function addFavorite(surahNumber, verseNumber, surahName, verseText) {
+export async function addFavorite(surahNumber, verseNumber, surahName, verseText, translation) {
   try {
     const user = auth.currentUser;
     if (!user) {
@@ -18,6 +18,7 @@ export async function addFavorite(surahNumber, verseNumber, surahName, verseText
       verseNumber,
       surahName,
       verseText,
+      translation,
       timestamp: new Date().toISOString()
     };
 

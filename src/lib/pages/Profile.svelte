@@ -356,6 +356,7 @@
                 <span class="verse-number">Verse {verse.verseNumber}</span>
               </div>
               <p class="verse-text arabic">{verse.verseText}</p>
+              <p class="verse-text translation">{verse.translation || 'Translation not available'}</p>
             </div>
           {/each}
         </div>
@@ -1004,8 +1005,16 @@
   .verse-text.arabic {
     font-size: 1.25rem;
     text-align: right;
-    margin-bottom: 0;
+    margin-bottom: 0.75rem;
     font-family: "Traditional Arabic", serif;
     direction: rtl;
+  }
+
+  .verse-text.translation {
+    font-size: 0.875rem;
+    color: #444;
+    line-height: 1.5;
+    margin: 0;
+    margin-top: 0.75rem;
   }
 </style> 
