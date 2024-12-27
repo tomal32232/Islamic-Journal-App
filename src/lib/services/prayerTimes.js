@@ -20,15 +20,33 @@ export async function getCurrentLocation() {
     if (Capacitor.isNativePlatform()) {
       // Request permissions first
       const permissionStatus = await Geolocation.checkPermissions();
+      console.log('Initial permission status:', permissionStatus);
+      
       if (permissionStatus.location !== 'granted') {
+        console.log('Requesting location permission...');
         const requestResult = await Geolocation.requestPermissions();
+        console.log('Permission request result:', requestResult);
+        
         if (requestResult.location !== 'granted') {
           throw new Error('Location permission was denied');
         }
       }
       
-      // Get position using Capacitor
-      const position = await Geolocation.getCurrentPosition();
+      // Get position using Capacitor with more options
+      console.log('Getting position...');
+      const position = await Geolocation.getCurrentPosition({
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0,
+        requireAltitude: false
+      });
+      
+      console.log('Position received:', position);
+      
+      if (!position || !position.coords) {
+        throw new Error('No location data received');
+      }
+      
       return {
         latitude: position.coords.latitude,
         longitude: position.coords.longitude
@@ -38,20 +56,46 @@ export async function getCurrentLocation() {
       return new Promise((resolve, reject) => {
         if (!navigator.geolocation) {
           reject(new Error('Geolocation is not supported by your browser'));
+          return;
         }
+        
+        const options = {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0
+        };
         
         navigator.geolocation.getCurrentPosition(
           (position) => resolve({
             latitude: position.coords.latitude,
             longitude: position.coords.longitude
           }),
-          (error) => reject(error)
+          (error) => {
+            console.error('Web geolocation error:', error);
+            reject(new Error(getGeolocationErrorMessage(error)));
+          },
+          options
         );
       });
     }
   } catch (error) {
     console.error('Location error:', error);
-    throw new Error('Failed to get location: ' + (error.message || 'Unknown error'));
+    const errorMessage = error.message || 'Unknown error';
+    console.log('Throwing error with message:', errorMessage);
+    throw new Error('Failed to get location: ' + errorMessage);
+  }
+}
+
+function getGeolocationErrorMessage(error) {
+  switch(error.code) {
+    case 1:
+      return 'Location permission denied';
+    case 2:
+      return 'Location unavailable. Please check your device settings';
+    case 3:
+      return 'Location request timed out';
+    default:
+      return 'Unable to get location';
   }
 }
 
@@ -60,19 +104,24 @@ export async function fetchPrayerTimes() {
     loadingStore.set(true);
     errorStore.set(null);
     
+    console.log('Fetching location...');
     const coords = await getCurrentLocation();
+    console.log('Location received:', coords);
     
     // Get location name
+    console.log('Fetching location name...');
     const response = await fetch(
       `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${coords.latitude}&longitude=${coords.longitude}&localityLanguage=en`
     );
     const locationData = await response.json();
+    console.log('Location data:', locationData);
     locationStore.set(`${locationData.city}, ${locationData.countryName}`);
     
     // Get prayer times
     const date = new Date();
     const timestamp = Math.floor(date.getTime() / 1000);
     
+    console.log('Fetching prayer times...');
     const prayerResponse = await fetch(
       `https://api.aladhan.com/v1/timings/${timestamp}?latitude=${coords.latitude}&longitude=${coords.longitude}&method=2`
     );
@@ -82,6 +131,7 @@ export async function fetchPrayerTimes() {
     }
     
     const data = await prayerResponse.json();
+    console.log('Prayer times received:', data);
     const timings = data.data.timings;
     
     const prayers = [
