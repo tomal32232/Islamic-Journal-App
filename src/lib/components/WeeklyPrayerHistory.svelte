@@ -58,11 +58,10 @@
     const sevenDaysAgo = new Date(today);
     sevenDaysAgo.setDate(today.getDate() - 6); // -6 because we want to include today
 
-    // Get user's account creation date
+    // Get user's account creation date with exact time
     const user = auth.currentUser;
-    const accountCreationDate = new Date(user.metadata.creationTime);
-    accountCreationDate.setHours(0, 0, 0, 0);
-    console.log('Account creation date:', accountCreationDate);
+    const accountCreationDateTime = new Date(user.metadata.creationTime);
+    console.log('Account creation date and time:', accountCreationDateTime);
 
     for (const prayer of prayers) {
       console.log(`\nProcessing prayer: ${prayer}`);
@@ -83,9 +82,8 @@
         // Get current time for comparison
         const now = new Date();
         const todayStr = new Date().toLocaleDateString('en-CA');
-        const prayerDateTime = getPrayerDateTime(day.date, 
-          $prayerTimesStore.find(p => p.name === prayer)?.time || '00:00 AM'
-        );
+        const prayerTime = $prayerTimesStore.find(p => p.name === prayer)?.time || '00:00 AM';
+        const prayerDateTime = getPrayerDateTime(day.date, prayerTime);
         
         let status = 'pending';
         const prayerDate = new Date(day.date);
@@ -119,8 +117,9 @@
             yesterday.setDate(yesterday.getDate() - 1);
             yesterday.setHours(0, 0, 0, 0);
             
-            // Check if the prayer date is after account creation
-            if (prayerDate >= accountCreationDate) {
+            // Check if the prayer time is after account creation time
+            console.log(`Prayer date time: ${prayerDateTime}, Account creation time: ${accountCreationDateTime}`);
+            if (prayerDateTime >= accountCreationDateTime) {
               if (prayerDate >= yesterday) {
                 status = 'missed';
                 if (prayerDate >= sevenDaysAgo && prayerDate <= today) {
@@ -130,8 +129,9 @@
                 status = 'pending';
               }
             } else {
-              // If prayer is before account creation, mark as pending
+              // If prayer time is before account creation, mark as pending
               status = 'pending';
+              console.log(`Prayer ${prayer} on ${day.date} at ${prayerTime} was before account creation`);
             }
           }
         }
