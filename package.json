@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "start:android": "chmod +x start-android.sh && ./start-android.sh",
+    "cap:android": "npm run build && npx cap sync android && npx cap open android"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^3.0.2",

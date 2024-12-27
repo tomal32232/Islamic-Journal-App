@@ -107,10 +107,18 @@
               weeklyStats.excused++;
             }
           } else {
-            status = 'missed';
-            // Only count missed if within the last 7 days
-            if (prayerDate >= sevenDaysAgo && prayerDate <= today) {
-              weeklyStats.missed++;
+            // Only mark as missed if it's today or yesterday
+            const yesterday = new Date();
+            yesterday.setDate(yesterday.getDate() - 1);
+            yesterday.setHours(0, 0, 0, 0);
+            
+            if (prayerDate >= yesterday) {
+              status = 'missed';
+              if (prayerDate >= sevenDaysAgo && prayerDate <= today) {
+                weeklyStats.missed++;
+              }
+            } else {
+              status = 'pending';
             }
           }
         }

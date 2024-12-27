@@ -602,15 +602,21 @@
                 </div>
                 <div class="prayer-right">
                   <div class="countdown">{upcomingCountdown}</div>
-                  <label class="toggle-switch">
-                    <input
-                      type="checkbox"
-                      checked={isExcusedPeriodActive}
-                      on:change={toggleExcusedPeriod}
-                    />
-                    <span class="slider"></span>
-                  </label>
+                  {#if isExcusedPeriodActive}
+                    <label class="toggle-switch">
+                      <input
+                        type="checkbox"
+                        checked={isExcusedPeriodActive}
+                        on:change={toggleExcusedPeriod}
+                      />
+                      <span class="slider"></span>
+                    </label>
+                  {/if}
                 </div>
+              </div>
+            {:else}
+              <div class="no-prayer-message">
+                <p>All prayers for today have passed. The next prayer times will be shown after midnight.</p>
               </div>
             {/if}
           </div>
@@ -1368,6 +1374,13 @@
     height: 28px;
     border-radius: 8px;
     background: rgba(33, 105, 116, 0.1);
+  }
+
+  .no-prayer-message {
+    text-align: center;
+    padding: 1rem;
+    color: #666;
+    font-size: 0.875rem;
   }
 </style>
 

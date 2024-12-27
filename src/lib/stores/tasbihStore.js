@@ -87,15 +87,19 @@ export async function getWeeklyStats() {
 function calculateStreakStats(dailyCounts) {
   // Calculate current streak up to today
   let currentStreak = 0;
-  let totalDays = 7; // We always want to show 7 days
   let daysWithDhikr = 0;
+  let firstDhikrIndex = -1;
 
-  // Count days with dhikr in the last 7 days
+  // Find the first day with dhikr to establish start date
   for (let i = 0; i < dailyCounts.length; i++) {
     if (dailyCounts[i].count > 0) {
+      if (firstDhikrIndex === -1) firstDhikrIndex = i;
       daysWithDhikr++;
     }
   }
+
+  // For new users, only count days since their first dhikr
+  let totalDays = firstDhikrIndex === -1 ? 0 : (dailyCounts.length - firstDhikrIndex);
 
   return {
     currentStreak: daysWithDhikr,
