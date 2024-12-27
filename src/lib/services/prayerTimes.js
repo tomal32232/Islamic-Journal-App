@@ -1,4 +1,6 @@
 import { writable } from 'svelte/store';
+import { Capacitor } from '@capacitor/core';
+import { Geolocation } from '@capacitor/geolocation';
 
 export const prayerTimesStore = writable([]);
 export const loadingStore = writable(true);
@@ -14,16 +16,43 @@ function formatTo12Hour(time24) {
 }
 
 export async function getCurrentLocation() {
-  return new Promise((resolve, reject) => {
-    if (!navigator.geolocation) {
-      reject(new Error('Geolocation is not supported by your browser'));
+  try {
+    if (Capacitor.isNativePlatform()) {
+      // Request permissions first
+      const permissionStatus = await Geolocation.checkPermissions();
+      if (permissionStatus.location !== 'granted') {
+        const requestResult = await Geolocation.requestPermissions();
+        if (requestResult.location !== 'granted') {
+          throw new Error('Location permission was denied');
+        }
+      }
+      
+      // Get position using Capacitor
+      const position = await Geolocation.getCurrentPosition();
+      return {
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude
+      };
+    } else {
+      // Web platform
+      return new Promise((resolve, reject) => {
+        if (!navigator.geolocation) {
+          reject(new Error('Geolocation is not supported by your browser'));
+        }
+        
+        navigator.geolocation.getCurrentPosition(
+          (position) => resolve({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude
+          }),
+          (error) => reject(error)
+        );
+      });
     }
-    
-    navigator.geolocation.getCurrentPosition(
-      (position) => resolve(position.coords),
-      (error) => reject(error)
-    );
-  });
+  } catch (error) {
+    console.error('Location error:', error);
+    throw new Error('Failed to get location: ' + (error.message || 'Unknown error'));
+  }
 }
 
 export async function fetchPrayerTimes() {
@@ -73,7 +102,7 @@ export async function fetchPrayerTimes() {
     prayerTimesStore.set(prayers);
   } catch (error) {
     console.error('Error fetching prayer times:', error);
-    errorStore.set('Unable to fetch prayer times. Please check your location settings.');
+    errorStore.set(error.message || 'Unable to fetch prayer times. Please check your location settings.');
     locationStore.set('Location unavailable');
   } finally {
     loadingStore.set(false);
