@@ -4,6 +4,7 @@ import { getPrayerHistory } from '../stores/prayerHistoryStore';
 import { toast } from '../stores/toastStore';
 import { onMount } from 'svelte';
 import { auth } from '../firebase';
+import { Spinner } from 'phosphor-svelte';
 
 let isSubmitting = false;
 let activeExcusedPeriod = null;
@@ -57,13 +58,12 @@ async function handleToggle(event) {
       console.log('Starting new period from:', today, currentPrayer);
       await saveExcusedPeriod(today, null, currentPrayer, null);
       await getPrayerHistory();
-      toast.show('Excused period started', 'success');
       await checkActiveExcusedPeriod();
+      toast.show('Excused period started', 'success');
     } else {
       // Ending current period
       if (!activeExcusedPeriod) {
         console.error('No active period found when trying to end');
-        toast.show('No active period to end', 'error');
         return;
       }
 
@@ -82,13 +82,13 @@ async function handleToggle(event) {
       console.log('Ending period:', activeExcusedPeriod.id);
       await endExcusedPeriod(activeExcusedPeriod.id, today, currentPrayer);
       await getPrayerHistory();
+      await checkActiveExcusedPeriod();
       toast.show('Excused period ended', 'success');
-      activeExcusedPeriod = null;
-      isToggled = false;
     }
   } catch (error) {
     console.error('Error toggling excused period:', error);
-    toast.show('Failed to update excused period', 'error');
+    // Reset toggle state on error by checking the current active period
+    await checkActiveExcusedPeriod();
   } finally {
     isSubmitting = false;
   }
@@ -96,7 +96,7 @@ async function handleToggle(event) {
 
 async function handleManualSubmit() {
   if (!startDate || !startPrayer || (endDate && !endPrayer)) {
-    toast.show('Please fill in all required fields', 'error');
+    toast.show('Please fill in all required fields', 'success');
     return;
   }
 
@@ -104,7 +104,7 @@ async function handleManualSubmit() {
     const start = new Date(startDate);
     const end = new Date(endDate);
     if (end < start || (start.getTime() === end.getTime() && prayers.indexOf(endPrayer) < prayers.indexOf(startPrayer))) {
-      toast.show('End time cannot be before start time', 'error');
+      toast.show('End time cannot be before start time', 'success');
       return;
     }
   }
@@ -120,7 +120,7 @@ async function handleManualSubmit() {
     showManualForm = false;
   } catch (error) {
     console.error('Error saving excused period:', error);
-    toast.show('Failed to save excused period', 'error');
+    await checkActiveExcusedPeriod();
   } finally {
     isSubmitting = false;
   }
@@ -142,7 +142,7 @@ function resetManualForm() {
   </p>
 
   <div class="toggle-section">
-    <label class="toggle-container">
+    <label class="toggle-container" class:disabled={isSubmitting}>
       <span class="toggle-label">I'm on my excused period</span>
       <div class="toggle-wrapper">
         <input 
@@ -151,7 +151,13 @@ function resetManualForm() {
           on:change={handleToggle}
           disabled={isSubmitting}
         />
-        <div class="toggle-slider"></div>
+        <div class="toggle-slider">
+          {#if isSubmitting}
+            <div class="loading-spinner">
+              <Spinner size={16} weight="bold" />
+            </div>
+          {/if}
+        </div>
       </div>
     </label>
 
@@ -224,29 +230,40 @@ function resetManualForm() {
 <style>
   .excused-period-manager {
     background: white;
-    border-radius: 12px;
-    padding: 1.5rem;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    margin-bottom: 1rem;
+    border-radius: 16px;
+    padding: 2rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    margin-bottom: 1.5rem;
+    border: 1px solid #E5E7EB;
   }
 
   h3 {
     color: #216974;
-    font-size: 1.25rem;
-    margin: 0 0 0.5rem 0;
+    font-size: 1.5rem;
+    margin: 0 0 0.75rem 0;
+    font-weight: 600;
+    letter-spacing: -0.025em;
   }
 
   .description {
-    color: #666;
-    font-size: 0.875rem;
-    margin-bottom: 1.5rem;
+    color: #4B5563;
+    font-size: 0.9375rem;
+    margin-bottom: 2rem;
+    line-height: 1.5;
   }
 
   .toggle-section {
     background: #F8FAFC;
-    border-radius: 8px;
-    padding: 1rem;
-    margin-bottom: 1rem;
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    border: 1px solid #E5E7EB;
+    transition: all 0.2s ease;
+  }
+
+  .toggle-section:hover {
+    border-color: #216974;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
   }
 
   .toggle-container {
@@ -254,24 +271,19 @@ function resetManualForm() {
     justify-content: space-between;
     align-items: center;
     cursor: pointer;
+    padding: 0.25rem 0;
   }
 
   .toggle-label {
-    font-size: 1rem;
+    font-size: 1.125rem;
     color: #216974;
     font-weight: 500;
   }
 
   .toggle-wrapper {
     position: relative;
-    width: 50px;
-    height: 26px;
-  }
-
-  .toggle-wrapper input {
-    opacity: 0;
-    width: 0;
-    height: 0;
+    width: 52px;
+    height: 28px;
   }
 
   .toggle-slider {
@@ -282,8 +294,9 @@ function resetManualForm() {
     right: 0;
     bottom: 0;
     background-color: #E5E7EB;
-    transition: .4s;
+    transition: .3s ease-in-out;
     border-radius: 34px;
+    border: 2px solid transparent;
   }
 
   .toggle-slider:before {
@@ -291,20 +304,16 @@ function resetManualForm() {
     content: "";
     height: 20px;
     width: 20px;
-    left: 3px;
-    bottom: 3px;
+    left: 4px;
+    bottom: 2px;
     background-color: white;
-    transition: .4s;
+    transition: .3s ease-in-out;
     border-radius: 50%;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   }
 
   input:checked + .toggle-slider {
     background-color: #216974;
-  }
-
-  input:disabled + .toggle-slider {
-    opacity: 0.5;
-    cursor: not-allowed;
   }
 
   input:checked + .toggle-slider:before {
@@ -312,101 +321,142 @@ function resetManualForm() {
   }
 
   .status-info {
-    margin-top: 1rem;
-    padding-top: 1rem;
+    margin-top: 1.25rem;
+    padding-top: 1.25rem;
     border-top: 1px solid #E5E7EB;
   }
 
   .status-info p {
-    color: #666;
-    font-size: 0.875rem;
+    color: #4B5563;
+    font-size: 0.9375rem;
     margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
   }
 
   .manual-section {
-    margin-top: 1rem;
+    margin-top: 1.5rem;
   }
 
   .manual-button {
     background: none;
     border: 2px solid #216974;
     color: #216974;
-    padding: 0.5rem 1rem;
-    border-radius: 6px;
+    padding: 0.75rem 1.25rem;
+    border-radius: 8px;
     font-weight: 500;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all 0.2s ease;
+    font-size: 0.9375rem;
   }
 
   .manual-button:hover {
     background: #216974;
     color: white;
-  }
-
-  .manual-button:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   }
 
   .manual-form {
-    margin-top: 1rem;
-    padding: 1rem;
+    margin-top: 1.5rem;
+    padding: 1.5rem;
     background: #F8FAFC;
-    border-radius: 8px;
+    border-radius: 12px;
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: 1.25rem;
+    border: 1px solid #E5E7EB;
   }
 
   .input-group {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: 0.625rem;
   }
 
   .datetime-input {
     display: grid;
     grid-template-columns: 1fr auto;
-    gap: 0.5rem;
+    gap: 0.75rem;
   }
 
   label {
-    font-size: 0.875rem;
+    font-size: 0.9375rem;
     color: #4B5563;
+    font-weight: 500;
   }
 
   input[type="date"], select {
-    padding: 0.5rem;
+    padding: 0.75rem;
     border: 1px solid #E5E7EB;
-    border-radius: 6px;
-    font-size: 0.875rem;
+    border-radius: 8px;
+    font-size: 0.9375rem;
+    background-color: white;
+    transition: all 0.2s ease;
+  }
+
+  input[type="date"]:focus, select:focus {
+    outline: none;
+    border-color: #216974;
+    box-shadow: 0 0 0 3px rgba(33, 105, 116, 0.1);
   }
 
   select {
-    min-width: 90px;
+    min-width: 100px;
+    cursor: pointer;
   }
 
   .submit-button {
     background: #216974;
     color: white;
     border: none;
-    border-radius: 6px;
-    padding: 0.75rem;
+    border-radius: 8px;
+    padding: 0.875rem;
     font-weight: 500;
     cursor: pointer;
-    transition: background-color 0.2s;
+    transition: all 0.2s ease;
+    font-size: 0.9375rem;
   }
 
   .submit-button:hover {
     background: #1a5259;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   }
 
-  .submit-button:disabled {
-    background: #94A3B8;
+  .toggle-container.disabled {
+    opacity: 0.6;
     cursor: not-allowed;
   }
 
+  .toggle-container.disabled .toggle-label {
+    color: #6B7280;
+  }
+
+  .loading-spinner {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    from {
+      transform: translate(-50%, -50%) rotate(0deg);
+    }
+    to {
+      transform: translate(-50%, -50%) rotate(360deg);
+    }
+  }
+
   @media (max-width: 640px) {
+    .excused-period-manager {
+      padding: 1.5rem;
+    }
+
     .toggle-container {
       flex-direction: column;
       gap: 1rem;
@@ -415,6 +465,10 @@ function resetManualForm() {
 
     .datetime-input {
       grid-template-columns: 1fr;
+    }
+
+    .manual-button {
+      width: 100%;
     }
   }
 </style> 
