@@ -1,15 +1,62 @@
 <script>
   import { auth } from '../firebase';
-  import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+  import { GoogleAuthProvider, signInWithPopup, signInWithCredential } from 'firebase/auth';
+  import { Capacitor } from '@capacitor/core';
+  import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
+
+  let errorMessage = '';
+  let isLoading = false;
 
   async function handleGoogleSignIn() {
     try {
-      const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(auth, provider);
-      console.log("Signed in user:", result.user);
+      isLoading = true;
+      errorMessage = '';
+      
+      if (Capacitor.isNativePlatform()) {
+        console.log('Attempting native sign-in...');
+        // Native platform (Android/iOS)
+        try {
+          const user = await GoogleAuth.signIn();
+          console.log('Google Auth response:', JSON.stringify(user, null, 2));
+          
+          if (!user.authentication?.idToken) {
+            throw new Error('No ID token received from Google Sign-In');
+          }
+          
+          const credential = GoogleAuthProvider.credential(
+            user.authentication.idToken,
+            user.authentication.accessToken
+          );
+          console.log('Created Firebase credential');
+          
+          const result = await signInWithCredential(auth, credential);
+          console.log("Successfully signed in user:", result.user.email);
+        } catch (nativeError) {
+          console.error('Native sign-in error:', nativeError);
+          throw new Error(`Native sign-in failed: ${nativeError.message || 'Unknown error'}`);
+        }
+      } else {
+        // Web platform
+        const provider = new GoogleAuthProvider();
+        const result = await signInWithPopup(auth, provider);
+        console.log("Successfully signed in user:", result.user.email);
+      }
     } catch (error) {
-      console.error("Error signing in:", error);
+      console.error("Detailed error:", error);
+      errorMessage = error.message || 'An error occurred during sign in';
+    } finally {
+      isLoading = false;
     }
+  }
+
+  // Initialize Google Auth when the component mounts
+  if (Capacitor.isNativePlatform()) {
+    GoogleAuth.initialize()
+      .then(() => console.log('Google Auth initialized successfully'))
+      .catch(error => {
+        console.error('Failed to initialize Google Auth:', error);
+        errorMessage = 'Failed to initialize Google Sign-In';
+      });
   }
 </script>
 
@@ -17,9 +64,20 @@
   <div class="content">
     <h1>Welcome to Islamic Journal</h1>
     <p>Please sign in to continue</p>
-    <button on:click={handleGoogleSignIn} class="google-button">
-      Sign in with Google
+    <button 
+      on:click={handleGoogleSignIn} 
+      class="google-button"
+      disabled={isLoading}
+    >
+      {#if isLoading}
+        Signing in...
+      {:else}
+        Sign in with Google
+      {/if}
     </button>
+    {#if errorMessage}
+      <p class="error-message">{errorMessage}</p>
+    {/if}
   </div>
 </main>
 
@@ -63,7 +121,18 @@
     transition: background-color 0.2s;
   }
 
-  .google-button:hover {
+  .google-button:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+  }
+
+  .google-button:not(:disabled):hover {
     background-color: #357ae8;
+  }
+
+  .error-message {
+    color: #dc3545;
+    margin-top: 1rem;
+    font-size: 0.875rem;
   }
 </style>

@@ -1,0 +1,12 @@
+{
+  "appId": "com.islamicjournal.app",
+  "appName": "Islamic Journal",
+  "webDir": "dist",
+  "plugins": {
+    "GoogleAuth": {
+      "scopes": ["profile", "email"],
+      "serverClientId": "398086636891-flpsa3do6ptr8utuq458ao093l0u3lsh.apps.googleusercontent.com",
+      "forceCodeForRefreshToken": true
+    }
+  }
+}

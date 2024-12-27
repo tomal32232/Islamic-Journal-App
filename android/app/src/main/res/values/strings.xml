@@ -1,0 +1,8 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Islamic Journal</string>
+    <string name="title_activity_main">Islamic Journal</string>
+    <string name="package_name">com.islamicjournal.app</string>
+    <string name="custom_url_scheme">com.islamicjournal.app</string>
+    <string name="server_client_id">398086636891-flpsa3do6ptr8utuq458ao093l0u3lsh.apps.googleusercontent.com</string>
+</resources>
