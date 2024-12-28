@@ -22,12 +22,17 @@ export async function getCurrentLocation() {
       const permissionStatus = await Geolocation.checkPermissions();
       console.log('Initial permission status:', permissionStatus);
       
-      if (permissionStatus.location !== 'granted') {
+      // Check if we have any required permission
+      const hasPermission = permissionStatus.location === 'granted' || permissionStatus.coarseLocation === 'granted';
+      
+      if (!hasPermission) {
         console.log('Requesting location permission...');
         const requestResult = await Geolocation.requestPermissions();
         console.log('Permission request result:', requestResult);
         
-        if (requestResult.location !== 'granted') {
+        // Check if either permission was granted
+        const wasGranted = requestResult.location === 'granted' || requestResult.coarseLocation === 'granted';
+        if (!wasGranted) {
           throw new Error('Location permission was denied');
         }
       }
@@ -41,8 +46,7 @@ export async function getCurrentLocation() {
         const position = await Geolocation.getCurrentPosition({
           enableHighAccuracy: true,
           timeout: 30000, // 30 seconds timeout for GPS fix
-          maximumAge: 0,
-          requireAltitude: false
+          maximumAge: 0
         });
         
         console.log('High accuracy position received:', position);
@@ -53,18 +57,21 @@ export async function getCurrentLocation() {
           console.log('Location accuracy too low, waiting for better fix...');
           // Wait 2 seconds and try again
           await new Promise(resolve => setTimeout(resolve, 2000));
-          const secondAttempt = await Geolocation.getCurrentPosition({
+          const betterPosition = await Geolocation.getCurrentPosition({
             enableHighAccuracy: true,
             timeout: 10000,
-            maximumAge: 0,
-            requireAltitude: false
+            maximumAge: 0
           });
-          console.log('Second attempt position:', secondAttempt);
-          console.log('Second attempt accuracy (meters):', secondAttempt.coords.accuracy);
+          console.log('Second attempt position:', betterPosition);
+          console.log('Second attempt accuracy (meters):', betterPosition.coords.accuracy);
           
           // Use the more accurate position
-          if (secondAttempt.coords.accuracy < position.coords.accuracy) {
-            position = secondAttempt;
+          if (betterPosition.coords.accuracy < position.coords.accuracy) {
+            return {
+              latitude: betterPosition.coords.latitude,
+              longitude: betterPosition.coords.longitude,
+              accuracy: betterPosition.coords.accuracy
+            };
           }
         }
         
@@ -83,8 +90,7 @@ export async function getCurrentLocation() {
         const position = await Geolocation.getCurrentPosition({
           enableHighAccuracy: false,
           timeout: 10000,
-          maximumAge: 0,
-          requireAltitude: false
+          maximumAge: 0
         });
         
         console.log('Low accuracy position received:', position);

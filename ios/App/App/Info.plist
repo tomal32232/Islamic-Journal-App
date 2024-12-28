@@ -56,5 +56,11 @@
 			<string>Google Auth</string>
 		</dict>
 	</array>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>We need your location to provide accurate prayer times based on your current position.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>We need your location to provide accurate prayer times based on your current position.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>We need your location to provide accurate prayer times based on your current position.</string>
 </dict>
 </plist>
