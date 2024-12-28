@@ -9,7 +9,7 @@
       "forceCodeForRefreshToken": true
     }
   },
-  "_devServer": {
+  "server": {
     "url": "http://192.168.0.112:5173",
     "cleartext": true
   }

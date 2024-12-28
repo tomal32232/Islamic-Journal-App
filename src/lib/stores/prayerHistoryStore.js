@@ -40,17 +40,22 @@ export async function initializeTodaysPrayers(prayers) {
     return;
   }
   
-  // Initialize prayers with 'upcoming' status
+  const now = new Date();
+  
+  // Initialize prayers with 'upcoming' status for future prayers and 'pending' for past prayers
   for (const prayer of prayers) {
     const prayerId = `${today}-${prayer.name.toLowerCase()}`;
     const prayerRef = doc(collection(db, 'prayer_history'));
+    
+    const prayerDateTime = getPrayerDateTime(today, prayer.time);
+    const status = prayerDateTime > now ? 'upcoming' : 'pending';
     
     await setDoc(prayerRef, {
       userId: user.uid,
       prayerId,
       prayerName: prayer.name,
       time: prayer.time,
-      status: 'upcoming',
+      status,
       date: today,
       timestamp: Timestamp.now()
     });
@@ -230,7 +235,7 @@ async function updateNormalPrayerStatus(prayer, todayStr, prayerTimes) {
       await savePrayerStatus({
         name: prayer,
         date: todayStr,
-        status: 'missed'
+        status: 'pending'
       });
     }
   }
@@ -342,10 +347,15 @@ export async function getPrayerHistory() {
   const user = auth.currentUser;
   if (!user) return { history: [], pendingByDate: {}, missedByDate: {} };
 
+  console.log('=== Getting Prayer History ===');
+  console.log('User ID:', user.uid);
+
   // Update prayer statuses first
   await updatePrayerStatuses();
 
   const today = new Date().toLocaleDateString('en-CA');
+  console.log('Today:', today);
+
   const historyQuery = query(
     collection(db, 'prayer_history'),
     where('userId', '==', user.uid),
@@ -353,31 +363,42 @@ export async function getPrayerHistory() {
   );
 
   const querySnapshot = await getDocs(historyQuery);
+  console.log('Total prayer records found:', querySnapshot.size);
+
   const history = [];
   const pendingByDate = {};
   const missedByDate = {};
 
   // Get active excused period first
   const activeExcusedPeriod = await getActiveExcusedPeriod();
+  console.log('Active excused period:', activeExcusedPeriod);
+
   const prayers = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
 
   querySnapshot.forEach(doc => {
     const prayer = doc.data();
     history.push(prayer);
     
+    console.log(`\nProcessing prayer: ${prayer.prayerName} for date ${prayer.date}`);
+    console.log('Prayer details:', {
+      id: doc.id,
+      ...prayer
+    });
+    
     const prayerDateTime = getPrayerDateTime(prayer.date, prayer.time);
     const now = new Date();
 
     // Only add to pending if:
-    // 1. Status is 'pending' or 'upcoming'
-    // 2. Prayer time has passed
-    // 3. Not in an excused period OR before start prayer in excused period
-    if ((prayer.status === 'pending' || prayer.status === 'upcoming') && prayerDateTime < now) {
+    // 1. Status is 'pending' or prayer time has passed and status is 'upcoming'
+    // 2. Not in an excused period OR before start prayer in excused period
+    if ((prayer.status === 'pending' || (prayer.status === 'upcoming' && prayerDateTime < now)) && prayerDateTime < now) {
       // Check if this prayer should be excused
       const shouldExcuse = activeExcusedPeriod && 
         prayer.date >= activeExcusedPeriod.startDate &&
         (prayer.date !== activeExcusedPeriod.startDate || 
          prayers.indexOf(prayer.prayerName) >= prayers.indexOf(activeExcusedPeriod.startPrayer));
+
+      console.log('Should excuse prayer:', shouldExcuse);
 
       if (!shouldExcuse) {
         const date = prayer.date;
@@ -388,7 +409,9 @@ export async function getPrayerHistory() {
           };
         }
         pendingByDate[date].prayers.push(prayer);
+        console.log('Added to pending prayers');
       } else {
+        console.log('Prayer will be marked as excused');
         // If prayer should be excused, update its status
         savePrayerStatus({
           name: prayer.prayerName,
@@ -408,6 +431,7 @@ export async function getPrayerHistory() {
         };
       }
       missedByDate[date].prayers.push(prayer);
+      console.log('Added to missed prayers');
     }
   });
 
@@ -428,7 +452,12 @@ export async function getPrayerHistory() {
     });
   });
 
-  console.log('Updated prayer history:', { history, pendingByDate, missedByDate });
+  console.log('\n=== Prayer History Summary ===');
+  console.log('Total prayers:', history.length);
+  console.log('Pending prayers by date:', pendingByDate);
+  console.log('Missed prayers by date:', missedByDate);
+  console.log('Full history:', history);
+
   prayerHistoryStore.set({ history, pendingByDate, missedByDate });
   return { history, pendingByDate, missedByDate };
 }
