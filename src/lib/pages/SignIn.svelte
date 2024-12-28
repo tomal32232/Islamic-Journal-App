@@ -51,7 +51,20 @@
 
   // Initialize Google Auth when the component mounts
   if (Capacitor.isNativePlatform()) {
-    GoogleAuth.initialize()
+    const platform = Capacitor.getPlatform();
+    const initOptions = platform === 'ios' 
+      ? {
+          clientId: '398086636891-f4e9nj7i8v5q4mep1thflr426obr8dd2.apps.googleusercontent.com',
+          scopes: ['profile', 'email'],
+          grantOfflineAccess: true,
+        }
+      : {
+          // Android will use the configuration from capacitor.config.json
+          scopes: ['profile', 'email'],
+          grantOfflineAccess: true,
+        };
+
+    GoogleAuth.initialize(initOptions)
       .then(() => console.log('Google Auth initialized successfully'))
       .catch(error => {
         console.error('Failed to initialize Google Auth:', error);
