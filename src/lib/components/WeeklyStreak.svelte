@@ -37,7 +37,7 @@
         <div class="bar-container">
           <div 
             class="bar {isToday ? 'today' : ''} {count > 0 ? 'has-count' : ''}" 
-            style="height: {count ? Math.max(count / 100 * 100, 25) : 4}%"
+            style="height: {count ? Math.min(Math.max(count / 100 * 100, 25), 100) : 4}%"
           >
             {#if count > 0}
               <span class="count">{count}</span>
@@ -132,6 +132,7 @@
     display: flex;
     align-items: flex-end;
     justify-content: center;
+    overflow: hidden;
   }
 
   .bar {
@@ -143,6 +144,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    max-height: 50px;
   }
 
   .bar.has-count {
