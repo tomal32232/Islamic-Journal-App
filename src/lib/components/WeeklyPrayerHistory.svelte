@@ -6,7 +6,7 @@
     getPrayerDateTime,
     shouldMarkPrayerExcused 
   } from '../stores/prayerHistoryStore';
-  import { prayerTimesStore } from '../stores/prayerTimes';
+  import { prayerTimesStore, fetchPrayerTimes } from '../stores/prayerTimes';
   import { iconMap } from '../utils/icons';
   import { auth } from '../firebase';
 
@@ -14,7 +14,8 @@
   let weeklyStats = {
     ontime: 0,
     late: 0,
-    missed: 0
+    missed: 0,
+    excused: 0
   };
   
   function getCurrentWeekDays() {
@@ -112,13 +113,31 @@
               weeklyStats.excused++;
             }
           } else if (day.date === todayStr) {
-            // Handle today's prayers
-            if (prayerDateTime < now) {
-              // Past prayer for today - show as pending with outline
-              status = 'pending';
+            // For today's prayers
+            const currentTime = new Date();
+            const prayerData = $prayerTimesStore.find(p => p.name === prayer);
+            
+            if (!prayerData || !prayerData.time) {
+              console.log(`No prayer time data available for ${prayer}`);
+              status = 'none';
             } else {
-              // Upcoming prayer for today
-              status = 'upcoming';
+              const prayerTime = prayerData.time;
+              console.log(`Processing ${prayer} - Current time: ${currentTime}, Prayer time: ${prayerTime}`);
+              
+              // Parse the prayer time (expecting HH:mm format from API)
+              const [hours, minutes] = prayerTime.split(':');
+              const prayerDate = new Date();
+              prayerDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+              
+              if (currentTime > prayerDate) {
+                // Past prayer for today - show as pending
+                status = 'pending';
+                console.log(`${prayer} is past time - setting to pending`);
+              } else {
+                // Future prayer for today - show as none
+                status = 'none';
+                console.log(`${prayer} is upcoming - setting to none`);
+              }
             }
           } else if (day.date < todayStr) {
             // Past days - mark as missed if after account creation
@@ -155,7 +174,10 @@
 
   onMount(async () => {
     console.log('WeeklyPrayerHistory mounted');
-    await getPrayerHistory();
+    await Promise.all([
+      getPrayerHistory(),
+      fetchPrayerTimes()
+    ]);
     console.log('Prayer history:', $prayerHistoryStore);
     await updateGrid();
   });
