@@ -14,6 +14,7 @@ import {
 import { db } from '../firebase';
 import { prayerTimesStore } from './prayerTimes';
 import { updatePrayerProgress } from '../services/badgeProgressService';
+import { onMount } from 'svelte';
 
 export const prayerHistoryStore = writable({
   pendingByDate: {},
@@ -21,47 +22,115 @@ export const prayerHistoryStore = writable({
   history: []
 });
 
+// Add this function to ensure prayers are initialized
+export async function ensurePrayerData() {
+  const user = auth.currentUser;
+  if (!user) return;
+
+  // Get the last check timestamp from localStorage
+  const lastCheck = localStorage.getItem('lastPrayerDataCheck');
+  const today = new Date().toLocaleDateString('en-CA');
+  
+  // If we haven't checked today, initialize prayers
+  if (lastCheck !== today) {
+    console.log('Initializing prayer data for the next 7 days');
+    const prayers = [
+      { name: 'Fajr', time: '', icon: 'SunDim', weight: 'regular' },
+      { name: 'Dhuhr', time: '', icon: 'Sun', weight: 'fill' },
+      { name: 'Asr', time: '', icon: 'CloudSun', weight: 'regular' },
+      { name: 'Maghrib', time: '', icon: 'SunHorizon', weight: 'regular' },
+      { name: 'Isha', time: '', icon: 'MoonStars', weight: 'regular' }
+    ];
+
+    // Get current prayer times
+    const prayerTimes = get(prayerTimesStore);
+    if (prayerTimes && prayerTimes.length > 0) {
+      prayers.forEach((prayer, index) => {
+        prayer.time = prayerTimes[index]?.time || '';
+      });
+    }
+
+    await initializeTodaysPrayers(prayers);
+    localStorage.setItem('lastPrayerDataCheck', today);
+  }
+}
+
 // Initialize today's prayers in Firestore
 export async function initializeTodaysPrayers(prayers) {
   const user = auth.currentUser;
   if (!user) return;
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = new Date().toLocaleDateString('en-CA');
+  
+  // Initialize next 7 days of prayers
+  const dates = [];
+  for (let i = 0; i < 7; i++) {
+    const date = new Date();
+    date.setDate(date.getDate() + i);
+    dates.push(date.toLocaleDateString('en-CA'));
+  }
+
+  console.log('Initializing prayers for dates:', dates);
+
+  // Check existing prayers for these dates
+  const existingPrayers = new Set();
+  const batch = [];
+
+  // Query all existing prayers for these dates at once
   const historyQuery = query(
     collection(db, 'prayer_history'),
     where('userId', '==', user.uid),
-    where('date', '==', today)
+    where('date', 'in', dates)
   );
 
-  // Check if prayers are already initialized for today
   const snapshot = await getDocs(historyQuery);
-  if (!snapshot.empty) {
-    console.log('Prayers already initialized for today');
-    return;
-  }
-  
+  snapshot.forEach(doc => {
+    existingPrayers.add(`${doc.data().date}-${doc.data().prayerName.toLowerCase()}`);
+  });
+
   const now = new Date();
-  
-  // Initialize prayers with 'upcoming' status for future prayers and 'pending' for past prayers
-  for (const prayer of prayers) {
-    const prayerId = `${today}-${prayer.name.toLowerCase()}`;
-    const prayerRef = doc(collection(db, 'prayer_history'));
-    
-    const prayerDateTime = getPrayerDateTime(today, prayer.time);
-    const status = prayerDateTime > now ? 'upcoming' : 'pending';
-    
-    await setDoc(prayerRef, {
-      userId: user.uid,
-      prayerId,
-      prayerName: prayer.name,
-      time: prayer.time,
-      status,
-      date: today,
-      timestamp: Timestamp.now()
-    });
+
+  // Initialize prayers for each date
+  for (const date of dates) {
+    for (const prayer of prayers) {
+      const prayerId = `${date}-${prayer.name.toLowerCase()}`;
+      
+      // Skip if prayer already exists
+      if (existingPrayers.has(prayerId)) {
+        console.log(`Prayer already exists: ${prayerId}`);
+        continue;
+      }
+
+      const prayerRef = doc(collection(db, 'prayer_history'));
+      const prayerDateTime = getPrayerDateTime(date, prayer.time);
+      
+      // For today's prayers, set status based on current time
+      // For future days, set as upcoming
+      const status = date === today && prayerDateTime < now ? 'pending' : 'upcoming';
+      
+      console.log(`Creating new prayer: ${prayerId} with status: ${status}`);
+      batch.push(
+        setDoc(prayerRef, {
+          userId: user.uid,
+          prayerId,
+          prayerName: prayer.name,
+          time: prayer.time,
+          status,
+          date,
+          timestamp: Timestamp.now()
+        })
+      );
+    }
   }
 
-  await getPrayerHistory();
+  // Execute all updates
+  if (batch.length > 0) {
+    console.log(`Executing batch update for ${batch.length} prayers`);
+    await Promise.all(batch);
+    await getPrayerHistory();
+  } else {
+    console.log('No new prayers to initialize');
+  }
 }
 
 export async function initializeMonthlyPrayers(prayers) {
@@ -250,80 +319,53 @@ export async function savePrayerStatus(prayerData) {
     return;
   }
 
-  console.log('=== Saving Prayer Status ===');
-  console.log('Prayer Data:', prayerData);
-  
-  const today = new Date().toLocaleDateString('en-CA');
-  const prayerDate = prayerData.date || today;
-  const prayerId = `${prayerDate}-${prayerData.name.toLowerCase()}`;
-  
-  console.log('Generated prayerId:', prayerId);
-  console.log('Date:', prayerDate);
-
-  // Query to find existing prayer document
-  const prayerQuery = query(
-    collection(db, 'prayer_history'),
-    where('userId', '==', user.uid),
-    where('prayerId', '==', prayerId)
-  );
-
-  const querySnapshot = await getDocs(prayerQuery);
-  console.log('Found existing prayer:', !querySnapshot.empty);
-  
   try {
-    if (!querySnapshot.empty) {
-      // Update existing prayer document
-      const docRef = querySnapshot.docs[0].ref;
-      const updateData = {
-        ...querySnapshot.docs[0].data(),
-        status: prayerData.status,
-        timestamp: Timestamp.now()
-      };
-      console.log('Updating prayer with data:', updateData);
-      await setDoc(docRef, updateData, { merge: true });
-      
-      // Immediately update the store to reflect changes
-      const currentStore = get(prayerHistoryStore);
-      console.log('Current store state:', currentStore);
-      
-      const updatedPendingByDate = { ...currentStore.pendingByDate };
-      
-      // Remove the prayer from pending if it exists
-      Object.keys(updatedPendingByDate).forEach(date => {
-        updatedPendingByDate[date].prayers = updatedPendingByDate[date].prayers.filter(
-          p => p.prayerId !== prayerId
-        );
-        // Remove the date entry if no prayers left
-        if (updatedPendingByDate[date].prayers.length === 0) {
-          delete updatedPendingByDate[date];
-        }
-      });
-      
-      prayerHistoryStore.set({
-        ...currentStore,
-        pendingByDate: updatedPendingByDate
-      });
+    const prayerId = `${prayerData.date}-${prayerData.name.toLowerCase()}`;
+    const prayerRef = doc(collection(db, 'prayer_history'));
 
-      // Update badge progress after saving prayer status
-      console.log('Updating badge progress');
-      updatePrayerProgress();
+    // Save to Firestore
+    await setDoc(prayerRef, {
+      userId: user.uid,
+      prayerId,
+      prayerName: prayerData.name,
+      time: prayerData.time || '',
+      status: prayerData.status,
+      date: prayerData.date,
+      timestamp: Timestamp.now()
+    });
+
+    // Update local store
+    const store = get(prayerHistoryStore);
+    
+    // Update history
+    const historyIndex = store.history.findIndex(
+      p => p.date === prayerData.date && p.prayerName === prayerData.name
+    );
+    
+    if (historyIndex >= 0) {
+      store.history[historyIndex] = {
+        ...store.history[historyIndex],
+        ...prayerData
+      };
     } else {
-      // If not found (shouldn't happen normally), create new
-      console.log('Creating new prayer record');
-      const prayerRef = doc(collection(db, 'prayer_history'));
-      await setDoc(prayerRef, {
-        userId: user.uid,
-        prayerId,
-        prayerName: prayerData.name,
-        time: prayerData.time,
-        status: prayerData.status,
-        date: prayerDate,
-        timestamp: Timestamp.now()
-      });
+      store.history.push(prayerData);
     }
 
-    console.log('Prayer status saved, updating history');
-    await getPrayerHistory();
+    // Remove from pendingByDate if status is final
+    if (['ontime', 'late', 'missed', 'excused'].includes(prayerData.status)) {
+      if (store.pendingByDate[prayerData.date]) {
+        store.pendingByDate[prayerData.date].prayers = 
+          store.pendingByDate[prayerData.date].prayers.filter(
+            p => p.prayerName !== prayerData.name
+          );
+      }
+    }
+
+    prayerHistoryStore.set(store);
+    
+    // Update badges if needed
+    await updatePrayerProgress();
+    
   } catch (error) {
     console.error('Error saving prayer status:', error);
     throw error;

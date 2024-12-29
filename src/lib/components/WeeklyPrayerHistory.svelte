@@ -132,7 +132,17 @@
               if (currentTime > prayerDate) {
                 // Past prayer for today - show as pending
                 status = 'pending';
-                console.log(`${prayer} is past time - setting to pending`);
+                // Add to pendingByDate for notification
+                if (!$prayerHistoryStore.pendingByDate[day.date]) {
+                  $prayerHistoryStore.pendingByDate[day.date] = { prayers: [] };
+                }
+                if (!$prayerHistoryStore.pendingByDate[day.date].prayers.some(p => p.prayerName === prayer)) {
+                  $prayerHistoryStore.pendingByDate[day.date].prayers.push({
+                    prayerName: prayer,
+                    time: prayerTime
+                  });
+                }
+                console.log(`${prayer} is past time - setting to pending with notification`);
               } else {
                 // Future prayer for today - show as none
                 status = 'none';

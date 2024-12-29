@@ -11,14 +11,22 @@
   import Journal from './lib/pages/Journal.svelte';
   import Prayer from './lib/pages/Prayer.svelte';
   import BottomNav from './lib/components/BottomNav.svelte';
+  import { ensurePrayerData } from './lib/stores/prayerHistoryStore';
 
   let user = null;
   let activeTab = 'home';
 
   onMount(() => {
-    auth.onAuthStateChanged((authUser) => {
-      user = authUser;
+    // Listen for auth state changes
+    const unsubscribe = auth.onAuthStateChanged(async (authUser) => {
+      user = authUser; // Set the user variable
+      if (user) {
+        // Ensure prayer data is initialized when user logs in
+        await ensurePrayerData();
+      }
     });
+
+    return () => unsubscribe();
   });
 
   function handleTabChange(event) {
