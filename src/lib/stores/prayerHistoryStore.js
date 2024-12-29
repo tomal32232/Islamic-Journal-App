@@ -321,7 +321,26 @@ export async function savePrayerStatus(prayerData) {
 
   try {
     const prayerId = `${prayerData.date}-${prayerData.name.toLowerCase()}`;
-    const prayerRef = doc(collection(db, 'prayer_history'));
+    
+    // Query to find the existing prayer document
+    const prayerQuery = query(
+      collection(db, 'prayer_history'),
+      where('userId', '==', user.uid),
+      where('prayerId', '==', prayerId)
+    );
+
+    const querySnapshot = await getDocs(prayerQuery);
+    let prayerRef;
+
+    if (!querySnapshot.empty) {
+      // Update existing document
+      prayerRef = querySnapshot.docs[0].ref;
+      console.log('Updating existing prayer document:', prayerId);
+    } else {
+      // Create new document only if it doesn't exist
+      prayerRef = doc(collection(db, 'prayer_history'));
+      console.log('Creating new prayer document:', prayerId);
+    }
 
     // Save to Firestore
     await setDoc(prayerRef, {
@@ -332,7 +351,7 @@ export async function savePrayerStatus(prayerData) {
       status: prayerData.status,
       date: prayerData.date,
       timestamp: Timestamp.now()
-    });
+    }, { merge: true });
 
     // Update local store
     const store = get(prayerHistoryStore);
@@ -358,6 +377,11 @@ export async function savePrayerStatus(prayerData) {
           store.pendingByDate[prayerData.date].prayers.filter(
             p => p.prayerName !== prayerData.name
           );
+        
+        // Remove the date if no prayers left
+        if (store.pendingByDate[prayerData.date].prayers.length === 0) {
+          delete store.pendingByDate[prayerData.date];
+        }
       }
     }
 
@@ -430,10 +454,17 @@ export async function getPrayerHistory() {
     const prayerDateTime = getPrayerDateTime(prayer.date, prayer.time);
     const now = new Date();
 
+    // Skip if prayer is already marked as ontime, late, or excused
+    if (['ontime', 'late', 'excused'].includes(prayer.status)) {
+      console.log(`Prayer ${prayer.prayerName} is already marked as ${prayer.status}, skipping`);
+      return;
+    }
+
     // Only add to pending if:
     // 1. Status is 'pending' or prayer time has passed and status is 'upcoming'
     // 2. Not in an excused period OR before start prayer in excused period
-    if ((prayer.status === 'pending' || (prayer.status === 'upcoming' && prayerDateTime < now)) && prayerDateTime < now) {
+    if ((prayer.status === 'pending' || (prayer.status === 'upcoming' && prayerDateTime < now)) && 
+        prayerDateTime < now) {
       // Check if this prayer should be excused
       const shouldExcuse = activeExcusedPeriod && 
         prayer.date >= activeExcusedPeriod.startDate &&
@@ -450,8 +481,19 @@ export async function getPrayerHistory() {
             prayers: []
           };
         }
-        pendingByDate[date].prayers.push(prayer);
-        console.log('Added to pending prayers');
+        // Double check that prayer isn't already marked before adding to pending
+        const existingPrayer = history.find(p => 
+          p.date === prayer.date && 
+          p.prayerName === prayer.prayerName && 
+          ['ontime', 'late', 'excused'].includes(p.status)
+        );
+        
+        if (!existingPrayer && !pendingByDate[date].prayers.some(p => p.prayerId === prayer.prayerId)) {
+          pendingByDate[date].prayers.push(prayer);
+          console.log('Added to pending prayers');
+        } else {
+          console.log('Prayer is already marked or in pending list, skipping');
+        }
       } else {
         console.log('Prayer will be marked as excused');
         // If prayer should be excused, update its status
