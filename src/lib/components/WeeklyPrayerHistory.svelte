@@ -56,7 +56,7 @@
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const sevenDaysAgo = new Date(today);
-    sevenDaysAgo.setDate(today.getDate() - 6); // -6 because we want to include today
+    sevenDaysAgo.setDate(today.getDate() - 6);
 
     // Get user's account creation date with exact time
     const user = auth.currentUser;
@@ -101,7 +101,7 @@
             else if (status === 'missed') weeklyStats.missed++;
             else if (status === 'excused') weeklyStats.excused++;
           }
-        } else if (day.date < todayStr || (day.date === todayStr && prayerDateTime < now)) {
+        } else {
           // Check if the prayer should be excused before marking as missed
           const isExcused = await shouldMarkPrayerExcused(day.date, prayer);
           console.log(`No record found. Checking if should be excused: ${isExcused}`);
@@ -111,28 +111,29 @@
             if (prayerDate >= sevenDaysAgo && prayerDate <= today) {
               weeklyStats.excused++;
             }
-          } else {
-            // Only mark as missed if it's today or yesterday and after account creation
-            const yesterday = new Date();
-            yesterday.setDate(yesterday.getDate() - 1);
-            yesterday.setHours(0, 0, 0, 0);
-            
-            // Check if the prayer time is after account creation time
-            console.log(`Prayer date time: ${prayerDateTime}, Account creation time: ${accountCreationDateTime}`);
+          } else if (day.date === todayStr) {
+            // Handle today's prayers
+            if (prayerDateTime < now) {
+              // Past prayer for today - show as pending with outline
+              status = 'pending';
+            } else {
+              // Upcoming prayer for today
+              status = 'upcoming';
+            }
+          } else if (day.date < todayStr) {
+            // Past days - mark as missed if after account creation
             if (prayerDateTime >= accountCreationDateTime) {
-              if (prayerDate >= yesterday) {
-                status = 'missed';
-                if (prayerDate >= sevenDaysAgo && prayerDate <= today) {
-                  weeklyStats.missed++;
-                }
-              } else {
-                status = 'pending';
+              status = 'missed';
+              if (prayerDate >= sevenDaysAgo) {
+                weeklyStats.missed++;
               }
             } else {
-              // If prayer time is before account creation, mark as pending
-              status = 'pending';
-              console.log(`Prayer ${prayer} on ${day.date} at ${prayerTime} was before account creation`);
+              // If before account creation, show nothing
+              status = 'none';
             }
+          } else {
+            // Future days
+            status = 'none';
           }
         }
 
@@ -233,6 +234,10 @@
     <div class="legend-item">
       <div class="status-dot missed"></div>
       <span>Missed</span>
+    </div>
+    <div class="legend-item">
+      <div class="status-dot upcoming"></div>
+      <span>Upcoming</span>
     </div>
     <div class="legend-item">
       <div class="status-dot excused"></div>
@@ -342,9 +347,24 @@
     border-color: #EF4444;
   }
 
+  .status-dot.upcoming {
+    background: white;
+    border: 1.5px solid #216974;
+  }
+
   .status-dot.pending {
     background: white;
-    border: 1.5px solid #eee;
+    border: 2px solid #216974;
+  }
+
+  .status-dot.none {
+    background: transparent;
+    border-color: #eee;
+  }
+
+  .status-dot.excused {
+    background: #9CA3AF;
+    border-color: #9CA3AF;
   }
 
   .legend {
@@ -434,10 +454,5 @@
     .stat-label {
       font-size: 0.75rem;
     }
-  }
-
-  .status-dot.excused {
-    background: #9CA3AF;
-    border-color: #9CA3AF;
   }
 </style>
