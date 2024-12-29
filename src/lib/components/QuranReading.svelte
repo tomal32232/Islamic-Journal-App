@@ -349,7 +349,7 @@
             on:change={handleSurahSelect}
             disabled={loading || isLoadingSurah}
           >
-            <option value="">Select a Surah</option>
+            <option value="" selected={!selectedSurah}>Select a Surah</option>
             {#each surahList as surah}
               <option value={surah.number}>
                 {surah.number}. {surah.englishName} ({surah.name})
