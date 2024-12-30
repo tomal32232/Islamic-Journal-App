@@ -15,6 +15,7 @@
 
   let user = null;
   let activeTab = 'home';
+  let isCounterMode = false;
 
   onMount(() => {
     // Listen for auth state changes
@@ -36,6 +37,10 @@
   function navigateTo(page) {
     activeTab = page;
   }
+
+  function handleCounterModeChange(event) {
+    isCounterMode = event.detail.isCounterMode;
+  }
 </script>
 
 {#if user}
@@ -54,7 +59,7 @@
       {:else if activeTab === 'profile'}
         <Profile {navigateTo} />
       {:else if activeTab === 'tasbih'}
-        <Tasbih />
+        <Tasbih on:countermodechange={handleCounterModeChange} />
       {:else if activeTab === 'journal'}
         <Journal />
       {:else if activeTab === 'prayer'}
@@ -63,7 +68,9 @@
         <Home />
       {/if}
     </main>
-    <BottomNav {activeTab} on:tabChange={handleTabChange} />
+    {#if !isCounterMode}
+      <BottomNav {activeTab} on:tabChange={handleTabChange} />
+    {/if}
   </div>
 {:else}
   <main>

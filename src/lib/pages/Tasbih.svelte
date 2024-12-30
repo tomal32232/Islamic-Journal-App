@@ -1,8 +1,10 @@
 <script>
   import { writable } from 'svelte/store';
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount, onDestroy, createEventDispatcher } from 'svelte';
   import { saveTasbihSession, getWeeklyStats, weeklyStatsStore } from '../stores/tasbihStore';
   import { updateDhikrProgress, updateDhikrStreak } from '../services/badgeProgressService';
+
+  const dispatch = createEventDispatcher();
 
   const dhikrOptions = [
     { arabic: 'سُبْحَانَ ٱللَّٰهِ', latin: 'SubhanAllah', meaning: 'Glory be to Allah' },
@@ -41,6 +43,7 @@
 
   function startCounter() {
     isCounterMode = true;
+    dispatch('countermodechange', { isCounterMode: true });
   }
 
   async function saveSession() {
@@ -64,6 +67,7 @@
     await saveSession();
     isCounterMode = false;
     count = 0;
+    dispatch('countermodechange', { isCounterMode: false });
   }
 
   function increment() {
