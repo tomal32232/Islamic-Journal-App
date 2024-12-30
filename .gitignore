@@ -27,3 +27,13 @@ dist-ssr
 .env.local
 .env.development
 .env.production
+
+# Built assets
+www/assets/*
+
+# iOS configuration
+ios/App/App/GoogleService-Info.plist
+
+# Android configuration
+android/app/google-services.json
+android/google-services.json
