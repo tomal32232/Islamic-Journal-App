@@ -44,8 +44,18 @@
   }
 
   function handleTabChange(event) {
+    const previousPage = currentPage;
     currentPage = event.detail;
-    if (currentPage === 'home') {
+    if (currentPage === 'home' && previousPage === 'tasbih') {
+      // Explicitly refresh weekly stats when coming from tasbih page
+      weeklyStatsStore.set({ dailyCounts: [], streak: 0 }); // Reset store first
+      getWeeklyStats().then((stats) => {
+        if (stats?.dailyCounts) {
+          const todayCount = stats.dailyCounts.find(day => day.isToday);
+          todayTasbihCount = todayCount ? todayCount.count : 0;
+        }
+      });
+    } else if (currentPage === 'home') {
       updateStats();
     }
   }
@@ -58,11 +68,6 @@
         p.date === today && (p.status === 'ontime' || p.status === 'late' || p.status === 'excused')
       );
       completedPrayersToday = todayPrayers.length;
-    }
-
-    if ($weeklyStatsStore?.dailyCounts) {
-      const todayCount = $weeklyStatsStore.dailyCounts.find(day => day.isToday);
-      todayTasbihCount = todayCount ? todayCount.count : 0;
     }
   }
 
@@ -195,11 +200,6 @@
         p.date === today && (p.status === 'ontime' || p.status === 'late' || p.status === 'excused')
       );
       completedPrayersToday = todayPrayers.length;
-    }
-
-    if ($weeklyStatsStore?.dailyCounts) {
-      const todayCount = $weeklyStatsStore.dailyCounts.find(day => day.isToday);
-      todayTasbihCount = todayCount ? todayCount.count : 0;
     }
   }
 
@@ -384,6 +384,12 @@
         await loadWeekMoods();
         await updateExcusedStatus();
         updatePrayerStatus();
+        // Get initial weekly stats
+        const stats = await getWeeklyStats();
+        if (stats?.dailyCounts) {
+          const todayCount = stats.dailyCounts.find(day => day.isToday);
+          todayTasbihCount = todayCount ? todayCount.count : 0;
+        }
       }
     });
 

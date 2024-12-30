@@ -37,12 +37,16 @@ function getTypeStyles(type) {
 <style>
   .toast-container {
     position: fixed;
-    top: 1rem;
-    right: 1rem;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
     z-index: 50;
     display: flex;
     align-items: center;
+    justify-content: center;
     pointer-events: none;
+    width: auto;
+    max-width: 90%;
   }
 
   .toast {
@@ -54,6 +58,7 @@ function getTypeStyles(type) {
     border: 1px solid;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     pointer-events: auto;
+    background: white;
   }
 
   .close-button {
