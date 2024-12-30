@@ -281,6 +281,7 @@
     max-width: 600px;
     margin: 0 auto;
     padding: 0 1rem;
+    box-sizing: border-box;
   }
 
   h1 {
@@ -291,10 +292,18 @@
     color: #216974;
     font-size: 1.5rem;
     font-weight: 600;
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .badge-count {
     text-align: right;
+    min-width: 80px;
+    max-width: 120px;
+    overflow: hidden;
   }
 
   .badge-count .count {
@@ -302,13 +311,19 @@
     font-size: 1.25rem;
     font-weight: 600;
     color: #216974;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .badge-count .label {
     display: block;
-    font-size: 0.875rem;
+    font-size: 0.75rem;
     color: #216974;
     opacity: 0.8;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .filters {
