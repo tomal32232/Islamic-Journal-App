@@ -83,10 +83,39 @@
   });
 
   function getGreeting() {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'Good morning';
-    if (hour < 17) return 'Good afternoon';
-    return 'Good evening';
+    // First check if store is initialized
+    if (!$journalStore || !$journalStore.streak) {
+      return "Welcome to your journal";
+    }
+
+    const { morning, evening } = $journalStore.streak;
+
+    // Both reflections completed
+    if (morning && evening) {
+      return "Great job completing your reflections today!";
+    }
+    // Only morning completed
+    else if (morning && !evening) {
+      return "Morning reflection complete! Don't forget to reflect on your day later.";
+    }
+    // Only evening completed
+    else if (!morning && evening) {
+      return "Evening reflection complete! See you tomorrow morning.";
+    }
+    // No reflections completed - show time-based messages
+    else {
+      const hour = new Date().getHours();
+      const isMorningTime = hour >= 5 && hour < 12;
+      const isEveningTime = hour >= 17;
+
+      if (isMorningTime) {
+        return "It's time for your morning reflection";
+      } else if (isEveningTime) {
+        return "Time to reflect on your day";
+      } else {
+        return "How is your day going?";
+      }
+    }
   }
 
   let currentQuestionIndex = 0;
