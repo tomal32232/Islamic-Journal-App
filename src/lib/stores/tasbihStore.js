@@ -10,6 +10,7 @@ import {
   Timestamp 
 } from 'firebase/firestore';
 import { db } from '../firebase';
+import { updateDhikrProgress, updateDhikrStreak } from '../services/badgeProgressService';
 
 export const weeklyStatsStore = writable({
   dailyCounts: [],
@@ -31,7 +32,20 @@ export async function saveTasbihSession(sessionData) {
   });
 
   // Update weekly stats after saving
-  await getWeeklyStats();
+  const stats = await getWeeklyStats();
+  
+  // Get today's total count from the stats
+  const todayCount = stats.dailyCounts.find(day => day.isToday)?.count || 0;
+  
+  // Update badge progress with today's total count
+  updateDhikrProgress(todayCount);
+  updateDhikrStreak(stats.currentStreak);
+
+  // Update store
+  weeklyStatsStore.set({
+    dailyCounts: stats.dailyCounts,
+    streak: stats.currentStreak
+  });
 }
 
 export async function getWeeklyStats() {
@@ -39,9 +53,9 @@ export async function getWeeklyStats() {
   if (!user) return;
 
   const today = new Date();
+  today.setHours(0, 0, 0, 0); // Normalize to start of day
   const startDate = new Date(today);
   startDate.setDate(today.getDate() - 6); // Go back 6 days to get last 7 days including today
-  startDate.setHours(0, 0, 0, 0);
 
   const sessionsQuery = query(
     collection(db, 'tasbih_sessions'),
@@ -60,14 +74,16 @@ export async function getWeeklyStats() {
   for (let i = 6; i >= 0; i--) { // Count backwards from 6 to 0 to get last 7 days
     const date = new Date(today);
     date.setDate(today.getDate() - i);
+    date.setHours(0, 0, 0, 0); // Normalize to start of day
     const dayStr = date.toLocaleDateString('en-US', { weekday: 'short' });
     const dateStr = date.getDate();
     
+    // Get all sessions for this day
     const dayCount = sessions
       .filter(session => {
         const sessionDate = session.timestamp.toDate();
-        return sessionDate.getDate() === date.getDate() &&
-               sessionDate.getMonth() === date.getMonth();
+        sessionDate.setHours(0, 0, 0, 0); // Normalize to start of day
+        return sessionDate.getTime() === date.getTime();
       })
       .reduce((sum, session) => sum + session.totalCount, 0);
 
@@ -80,8 +96,11 @@ export async function getWeeklyStats() {
   }
 
   const stats = calculateStreakStats(dailyCounts);
-  weeklyStatsStore.set(stats);
-  return stats;
+  return {
+    dailyCounts,
+    currentStreak: stats.currentStreak,
+    totalDays: stats.totalDays
+  };
 }
 
 function calculateStreakStats(dailyCounts) {
@@ -103,7 +122,6 @@ function calculateStreakStats(dailyCounts) {
 
   return {
     currentStreak: daysWithDhikr,
-    totalDays,
-    dailyCounts
+    totalDays
   };
 } 
