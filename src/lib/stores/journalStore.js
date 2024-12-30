@@ -123,22 +123,24 @@ function createJournalStore() {
       date: null 
     }));
 
-    // First, add completed days in sequence
+    // First, add completed days in sequence, but only up to 7 days total
     let progressIndex = 0;
+    let completedDaysShown = 0;
     dailyProgress.forEach((day) => {
-      if (day.morning && day.evening) {
+      if (day.morning && day.evening && completedDaysShown < 7) {
         sortedProgress[progressIndex] = {
           morning: true,
           evening: true,
           date: day.date
         };
         progressIndex++;
+        completedDaysShown++;
       }
     });
 
     // Add today's progress if it's morning-only
     const todayProgress = dailyProgress[dailyProgress.length - 1];
-    if (todayProgress.morning && !todayProgress.evening) {
+    if (todayProgress.morning && !todayProgress.evening && completedDaysShown < 7) {
       sortedProgress[progressIndex] = {
         morning: true,
         evening: false,

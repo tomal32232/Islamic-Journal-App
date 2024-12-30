@@ -121,6 +121,7 @@
     padding: 0.5rem;
     max-width: 1200px;
     margin: 0 auto;
+    margin-bottom: 4rem;
   }
 
   .tabs {

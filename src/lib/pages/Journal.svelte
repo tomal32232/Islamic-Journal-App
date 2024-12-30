@@ -26,7 +26,7 @@
 
   function getChallengeMessage() {
     const completedDays = $journalStore.completedDays;
-    const totalCompletedDays = Math.min(completedDays, 7); // Cap at 7 for the challenge
+    const totalCompletedDays = Math.min(completedDays, 7); // Cap at 7 for the challenge display
 
     switch(totalCompletedDays) {
       case 0:
@@ -44,7 +44,7 @@
       case 6:
         return "One final day! You've come so far, finish strong!";
       case 7:
-        return "Congratulations! You've completed the challenge! Ready for another week of growth?";
+        return "Congratulations! You've completed the challenge! Keep going for another milestone!";
       default:
         return "One day at a time, one step closer to a better you";
     }
@@ -315,8 +315,7 @@
         <div class="progress-circle">
           <div class="circle-content">
             <div 
-              class="circle-number {$journalStore.dailyProgress[i]?.morning && !$journalStore.dailyProgress[i]?.evening ? 'morning-only' : ''} 
-                {$journalStore.dailyProgress[i]?.morning && $journalStore.dailyProgress[i]?.evening ? 'completed' : ''}"
+              class="circle-number {i < Math.min($journalStore.completedDays, 7) ? 'completed' : ''}"
             >
               {i + 1}
             </div>
