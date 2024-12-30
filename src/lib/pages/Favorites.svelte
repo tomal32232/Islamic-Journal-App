@@ -1,10 +1,11 @@
 <script>
   import { onMount } from 'svelte';
-  import { favoritesStore, getFavorites } from '../services/favoriteService';
-  import { Book, ArrowLeft } from 'phosphor-svelte';
+  import { favoritesStore, getFavorites, removeFavorite } from '../services/favoriteService';
+  import { Book, ArrowLeft, Trash } from 'phosphor-svelte';
   import { currentPage } from '../stores/pageStore';
 
   let isLoading = false;
+  let isDeleting = false;
 
   // Subscribe to favorites store
   $: favoriteVerses = $favoritesStore || [];
@@ -14,6 +15,19 @@
     await getFavorites();
     isLoading = false;
   });
+
+  async function handleDelete(verse) {
+    if (isDeleting) return;
+    
+    try {
+      isDeleting = true;
+      await removeFavorite(verse.surahNumber, verse.verseNumber);
+    } catch (error) {
+      console.error('Error deleting favorite:', error);
+    } finally {
+      isDeleting = false;
+    }
+  }
 
   export let onBack;
 </script>
@@ -43,8 +57,17 @@
         {#each favoriteVerses as verse}
           <div class="verse-card">
             <div class="verse-header">
-              <span class="surah-name">{verse.surahName}</span>
-              <span class="verse-number">Verse {verse.verseNumber}</span>
+              <div class="verse-info">
+                <span class="surah-name">{verse.surahName}</span>
+                <span class="verse-number">Verse {verse.verseNumber}</span>
+              </div>
+              <button 
+                class="delete-button" 
+                on:click={() => handleDelete(verse)}
+                disabled={isDeleting}
+              >
+                <Trash weight="bold" />
+              </button>
             </div>
             <p class="verse-text arabic">{verse.verseText}</p>
             <p class="verse-text translation">{verse.translation || 'Translation not available'}</p>
@@ -125,7 +148,14 @@
   .verse-header {
     display: flex;
     justify-content: space-between;
+    align-items: flex-start;
     margin-bottom: 0.75rem;
+  }
+
+  .verse-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
   }
 
   .surah-name {
@@ -136,6 +166,30 @@
   .verse-number {
     font-size: 0.875rem;
     color: #666;
+  }
+
+  .delete-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    color: #ef4444;
+    padding: 0.5rem;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    opacity: 0.6;
+  }
+
+  .delete-button:hover {
+    background: rgba(239, 68, 68, 0.1);
+    opacity: 1;
+  }
+
+  .delete-button:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
   }
 
   .verse-text {
