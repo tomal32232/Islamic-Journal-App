@@ -64,8 +64,9 @@ export function updatePrayerProgress() {
 
 // Update dhikr progress
 export function updateDhikrProgress(count) {
-  // Update daily dhikr count
-  badgeStore.updateProgress('daily_dhikr', count);
+  console.log('Updating daily dhikr progress:', count);
+  // Update daily dhikr count - this will be the total for today
+  badgeStore.updateProgress('daily_dhikr', count, false);
 }
 
 // Update dhikr streak

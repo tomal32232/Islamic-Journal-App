@@ -7,7 +7,8 @@ import {
   query, 
   where, 
   getDocs,
-  Timestamp 
+  Timestamp,
+  getDoc 
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { updateDhikrProgress, updateDhikrStreak } from '../services/badgeProgressService';
@@ -17,10 +18,33 @@ export const weeklyStatsStore = writable({
   streak: 0
 });
 
+// Helper function to check if we need to reset daily count
+async function checkAndResetDailyCount(userId) {
+  const lastResetKey = `last_dhikr_reset_${userId}`;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  const lastReset = localStorage.getItem(lastResetKey);
+  const lastResetDate = lastReset ? new Date(lastReset) : null;
+  
+  // If we haven't reset today, reset the count
+  if (!lastResetDate || lastResetDate < today) {
+    console.log('Resetting daily dhikr count');
+    updateDhikrProgress(0);
+    localStorage.setItem(lastResetKey, today.toISOString());
+    return true; // Indicates we did a reset
+  }
+  return false; // Indicates no reset was needed
+}
+
 export async function saveTasbihSession(sessionData) {
   const user = auth.currentUser;
   if (!user) return;
 
+  // Check if we need to reset daily count
+  const wasReset = await checkAndResetDailyCount(user.uid);
+
+  // Save the individual session
   const sessionRef = doc(collection(db, 'tasbih_sessions'));
   await setDoc(sessionRef, {
     userId: user.uid,
@@ -31,36 +55,46 @@ export async function saveTasbihSession(sessionData) {
     timestamp: Timestamp.now()
   });
 
-  // Update weekly stats after saving
+  // Get weekly stats first
   const stats = await getWeeklyStats();
   
-  // Get today's total count from the stats
-  const todayCount = stats.dailyCounts.find(day => day.isToday)?.count || 0;
-  
-  // Update badge progress with today's total count
-  updateDhikrProgress(todayCount);
+  // Find today's count from stats and add the current session
+  const todayStats = stats.dailyCounts.find(day => day.isToday);
+  const previousCount = todayStats ? todayStats.count : 0;
+  const newTotalCount = previousCount + sessionData.totalCount;
+
+  // Update the dailyCounts with the new total
+  const updatedDailyCounts = stats.dailyCounts.map(day => 
+    day.isToday ? { ...day, count: newTotalCount } : day
+  );
+
+  // Update badge progress with the new total
+  console.log('Updating daily dhikr progress with new total:', newTotalCount);
+  updateDhikrProgress(newTotalCount);
   updateDhikrStreak(stats.currentStreak);
 
-  // Update store
+  // Update store with the new counts
   weeklyStatsStore.set({
-    dailyCounts: stats.dailyCounts,
+    dailyCounts: updatedDailyCounts,
     streak: stats.currentStreak
   });
 }
 
 export async function getWeeklyStats() {
   const user = auth.currentUser;
-  if (!user) return;
+  if (!user) return null;
+
+  // Check if we need to reset daily count
+  await checkAndResetDailyCount(user.uid);
 
   const today = new Date();
-  today.setHours(0, 0, 0, 0); // Normalize to start of day
+  today.setHours(0, 0, 0, 0);
   const startDate = new Date(today);
   startDate.setDate(today.getDate() - 6); // Go back 6 days to get last 7 days including today
 
   const sessionsQuery = query(
     collection(db, 'tasbih_sessions'),
     where('userId', '==', user.uid),
-    where('timestamp', '>=', Timestamp.fromDate(startDate))
   );
 
   const querySnapshot = await getDocs(sessionsQuery);
@@ -71,10 +105,14 @@ export async function getWeeklyStats() {
 
   // Process daily counts
   const dailyCounts = [];
-  for (let i = 6; i >= 0; i--) { // Count backwards from 6 to 0 to get last 7 days
+  let daysWithDhikr = 0;
+  let todayCount = 0;
+
+  for (let i = 6; i >= 0; i--) {
     const date = new Date(today);
     date.setDate(today.getDate() - i);
-    date.setHours(0, 0, 0, 0); // Normalize to start of day
+    date.setHours(0, 0, 0, 0);
+    
     const dayStr = date.toLocaleDateString('en-US', { weekday: 'short' });
     const dateStr = date.getDate();
     
@@ -82,10 +120,19 @@ export async function getWeeklyStats() {
     const dayCount = sessions
       .filter(session => {
         const sessionDate = session.timestamp.toDate();
-        sessionDate.setHours(0, 0, 0, 0); // Normalize to start of day
+        sessionDate.setHours(0, 0, 0, 0);
         return sessionDate.getTime() === date.getTime();
       })
       .reduce((sum, session) => sum + session.totalCount, 0);
+
+    if (dayCount > 0) {
+      daysWithDhikr++;
+    }
+
+    // Store today's count
+    if (i === 0) {
+      todayCount = dayCount;
+    }
 
     dailyCounts.push({
       day: dayStr,
@@ -95,33 +142,12 @@ export async function getWeeklyStats() {
     });
   }
 
-  const stats = calculateStreakStats(dailyCounts);
+  // Update badge progress with today's count
+  updateDhikrProgress(todayCount);
+
   return {
     dailyCounts,
-    currentStreak: stats.currentStreak,
-    totalDays: stats.totalDays
-  };
-}
-
-function calculateStreakStats(dailyCounts) {
-  // Calculate current streak up to today
-  let currentStreak = 0;
-  let daysWithDhikr = 0;
-  let firstDhikrIndex = -1;
-
-  // Find the first day with dhikr to establish start date
-  for (let i = 0; i < dailyCounts.length; i++) {
-    if (dailyCounts[i].count > 0) {
-      if (firstDhikrIndex === -1) firstDhikrIndex = i;
-      daysWithDhikr++;
-    }
-  }
-
-  // For new users, only count days since their first dhikr
-  let totalDays = firstDhikrIndex === -1 ? 0 : (dailyCounts.length - firstDhikrIndex);
-
-  return {
     currentStreak: daysWithDhikr,
-    totalDays
+    totalDays: 7 // Always 7 days for weekly view
   };
 } 

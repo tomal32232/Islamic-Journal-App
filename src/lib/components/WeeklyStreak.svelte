@@ -1,29 +1,60 @@
 <script>
   import { onMount } from 'svelte';
   import { weeklyStatsStore, getWeeklyStats } from '../stores/tasbihStore';
+  import { auth } from '../firebase';
+  import { onAuthStateChanged } from 'firebase/auth';
 
   let stats = {
     currentStreak: 0,
-    totalDays: 0
+    totalDays: 7
   };
 
-  onMount(async () => {
+  let dailyCounts = [];
+
+  async function loadWeeklyStats() {
     const weeklyStats = await getWeeklyStats();
     if (weeklyStats) {
-      stats.currentStreak = weeklyStats.currentStreak;
-      stats.totalDays = weeklyStats.totalDays;
+      stats = {
+        currentStreak: weeklyStats.currentStreak,
+        totalDays: weeklyStats.totalDays
+      };
+      dailyCounts = weeklyStats.dailyCounts;
+      weeklyStatsStore.set({
+        dailyCounts: weeklyStats.dailyCounts,
+        streak: weeklyStats.currentStreak
+      });
     }
+  }
+
+  onMount(() => {
+    // Set up auth state listener
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        loadWeeklyStats();
+      }
+    });
+
+    // If already authenticated, load stats immediately
+    if (auth.currentUser) {
+      loadWeeklyStats();
+    }
+
+    return () => {
+      unsubscribe();
+    };
   });
 
+  // Subscribe to store changes
   $: {
     if ($weeklyStatsStore.dailyCounts) {
-      stats.currentStreak = $weeklyStatsStore.currentStreak;
-      stats.totalDays = $weeklyStatsStore.totalDays;
+      dailyCounts = $weeklyStatsStore.dailyCounts;
+      stats.currentStreak = $weeklyStatsStore.streak;
     }
   }
 </script>
 
 <div class="streak-card">
+  <h2>Weekly Dhikr Streak</h2>
   <div class="streak-header">
     <div class="streak-stats">
       <span class="streak-count">{stats.currentStreak}/{stats.totalDays} Days</span>
@@ -32,7 +63,7 @@
   </div>
 
   <div class="chart">
-    {#each $weeklyStatsStore.dailyCounts as { day, date, count, isToday }}
+    {#each dailyCounts as { day, date, count, isToday }}
       <div class="chart-column">
         <div class="bar-container">
           <div 
@@ -62,17 +93,17 @@
     margin-bottom: 1rem;
   }
 
+  h2 {
+    font-size: 1.25rem;
+    color: #216974;
+    margin: 0 0 1rem 0;
+  }
+
   .streak-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 1rem;
-  }
-
-  h2 {
-    font-size: 1rem;
-    color: #216974;
-    margin: 0;
   }
 
   .streak-stats {
@@ -162,6 +193,6 @@
   }
 
   .bar.today .count {
-    color: #BE9F68;
+    color: white;
   }
 </style> 

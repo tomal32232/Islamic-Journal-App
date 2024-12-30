@@ -15,6 +15,8 @@
     Sparkle
   } from 'phosphor-svelte';
   import { auth } from '../firebase';
+  import { weeklyStatsStore } from '../stores/tasbihStore';
+  import { updateDhikrProgress } from '../services/badgeProgressService';
 
   export let onBack;
 
@@ -35,6 +37,15 @@
       console.log('No user found');
     }
   });
+
+  // Update badge progress when weekly stats change
+  $: if ($weeklyStatsStore?.dailyCounts) {
+    const todayCount = $weeklyStatsStore.dailyCounts.find(day => day.isToday);
+    if (todayCount) {
+      console.log('Syncing daily dhikr progress with weekly stats:', todayCount.count);
+      updateDhikrProgress(todayCount.count);
+    }
+  }
 
   // Update earned badges when store changes
   $: if ($badgeStore) {
