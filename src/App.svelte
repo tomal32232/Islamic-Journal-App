@@ -12,6 +12,7 @@
   import Prayer from './lib/pages/Prayer.svelte';
   import BottomNav from './lib/components/BottomNav.svelte';
   import { ensurePrayerData } from './lib/stores/prayerHistoryStore';
+  import Favorites from './lib/pages/Favorites.svelte';
 
   let user = null;
   let activeTab = 'home';
@@ -56,6 +57,8 @@
         <Notifications onBack={() => navigateTo('home')} />
       {:else if activeTab === 'badges'}
         <Badges onBack={() => navigateTo('profile')} />
+      {:else if activeTab === 'favorites'}
+        <Favorites onBack={() => navigateTo('profile')} />
       {:else if activeTab === 'profile'}
         <Profile {navigateTo} />
       {:else if activeTab === 'tasbih'}

@@ -26,6 +26,9 @@
 
   // Subscribe to favorites store
   $: favoriteVerses = $favoritesStore || [];
+  $: recentFavorites = [...favoriteVerses]
+    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+    .slice(0, 3);
 
   function showErrorToast(message) {
     toastMessage = message;
@@ -339,7 +342,10 @@
 
     <!-- Favorite Verses Card -->
     <div class="card">
-      <h3><Book weight="fill" /> Favorite Verses</h3>
+      <div class="section-header">
+        <h3><Book weight="fill" /> Favorite Verses</h3>
+        <span class="badge-count">{favoriteVerses.length}</span>
+      </div>
       {#if isLoadingFavorites}
         <div class="loading-state">Loading favorite verses...</div>
       {:else if favoriteVerses.length === 0}
@@ -349,7 +355,7 @@
         </div>
       {:else}
         <div class="verses-list">
-          {#each favoriteVerses as verse}
+          {#each recentFavorites as verse}
             <div class="verse-item">
               <div class="verse-header">
                 <span class="surah-name">{verse.surahName}</span>
@@ -360,6 +366,12 @@
             </div>
           {/each}
         </div>
+        {#if favoriteVerses.length > 3}
+          <button class="view-all" on:click={() => navigateTo('favorites')}>
+            <span>View All Favorites</span>
+            <ArrowRight weight="bold" />
+          </button>
+        {/if}
       {/if}
     </div>
 
