@@ -672,6 +672,7 @@
     box-sizing: border-box;
     padding: 0 10px;
     margin-top: 20px;
+    margin-bottom: 4rem;
   }
 
   .home-content {

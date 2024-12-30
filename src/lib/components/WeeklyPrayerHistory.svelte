@@ -268,10 +268,6 @@
       <span>Missed</span>
     </div>
     <div class="legend-item">
-      <div class="status-dot upcoming"></div>
-      <span>Upcoming</span>
-    </div>
-    <div class="legend-item">
       <div class="status-dot excused"></div>
       <span>Excused</span>
     </div>
