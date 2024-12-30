@@ -54,7 +54,6 @@
 </script>
 
 <div class="streak-card">
-  <h2>Weekly Dhikr Streak</h2>
   <div class="streak-header">
     <div class="streak-stats">
       <span class="streak-count">{stats.currentStreak}/{stats.totalDays} Days</span>
