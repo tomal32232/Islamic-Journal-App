@@ -1,9 +1,11 @@
 import { db } from '../firebase';
-import { collection, addDoc, query, where, getDocs, deleteDoc } from 'firebase/firestore';
+import { collection, addDoc, query, where, getDocs, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { auth } from '../firebase';
 import { writable } from 'svelte/store';
 
 export const favoritesStore = writable([]);
+
+const BASE_URL = 'https://api.alquran.cloud/v1';
 
 export async function addFavorite(surahNumber, verseNumber, surahName, verseText, translation) {
   try {
@@ -64,6 +66,22 @@ export async function removeFavorite(surahNumber, verseNumber) {
   }
 }
 
+async function fetchTranslation(surahNumber, verseNumber) {
+  try {
+    const response = await fetch(`${BASE_URL}/surah/${surahNumber}/en.sahih`);
+    const data = await response.json();
+    
+    if (data.code === 200) {
+      const verse = data.data.ayahs.find(a => a.numberInSurah === verseNumber);
+      return verse?.text || '';
+    }
+    return '';
+  } catch (error) {
+    console.error('Error fetching translation:', error);
+    return '';
+  }
+}
+
 export async function getFavorites() {
   try {
     const user = auth.currentUser;
@@ -81,9 +99,24 @@ export async function getFavorites() {
       ...doc.data()
     }));
     
+    // Check for favorites without translations and update them
+    const updatePromises = favorites.map(async favorite => {
+      if (!favorite.translation) {
+        const translation = await fetchTranslation(favorite.surahNumber, favorite.verseNumber);
+        if (translation) {
+          // Update the document in Firestore
+          await updateDoc(doc(db, 'favorites', favorite.id), { translation });
+          return { ...favorite, translation };
+        }
+      }
+      return favorite;
+    });
+    
+    const updatedFavorites = await Promise.all(updatePromises);
+    
     // Update store
-    favoritesStore.set(favorites);
-    return favorites;
+    favoritesStore.set(updatedFavorites);
+    return updatedFavorites;
   } catch (error) {
     console.error('Error getting favorites:', error);
     return [];
