@@ -12,6 +12,30 @@
   let dailyCounts = [];
   let maxCount = 0;
 
+  // Format large numbers (e.g., 1000 -> 1k)
+  function formatCount(count) {
+    if (count >= 1000000) {
+      return (count / 1000000).toFixed(1) + 'M';
+    }
+    if (count >= 1000) {
+      return (count / 1000).toFixed(1) + 'k';
+    }
+    return count.toString();
+  }
+
+  // Calculate bar height based on maximum value using logarithmic scale
+  function getBarHeight(count) {
+    if (count === 0) return 4;
+    if (maxCount === 0) return 25;
+    
+    // Use logarithmic scale for better visualization of large differences
+    const logCount = Math.log10(count + 1);
+    const logMax = Math.log10(maxCount + 1);
+    
+    // Scale between 25% and 100% of height
+    return 25 + (logCount / logMax * 75);
+  }
+
   async function loadWeeklyStats() {
     const weeklyStats = await getWeeklyStats();
     if (weeklyStats) {
@@ -54,14 +78,6 @@
       maxCount = Math.max(...dailyCounts.map(d => d.count));
     }
   }
-
-  // Calculate bar height based on maximum value
-  function getBarHeight(count) {
-    if (count === 0) return 4;
-    if (maxCount === 0) return 25;
-    // Scale between 25% and 100% of height
-    return 25 + (count / maxCount * 75);
-  }
 </script>
 
 <div class="streak-card">
@@ -81,7 +97,7 @@
             style="height: {getBarHeight(count)}%"
           >
             {#if count > 0}
-              <span class="count">{count}</span>
+              <span class="count">{formatCount(count)}</span>
             {/if}
           </div>
         </div>
@@ -181,7 +197,7 @@
   }
 
   .bar {
-    width: 28px;
+    width: 32px; /* Slightly wider to accommodate larger numbers */
     background: #E0E0E0;
     border-radius: 4px;
     position: relative;
@@ -208,6 +224,11 @@
     bottom: 4px;
     width: 100%;
     text-align: center;
+    padding: 0 2px;
+    box-sizing: border-box;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .bar.today .count {
