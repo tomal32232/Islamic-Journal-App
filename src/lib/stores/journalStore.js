@@ -155,17 +155,23 @@ function createJournalStore() {
 
     // Update streak in store and badge progress
     update(store => {
+      const todayStr = today.toISOString().split('T')[0];
+      const todayReflections = reflectionsByDate.get(todayStr) || { morning: false, evening: false };
+      
       const newStore = {
         ...store,
         streak: {
           ...store.streak,
           current: streak,
-          morning: !!reflectionsByDate.get(today.toISOString().split('T')[0])?.morning,
-          evening: !!reflectionsByDate.get(today.toISOString().split('T')[0])?.evening
+          morning: todayReflections.morning,
+          evening: todayReflections.evening
         },
         completedDays: totalCompletedDays,
         dailyProgress: sortedProgress,
-        totalEntries: snapshot.docs.length
+        totalEntries: snapshot.docs.length,
+        // Reset today's reflections if they don't exist
+        todayMorningReflection: todayReflections.morning ? store.todayMorningReflection : null,
+        todayEveningReflection: todayReflections.evening ? store.todayEveningReflection : null
       };
 
       try {
