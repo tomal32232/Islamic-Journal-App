@@ -11,12 +11,20 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
-    // Helper function to check if earnedBadges are only being added to (not removed)
-    function isValidBadgeUpdate() {
+    // Helper functions for badge validation
+    function isProgressOnlyUpdate() {
+      let changedFields = request.resource.data.diff(resource.data).affectedKeys();
+      return changedFields.hasOnly(['progress', 'lastUpdated']) || 
+             (changedFields.hasOnly(['progress', 'lastUpdated', 'earnedBadges']) && 
+              (!resource.data.keys().hasAll(['earnedBadges']) || 
+               request.resource.data.earnedBadges.hasAll(resource.data.earnedBadges)));
+    }
+
+    function hasValidBadgeUpdate() {
       let oldBadges = resource.data.earnedBadges;
       let newBadges = request.resource.data.earnedBadges;
-      return oldBadges == null || oldBadges.size() == 0 || 
-             (!(oldBadges.hasAll(newBadges)) && newBadges.hasAll(oldBadges));
+      return !resource.data.keys().hasAll(['earnedBadges']) || 
+             newBadges.hasAll(oldBadges);
     }
 
     // Daily Quotes collection - public read access
@@ -85,11 +93,7 @@ service cloud.firestore {
     match /users/{userId}/achievements/badges {
       allow read: if isOwner(userId);
       allow create: if isOwner(userId);
-      // Allow updates that either only modify progress or properly update earnedBadges
-      allow update: if isOwner(userId) && 
-        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['progress', 'lastUpdated']) || 
-         (request.resource.data.diff(resource.data).affectedKeys().hasAll(['earnedBadges', 'lastUpdated']) && 
-          isValidBadgeUpdate()));
+      allow update: if isOwner(userId) && (isProgressOnlyUpdate() || hasValidBadgeUpdate());
     }
 
     match /users/{userId} {

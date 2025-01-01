@@ -1114,6 +1114,7 @@
     height: 28px;
     border-radius: 4px;
     display: flex;
+
     align-items: center;
     justify-content: center;
     background: rgba(33, 105, 116, 0.1);

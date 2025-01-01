@@ -1,4 +1,4 @@
-import { writable, derived } from 'svelte/store';
+import { writable, derived, get } from 'svelte/store';
 import { badges } from '../data/badges';
 import { auth } from '../firebase';
 import { db } from '../firebase';
@@ -98,6 +98,7 @@ function createBadgeStore() {
             const updatedData = {
               ...data,
               earnedBadges,
+              progress: data.progress || {},
               lastUpdated: new Date()
             };
             
@@ -108,7 +109,11 @@ function createBadgeStore() {
             
             set(updatedData);
           } else {
-            set({ ...data, lastUpdated: new Date() });
+            set({ 
+              earnedBadges: data.earnedBadges || [], 
+              progress: data.progress || {}, 
+              lastUpdated: new Date() 
+            });
           }
         } else {
           console.log('No badge document exists, creating initial data');
@@ -133,10 +138,19 @@ function createBadgeStore() {
 
       const userDoc = doc(db, 'users', userId, 'achievements', 'badges');
       
+      // First check if the document exists
+      const docSnap = await getDoc(userDoc);
+      const exists = docSnap.exists();
+      console.log('Document exists:', exists);
+
       update(state => {
-        console.log('Current state:', state);
-        const progress = { ...state.progress };
-        const earnedBadges = [...state.earnedBadges];
+        console.log('Current state before update:', {
+          earnedBadges: state.earnedBadges,
+          progress: state.progress,
+          lastUpdated: state.lastUpdated
+        });
+        const progress = exists ? { ...docSnap.data().progress } : {};
+        const earnedBadges = exists ? [...docSnap.data().earnedBadges] : [];
         
         // Store progress with both formats for backward compatibility
         progress[type] = value;
@@ -228,10 +242,41 @@ function createBadgeStore() {
           progress,
           lastUpdated: new Date()
         };
-        console.log('Saving to Firestore:', updatedData);
-        setDoc(userDoc, updatedData, { merge: true })
-          .then(() => console.log('Successfully saved badge data to Firestore'))
-          .catch(error => console.error('Error saving badge data:', error));
+        console.log('=== Saving to Firestore ===');
+        console.log('Document path:', `users/${userId}/achievements/badges`);
+        console.log('Updated data:', JSON.stringify(updatedData, null, 2));
+        console.log('Changed fields:', Object.keys(updatedData));
+        console.log('Document exists:', exists);
+        console.log('Previous earnedBadges:', exists ? docSnap.data().earnedBadges : []);
+        console.log('New earnedBadges:', earnedBadges);
+        
+        if (!exists) {
+          // If document doesn't exist, create it
+          console.log('Creating new badge document');
+          setDoc(userDoc, updatedData)
+            .then(() => console.log('Successfully created badge document'))
+            .catch(error => {
+              console.error('Error creating badge document:', error);
+              console.error('Error details:', {
+                code: error.code,
+                message: error.message,
+                details: error.details
+              });
+            });
+        } else {
+          // If document exists, update it
+          console.log('Updating existing badge document');
+          setDoc(userDoc, updatedData, { merge: true })
+            .then(() => console.log('Successfully updated badge document'))
+            .catch(error => {
+              console.error('Error updating badge document:', error);
+              console.error('Error details:', {
+                code: error.code,
+                message: error.message,
+                details: error.details
+              });
+            });
+        }
 
         return updatedData;
       });
