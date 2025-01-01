@@ -516,6 +516,7 @@
 <style>
   .quran-container {
     padding: 1rem;
+    padding-bottom: 6rem;
     max-width: 800px;
     margin: 0 auto;
   }

@@ -317,7 +317,9 @@
       </div>
     {/if}
   {:else}
-    <QuranReading />
+    <div class="quran-section">
+      <QuranReading />
+    </div>
   {/if}
 </div>
 
@@ -399,6 +401,7 @@
   .prayer-times-section {
     padding: 0 10px;
     margin-top: 10px;
+    padding-bottom: 6rem;
   }
 
   h2 {
@@ -488,6 +491,7 @@
     padding: 1rem;
     max-width: 600px;
     margin: 0 auto;
+    padding-bottom: 6rem;
   }
 
   .setup-card {
@@ -779,6 +783,10 @@
       width: 16px;
       height: 16px;
     }
+  }
+
+  .quran-section {
+    padding-bottom: 6rem;
   }
 </style>
 
