@@ -707,20 +707,41 @@
     position: sticky;
     top: 0;
     z-index: 100;
-    transition: all 0.3s ease;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .quote-card.scrolled {
     padding: 0.5rem 1rem;
-    border-radius: 0;
+    border-radius: 0 0 12px 12px;
   }
 
   .quote-card.scrolled .quote-section {
-    display: none;
+    height: 0;
+    opacity: 0;
+    margin: 0;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .quote-card.scrolled .datetime {
-    display: none;
+    height: 0;
+    opacity: 0;
+    margin: 0;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .quote-section {
+    text-align: center;
+    height: auto;
+    opacity: 1;
+    margin-top: 0.75rem;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .datetime {
+    text-align: right;
+    height: auto;
+    opacity: 1;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .greeting-section {
