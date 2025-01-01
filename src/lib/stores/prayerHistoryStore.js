@@ -193,11 +193,43 @@ export async function updatePrayerStatuses() {
   if (!user) return;
 
   const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayStr = yesterday.toLocaleDateString('en-CA');
+  
   const prayerTimes = await getPrayerTimes(today);
   if (!prayerTimes) return;
 
   const prayers = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
   const todayStr = today.toLocaleDateString('en-CA');
+
+  // Check yesterday's unmarked prayers first
+  const yesterdayQuery = query(
+    collection(db, 'prayer_history'),
+    where('userId', '==', user.uid),
+    where('date', '==', yesterdayStr),
+    where('status', 'in', ['pending', 'upcoming'])
+  );
+
+  const yesterdaySnapshot = await getDocs(yesterdayQuery);
+  const batch = [];
+
+  // Mark all pending/upcoming prayers from yesterday as missed
+  yesterdaySnapshot.forEach((doc) => {
+    const prayerRef = doc.ref;
+    batch.push(
+      setDoc(prayerRef, {
+        ...doc.data(),
+        status: 'missed',
+        timestamp: Timestamp.now()
+      }, { merge: true })
+    );
+  });
+
+  if (batch.length > 0) {
+    await Promise.all(batch);
+    await getPrayerHistory(); // Refresh the store
+  }
 
   // Check if there's an active excused period
   const activeExcusedPeriod = await getActiveExcusedPeriod();
