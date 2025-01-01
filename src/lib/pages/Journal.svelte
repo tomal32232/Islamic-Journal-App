@@ -294,11 +294,31 @@
     weekDays = getCurrentWeek(); // Refresh the week display
     eveningReflection = { highlights: '', learnings: '', satisfaction: '', barriers: '' }; // Reset form
   }
+
+  let scrollY = 0;
+
+  function handleScroll(event) {
+    const container = event.target;
+    scrollY = container.scrollTop;
+  }
+
+  onMount(() => {
+    const container = document.querySelector('.journal-container');
+    if (container) {
+      container.addEventListener('scroll', handleScroll);
+    }
+    // ... rest of onMount code ...
+
+    return () => {
+      // ... existing cleanup ...
+      container?.removeEventListener('scroll', handleScroll);
+    };
+  });
 </script>
 
 <div class="journal-container">
   <div class="journal-header">
-    <div class="week-strip">
+    <div class="week-strip" class:scrolled={scrollY > 50}>
       {#each weekDays as { day, date, isToday, fullDate }}
         {@const hasCompletion = $journalStore.dailyProgress.find(d => d.date === fullDate)}
         {@const isTodayComplete = isToday && $journalStore.streak?.morning && $journalStore.streak?.evening}
@@ -447,6 +467,7 @@
     background: white;
     color: #333;
     min-height: 100vh;
+    overflow-y: auto;
   }
 
   .journal-header {
@@ -458,7 +479,22 @@
     justify-content: space-between;
     background: #216974;
     padding: 1rem;
-    margin-bottom: 1.5rem;
+    margin: 10px;
+    border-radius: 12px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .week-strip.scrolled {
+    padding: 0.5rem 1rem;
+    margin-top: 0;
+    border-radius: 0 0 12px 12px;
+  }
+
+  .week-strip.scrolled .day-name {
+    display: none;
   }
 
   .day-item {
@@ -481,6 +517,7 @@
   .day-name {
     font-size: 0.75rem;
     text-transform: uppercase;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .day-number {
