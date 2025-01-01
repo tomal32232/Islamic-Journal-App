@@ -23,17 +23,28 @@
     return count.toString();
   }
 
-  // Calculate bar height based on maximum value using logarithmic scale
+  // Calculate bar height based on maximum value using a hybrid approach
   function getBarHeight(count) {
     if (count === 0) return 4;
     if (maxCount === 0) return 25;
     
-    // Use logarithmic scale for better visualization of large differences
-    const logCount = Math.log10(count + 1);
-    const logMax = Math.log10(maxCount + 1);
+    // Minimum height for non-zero values (25%)
+    const minHeight = 25;
     
-    // Scale between 25% and 100% of height
-    return 25 + (logCount / logMax * 75);
+    // For very small numbers (< 10), use linear scale
+    if (maxCount < 10) {
+      return minHeight + (count / maxCount * 75);
+    }
+    
+    // For larger numbers, use a hybrid approach
+    // This gives more weight to smaller numbers while still showing differences in larger ones
+    const ratio = count / maxCount;
+    const logScale = Math.log10(count + 1) / Math.log10(maxCount + 1);
+    
+    // Blend linear and logarithmic scales
+    const blendedScale = (ratio + logScale) / 2;
+    
+    return minHeight + (blendedScale * 75);
   }
 
   async function loadWeeklyStats() {
