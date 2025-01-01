@@ -341,15 +341,17 @@
     <div class="controls-section">
       {#if isLoadingQuran}
         <div class="loading-indicator">Loading Quran data...</div>
+      {:else if !surahList || surahList.length === 0}
+        <div class="loading-indicator">Loading Surah list...</div>
       {:else}
         <div class="select-wrapper">
           <select 
             class="surah-select" 
-            value={selectedSurah} 
+            bind:value={selectedSurah} 
             on:change={handleSurahSelect}
             disabled={loading || isLoadingSurah}
           >
-            <option value="" selected={!selectedSurah}>Select a Surah</option>
+            <option value={null}>Select a Surah</option>
             {#each surahList as surah}
               <option value={surah.number}>
                 {surah.number}. {surah.englishName} ({surah.name})
@@ -907,5 +909,9 @@
   .favorite-button:focus-visible {
     outline: none;
     box-shadow: none;
+  }
+
+  .surah-select option[value=""] {
+    color: #666;
   }
 </style> 
