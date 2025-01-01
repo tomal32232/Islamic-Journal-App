@@ -18,6 +18,7 @@
   let currentPrayer = null;
   let nextPrayer = null;
   let activeTab = 'prayer'; // 'prayer' or 'quran'
+  let scrollY = 0;
 
   function getNextPrayer(prayers) {
     const now = new Date();
@@ -54,9 +55,24 @@
     }
   }
 
+  function handleScroll(event) {
+    const container = event.target;
+    scrollY = container.scrollTop;
+  }
+
   onMount(() => {
+    const container = document.querySelector('.prayer-container');
+    if (container) {
+      container.addEventListener('scroll', handleScroll);
+    }
+
     timeInterval = setInterval(updateNextPrayer, 60000);
     updateNextPrayer();
+
+    return () => {
+      if (timeInterval) clearInterval(timeInterval);
+      container?.removeEventListener('scroll', handleScroll);
+    };
   });
 
   onDestroy(() => {
@@ -65,7 +81,7 @@
 </script>
 
 <div class="prayer-container">
-  <div class="tabs">
+  <div class="tabs" class:scrolled={scrollY > 50}>
     <button 
       class="tab-button {activeTab === 'prayer' ? 'active' : ''}"
       on:click={() => activeTab = 'prayer'}
@@ -118,31 +134,48 @@
 
 <style>
   .prayer-container {
-    padding: 0.5rem;
+    padding: 0;
     max-width: 1200px;
     margin: 0 auto;
     margin-bottom: 4rem;
+    height: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    box-sizing: border-box;
+    background: #F8FAFC;
   }
 
   .tabs {
     display: flex;
     gap: 1rem;
-    margin-bottom: 1.5rem;
-    padding: 0.5rem 1rem;
+    margin: 10px;
+    padding: 1rem;
     justify-content: center;
-    background: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
+    background: #216974;
+    border-radius: 12px;
     position: sticky;
-    top: 0;
-    z-index: 20;
+    top: 10px;
+    z-index: 100;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .tabs.scrolled {
+    padding: 0.5rem 1rem;
+    margin: 0 10px;
+    border-radius: 12px;
   }
 
   .tab-button {
     background: none;
     border: none;
     padding: 0.75rem 2rem;
-    color: #666;
+    color: rgba(255, 255, 255, 0.8);
     font-size: 1rem;
     cursor: pointer;
     border-radius: 8px;
@@ -154,15 +187,22 @@
   }
 
   .tab-button:hover {
-    background: rgba(33, 105, 116, 0.05);
-    border-color: #eee;
+    background: rgba(255, 255, 255, 0.1);
   }
 
   .tab-button.active {
-    color: #216974;
-    background: rgba(33, 105, 116, 0.1);
-    border-color: #216974;
+    color: white;
+    background: rgba(255, 255, 255, 0.1);
     font-weight: 500;
+  }
+
+  .tab-button :global(svg) {
+    color: inherit;
+  }
+
+  .prayer-times-section {
+    padding: 0 10px;
+    margin-top: 10px;
   }
 
   h2 {
@@ -250,7 +290,7 @@
 
   @media (max-width: 640px) {
     .prayer-container {
-      padding: 0.5rem;
+      padding: 0;
     }
 
     .prayer-times-grid {
