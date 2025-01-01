@@ -12,13 +12,32 @@
   import { nearbyMosquesStore, mosqueLoadingStore, fetchNearbyMosques } from '../services/mosqueService';
   import PrayerHistorySection from '../components/PrayerHistorySection.svelte';
   import QuranReading from '../components/QuranReading.svelte';
-  import { Mosque, Book } from 'phosphor-svelte';
+  import { Mosque, Book, HandsPraying } from 'phosphor-svelte';
+  import { saveTasbihSession, getWeeklyStats, weeklyStatsStore } from '../stores/tasbihStore';
 
   let timeInterval;
   let currentPrayer = null;
   let nextPrayer = null;
-  let activeTab = 'prayer'; // 'prayer' or 'quran'
+  let activeTab = 'prayer'; // 'prayer', 'quran', or 'tasbih'
   let scrollY = 0;
+
+  // Tasbih state
+  const dhikrOptions = [
+    { arabic: 'سُبْحَانَ ٱللَّٰهِ', latin: 'SubhanAllah', meaning: 'Glory be to Allah' },
+    { arabic: 'ٱلْحَمْدُ لِلَّٰهِ', latin: 'Alhamdulillah', meaning: 'Praise be to Allah' },
+    { arabic: 'ٱللَّٰهُ أَكْبَرُ', latin: 'Allahu Akbar', meaning: 'Allah is Greater' },
+    { arabic: 'لَا إِلَٰهَ إِلَّا ٱللَّٰهُ', latin: 'La ilaha illAllah', meaning: 'There is no deity except Allah' }
+  ];
+
+  let selectedDhikr = dhikrOptions[0];
+  let count = 0;
+  let sets = 0;
+  let totalCount = 0;
+  let selectedTarget = 33;
+  let customTarget = '';
+  let isCounterMode = false;
+  let weeklyStreak = 0;
+  let target = 33;
 
   function getNextPrayer(prayers) {
     const now = new Date();
@@ -60,7 +79,7 @@
     scrollY = container.scrollTop;
   }
 
-  onMount(() => {
+  onMount(async () => {
     const container = document.querySelector('.prayer-container');
     if (container) {
       container.addEventListener('scroll', handleScroll);
@@ -69,15 +88,81 @@
     timeInterval = setInterval(updateNextPrayer, 60000);
     updateNextPrayer();
 
-    return () => {
-      if (timeInterval) clearInterval(timeInterval);
-      container?.removeEventListener('scroll', handleScroll);
-    };
+    const stats = await getWeeklyStats();
+    weeklyStreak = stats?.streak || 0;
+
+    if (container) {
+      return () => {
+        if (timeInterval) clearInterval(timeInterval);
+        container.removeEventListener('scroll', handleScroll);
+      };
+    }
   });
 
   onDestroy(() => {
     if (timeInterval) clearInterval(timeInterval);
   });
+
+  // Tasbih functions
+  function handleTargetChange(newTarget) {
+    selectedTarget = newTarget;
+    count = 0;
+  }
+
+  function handleCustomTarget() {
+    if (customTarget && !isNaN(customTarget)) {
+      selectedTarget = parseInt(customTarget);
+      count = 0;
+    }
+  }
+
+  function startCounter() {
+    isCounterMode = true;
+  }
+
+  async function saveSession() {
+    if (totalCount > 0) {
+      await saveTasbihSession({
+        dhikr: selectedDhikr,
+        count,
+        sets,
+        totalCount
+      });
+      const stats = await getWeeklyStats();
+      weeklyStreak = stats?.streak || 0;
+    }
+  }
+
+  async function exitCounter() {
+    await saveSession();
+    isCounterMode = false;
+    count = 0;
+  }
+
+  function increment() {
+    count++;
+    totalCount++;
+    if (count === selectedTarget) {
+      if ('vibrate' in navigator) {
+        navigator.vibrate(200);
+      }
+      sets++;
+      count = 0;
+    }
+  }
+
+  function reset() {
+    count = 0;
+    sets = 0;
+    totalCount = 0;
+  }
+
+  function setTarget(value) {
+    const numValue = typeof value === 'string' ? parseInt(value) : value;
+    target = numValue || 33;
+    selectedTarget = target;
+    count = 0;
+  }
 </script>
 
 <div class="prayer-container">
@@ -95,6 +180,13 @@
     >
       <Book weight={activeTab === 'quran' ? 'fill' : 'regular'} size={20} />
       <span>Quran</span>
+    </button>
+    <button 
+      class="tab-button {activeTab === 'tasbih' ? 'active' : ''}"
+      on:click={() => activeTab = 'tasbih'}
+    >
+      <HandsPraying weight={activeTab === 'tasbih' ? 'fill' : 'regular'} size={20} />
+      <span>Tasbih</span>
     </button>
   </div>
 
@@ -127,6 +219,103 @@
 
       <PrayerHistorySection />
     </div>
+  {:else if activeTab === 'tasbih'}
+    {#if !isCounterMode}
+      <div class="tasbih-section">
+        <div class="setup-card">
+          <div class="streak-display">
+            <h3>Weekly Streak</h3>
+            <span class="streak-count">{weeklyStreak} days</span>
+          </div>
+          
+          <h2>Select Dhikr</h2>
+          <div class="dhikr-options">
+            {#each dhikrOptions as dhikr}
+              <button 
+                class="dhikr-button {selectedDhikr === dhikr ? 'active' : ''}"
+                on:click={() => selectedDhikr = dhikr}
+              >
+                <span class="arabic">{dhikr.arabic}</span>
+                <span class="latin">{dhikr.latin}</span>
+              </button>
+            {/each}
+          </div>
+
+          <div class="target-selector">
+            <h3>Select Target</h3>
+            <div class="target-options">
+              <button 
+                class="target-button {target === 33 ? 'active' : ''}" 
+                on:click={() => setTarget(33)}
+              >
+                33
+              </button>
+              <button 
+                class="target-button {target === 66 ? 'active' : ''}" 
+                on:click={() => setTarget(66)}
+              >
+                66
+              </button>
+              <button 
+                class="target-button {target === 99 ? 'active' : ''}" 
+                on:click={() => setTarget(99)}
+              >
+                99
+              </button>
+              <button 
+                class="target-button {target === 100 ? 'active' : ''}" 
+                on:click={() => setTarget(100)}
+              >
+                100
+              </button>
+            </div>
+            
+            <div class="custom-target {target === parseInt(customTarget) ? 'active' : ''}">
+              <input
+                type="number"
+                bind:value={customTarget}
+                on:focus={() => setTarget(customTarget)}
+                placeholder="Custom"
+                min="1"
+                max="999"
+              />
+              <span>times</span>
+            </div>
+          </div>
+
+          <button class="start-button" on:click={startCounter}>
+            Start Dhikr
+          </button>
+        </div>
+      </div>
+    {:else}
+      <div class="counter-mode">
+        <button class="exit-button" on:click={exitCounter}>Exit</button>
+        
+        <div class="counter-content">
+          <div class="dhikr-display">
+            <span class="arabic-large">{selectedDhikr.arabic}</span>
+            <span class="latin-large">{selectedDhikr.latin}</span>
+            <span class="meaning">{selectedDhikr.meaning}</span>
+          </div>
+
+          <div class="progress">
+            <span class="sets-display">Set {sets + 1}</span>
+            <span class="count-large">{count}</span>
+            <span class="target-display">of {selectedTarget}</span>
+            <span class="total-count">Total: {totalCount}</span>
+          </div>
+
+          <button class="counter-button" on:click={increment}>
+            <div class="inner-circle">
+              <span class="tap-text">Tap</span>
+            </div>
+          </button>
+
+          <button class="reset-button" on:click={reset}>Reset</button>
+        </div>
+      </div>
+    {/if}
   {:else}
     <QuranReading />
   {/if}
@@ -153,10 +342,10 @@
 
   .tabs {
     display: flex;
-    gap: 1rem;
+    gap: 0.5rem;
     margin: 10px;
-    padding: 1rem;
-    justify-content: center;
+    padding: 0.75rem;
+    justify-content: space-between;
     background: #216974;
     border-radius: 12px;
     position: sticky;
@@ -174,16 +363,23 @@
   .tab-button {
     background: none;
     border: none;
-    padding: 0.75rem 2rem;
+    padding: 0.75rem;
     color: rgba(255, 255, 255, 0.8);
-    font-size: 1rem;
+    font-size: 0.875rem;
     cursor: pointer;
     border-radius: 8px;
     transition: all 0.2s;
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    justify-content: center;
+    gap: 0.375rem;
     border: 1px solid transparent;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .tab-button span {
+    white-space: nowrap;
   }
 
   .tab-button:hover {
@@ -288,6 +484,260 @@
     background: rgba(239, 68, 68, 0.1);
   }
 
+  .tasbih-section {
+    padding: 1rem;
+    max-width: 600px;
+    margin: 0 auto;
+  }
+
+  .setup-card {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  }
+
+  .streak-display {
+    text-align: center;
+    margin-bottom: 2rem;
+    padding: 1rem;
+    background: rgba(33, 105, 116, 0.1);
+    border-radius: 8px;
+  }
+
+  .streak-count {
+    font-size: 1.5rem;
+    color: #216974;
+    font-weight: 500;
+  }
+
+  .dhikr-options {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+    margin-bottom: 2rem;
+  }
+
+  .dhikr-button {
+    background: white;
+    border: 1px solid #E0E0E0;
+    padding: 1rem;
+    border-radius: 8px;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.2s ease;
+    cursor: pointer;
+  }
+
+  .dhikr-button.active {
+    border-color: #216974;
+    background: #216974;
+    color: white;
+  }
+
+  .arabic {
+    font-size: 1.5rem;
+    font-weight: 500;
+  }
+
+  .latin {
+    font-size: 0.875rem;
+  }
+
+  .target-selector {
+    margin-bottom: 2rem;
+  }
+
+  .target-options {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+  }
+
+  .target-button {
+    background: white;
+    border: 1px solid #E0E0E0;
+    padding: 0.75rem;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 1rem;
+    color: #216974;
+  }
+
+  .target-button:hover {
+    border-color: #216974;
+  }
+
+  .target-button.active {
+    background: #216974;
+    border-color: #216974;
+    color: white;
+  }
+
+  .custom-target {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: white;
+    padding: 0.75rem;
+    border-radius: 8px;
+    border: 1px solid #E0E0E0;
+  }
+
+  .custom-target input {
+    width: 100px;
+    border: none;
+    padding: 0.5rem;
+    font-size: 1rem;
+    color: #216974;
+    text-align: center;
+  }
+
+  .custom-target.active {
+    border-color: #216974;
+  }
+
+  .start-button {
+    background: #216974;
+    color: white;
+    width: 100%;
+    padding: 1rem;
+    border: none;
+    border-radius: 8px;
+    font-size: 1.125rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .counter-mode {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, #216974, #1a545d);
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    color: white;
+    z-index: 1000;
+  }
+
+  .exit-button {
+    position: absolute;
+    top: 1rem;
+    left: 1rem;
+    background: rgba(255,255,255,0.2);
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+
+  .counter-content {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2rem;
+  }
+
+  .dhikr-display {
+    text-align: center;
+  }
+
+  .arabic-large {
+    font-size: 3rem;
+    display: block;
+    margin-bottom: 0.5rem;
+  }
+
+  .latin-large {
+    font-size: 1.5rem;
+    display: block;
+    margin-bottom: 0.25rem;
+  }
+
+  .meaning {
+    font-size: 1rem;
+    opacity: 0.8;
+  }
+
+  .progress {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .count-large {
+    font-size: 5rem;
+    font-weight: 500;
+  }
+
+  .sets-display, .target-display {
+    font-size: 1.25rem;
+    opacity: 0.8;
+  }
+
+  .total-count {
+    font-size: 1rem;
+    color: #E09453;
+    margin-top: 0.5rem;
+  }
+
+  .counter-button {
+    width: 200px;
+    height: 200px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.1);
+    border: 2px solid rgba(255,255,255,0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .inner-circle {
+    width: 80%;
+    height: 80%;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .tap-text {
+    font-size: 1.5rem;
+    opacity: 0.9;
+  }
+
+  .counter-button:active {
+    transform: scale(0.95);
+    background: rgba(255,255,255,0.15);
+  }
+
+  .reset-button {
+    background: rgba(255,255,255,0.1);
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1rem;
+  }
+
   @media (max-width: 640px) {
     .prayer-container {
       padding: 0;
@@ -313,6 +763,21 @@
 
     .prayer-time {
       font-size: 0.75rem;
+    }
+
+    .tabs {
+      padding: 0.5rem;
+      gap: 0.25rem;
+    }
+
+    .tab-button {
+      padding: 0.5rem;
+      font-size: 0.75rem;
+    }
+
+    .tab-button :global(svg) {
+      width: 16px;
+      height: 16px;
     }
   }
 </style>
