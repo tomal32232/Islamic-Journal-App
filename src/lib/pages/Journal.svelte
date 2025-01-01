@@ -298,11 +298,6 @@
 
 <div class="journal-container">
   <div class="journal-header">
-    <div class="date-header">
-      <span class="current-date">{new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</span>
-      <h1>{greeting}, {userName}!</h1>
-    </div>
-
     <div class="week-strip">
       {#each weekDays as { day, date, isToday, fullDate }}
         {@const hasCompletion = $journalStore.dailyProgress.find(d => d.date === fullDate)}
@@ -316,6 +311,11 @@
           {/if}
         </div>
       {/each}
+    </div>
+
+    <div class="date-header">
+      <span class="current-date">{new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</span>
+      <h1>{greeting}, {userName}!</h1>
     </div>
   </div>
 
@@ -443,7 +443,7 @@
   .journal-container {
     max-width: 800px;
     margin: 0 auto;
-    padding: 1.5rem;
+    padding: 0;
     background: white;
     color: #333;
     min-height: 100vh;
@@ -453,9 +453,50 @@
     margin-bottom: 2rem;
   }
 
+  .week-strip {
+    display: flex;
+    justify-content: space-between;
+    background: #216974;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .day-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.5rem;
+    color: rgba(255, 255, 255, 0.8);
+    position: relative;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+  }
+
+  .day-item.active {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+  }
+
+  .day-name {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+  }
+
+  .day-number {
+    font-size: 1.125rem;
+    font-weight: 500;
+  }
+
+  .completion-mark {
+    color: white;
+    font-size: 1rem;
+    margin-top: 0.125rem;
+  }
+
   .date-header {
     text-align: center;
-    margin-bottom: 1.5rem;
+    padding: 0 1.5rem;
   }
 
   .current-date {
@@ -472,43 +513,11 @@
     color: #216974;
   }
 
-  .week-strip {
-    display: flex;
-    justify-content: space-between;
-    margin-top: 1.5rem;
-  }
-
-  .day-item {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.25rem;
-    padding: 0.5rem;
-    color: #666;
-    position: relative;
-  }
-
-  .day-item.active {
-    background: rgba(33, 105, 116, 0.1);
-    border-radius: 8px;
-    color: #216974;
-  }
-
-  .day-name {
-    font-size: 0.75rem;
-    text-transform: uppercase;
-  }
-
-  .day-number {
-    font-size: 1rem;
-    font-weight: 500;
-  }
-
   .reflection-cards {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 1rem;
-    margin-bottom: 1.5rem;
+    margin: 0 10px 1.5rem 10px;
   }
 
   .reflection-card {
@@ -570,7 +579,7 @@
     background: #f8fafc;
     border-radius: 16px;
     padding: 1.5rem;
-    margin-bottom: 1.5rem;
+    margin: 0 10px 1.5rem 10px;
     border: 1px solid #e0e0e0;
   }
 
@@ -843,7 +852,7 @@
   }
 
   .completion-mark {
-    color: #216974;
+    color: white;
     font-size: 0.875rem;
     margin-top: 0.125rem;
   }
