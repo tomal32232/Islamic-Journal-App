@@ -466,8 +466,13 @@
     padding: 0;
     background: white;
     color: #333;
-    min-height: 100vh;
+    height: 100vh;
     overflow-y: auto;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
   }
 
   .journal-header {
@@ -482,19 +487,25 @@
     margin: 10px;
     border-radius: 12px;
     position: sticky;
-    top: 0;
+    top: 10px;
     z-index: 100;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .week-strip.scrolled {
     padding: 0.5rem 1rem;
-    margin-top: 0;
     border-radius: 0 0 12px 12px;
   }
 
+  .week-strip.scrolled .day-item {
+    padding: 0.25rem 0.5rem;
+  }
+
   .week-strip.scrolled .day-name {
-    display: none;
+    height: 0;
+    opacity: 0;
+    margin: 0;
+    overflow: hidden;
   }
 
   .day-item {
