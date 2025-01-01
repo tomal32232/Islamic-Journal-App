@@ -11,6 +11,14 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
+    // Helper function to check if earnedBadges are only being added to (not removed)
+    function isValidBadgeUpdate() {
+      let oldBadges = resource.data.earnedBadges;
+      let newBadges = request.resource.data.earnedBadges;
+      return oldBadges == null || oldBadges.size() == 0 || 
+             (!(oldBadges.hasAll(newBadges)) && newBadges.hasAll(oldBadges));
+    }
+
     // Daily Quotes collection - public read access
     match /daily_quotes/{quoteId} {
       allow read: if true;  // Anyone can read quotes
@@ -73,9 +81,15 @@ service cloud.firestore {
       allow create: if isOwner(request.resource.data.userId);
     }
 
-    match /users/{userId}/achievements/{document=**} {
+    // Special rules for badges document to protect earnedBadges
+    match /users/{userId}/achievements/badges {
       allow read: if isOwner(userId);
-      allow write: if isOwner(userId);
+      allow create: if isOwner(userId);
+      // Allow updates that either only modify progress or properly update earnedBadges
+      allow update: if isOwner(userId) && 
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['progress', 'lastUpdated']) || 
+         (request.resource.data.diff(resource.data).affectedKeys().hasAll(['earnedBadges', 'lastUpdated']) && 
+          isValidBadgeUpdate()));
     }
 
     match /users/{userId} {
