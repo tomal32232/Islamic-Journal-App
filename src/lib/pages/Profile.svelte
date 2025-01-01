@@ -23,6 +23,7 @@
   let todayReadingTime = 0;
   let todayDhikrCount = 0;
   let isLoadingFavorites = false;
+  let scrollY = 0;
 
   // Subscribe to favorites store
   $: favoriteVerses = $favoritesStore || [];
@@ -243,14 +244,32 @@
     editingGoal = null;
   }
 
-  onMount(async () => {
-    await goalStore.loadGoals();
-    await updateTodayReadingTime();
-    
-    // Load favorite verses
-    isLoadingFavorites = true;
-    await getFavorites();
-    isLoadingFavorites = false;
+  function handleScroll(event) {
+    const container = event.target;
+    scrollY = container.scrollTop;
+  }
+
+  onMount(() => {
+    const container = document.querySelector('.profile-container');
+    if (container) {
+      container.addEventListener('scroll', handleScroll);
+    }
+
+    // Initialize async operations
+    Promise.all([
+      goalStore.loadGoals(),
+      updateTodayReadingTime(),
+      (async () => {
+        isLoadingFavorites = true;
+        await getFavorites();
+        isLoadingFavorites = false;
+      })()
+    ]);
+
+    // Return cleanup function
+    return () => {
+      container?.removeEventListener('scroll', handleScroll);
+    };
   });
 
   // Handle logout
@@ -295,9 +314,8 @@
 <Toast />
 
 <main class="profile-container">
-  <div class="profile-content">
-    <!-- Basic User Info Card -->
-    <div class="card user-info">
+  <div class="header-card" class:scrolled={scrollY > 50}>
+    <div class="user-info">
       <img 
         src={user?.photoURL || 'default-avatar.png'} 
         alt="Profile" 
@@ -308,9 +326,11 @@
         <p class="email">{user?.email}</p>
       </div>
     </div>
+  </div>
 
+  <div class="profile-content">
     <!-- Achievement Badges Card -->
-    <div class="badges-section">
+    <div class="badges-section card">
       <div class="section-header">
         <h2>
           <Trophy weight="fill" />
@@ -405,26 +425,45 @@
 
 <style>
   .profile-container {
-    padding: 1rem;
-    padding-bottom: 64px;
+    padding: 0;
     background: #F8FAFC;
-    min-height: 100vh;
+    height: 100%;
     overflow-y: auto;
+    overflow-x: hidden;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .header-card {
+    background: #216974;
+    color: white;
+    padding: 1rem;
+    margin: 10px 10px 0 10px;
+    border-radius: 12px;
+    position: sticky;
+    top: 10px;
+    z-index: 100;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .header-card.scrolled {
+    padding: 0.5rem 1rem;
+    margin: 0 10px;
+    border-radius: 12px;
   }
 
   .profile-content {
+    padding: 0 10px;
+    margin-top: 10px;
+    margin-bottom: 4rem;
     max-width: 600px;
-    margin: 0 auto;
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-  }
-
-  .card {
-    background: white;
-    padding: 1rem;
-    border-radius: 12px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-left: auto;
+    margin-right: auto;
   }
 
   .user-info {
@@ -434,20 +473,20 @@
   }
 
   .profile-image {
-    width: 80px;
-    height: 80px;
-    border-radius: 40px;
+    width: 48px;
+    height: 48px;
+    border-radius: 24px;
     object-fit: cover;
   }
 
   .user-details h2 {
     margin: 0;
-    font-size: 1.25rem;
-    color: #216974;
+    font-size: 1.125rem;
+    color: white;
   }
 
   .email {
-    color: #666;
+    color: rgba(255, 255, 255, 0.8);
     font-size: 0.875rem;
     margin: 0;
   }
@@ -489,6 +528,7 @@
     border-radius: 12px;
     padding: 1rem;
     margin-bottom: 1rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
   }
 
   .section-header {
@@ -498,7 +538,7 @@
     margin-bottom: 1rem;
   }
 
-  h2 {
+  .section-header h2 {
     display: flex;
     align-items: center;
     gap: 0.5rem;
@@ -508,8 +548,11 @@
   }
 
   .badge-count {
-    font-size: 0.875rem;
+    background: rgba(33, 105, 116, 0.1);
     color: #216974;
+    padding: 0.25rem 0.5rem;
+    border-radius: 1rem;
+    font-size: 0.875rem;
     font-weight: 500;
   }
 
@@ -766,7 +809,7 @@
 
   @media (max-width: 480px) {
     .profile-container {
-      padding: 0.75rem;
+      padding: 0;
     }
 
     .profile-image {
