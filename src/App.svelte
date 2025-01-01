@@ -45,6 +45,7 @@
 </script>
 
 {#if user}
+  <div class="top-bar"></div>
   <div class="app-container">
     {#if activeTab !== 'notifications'}
       <NotificationIcon on:click={() => navigateTo('notifications')} />
@@ -75,6 +76,7 @@
       <BottomNav {activeTab} on:tabChange={handleTabChange} />
     {/if}
   </div>
+  <div class="bottom-bar"></div>
 {:else}
   <main>
     <SignIn />
@@ -82,15 +84,37 @@
 {/if}
 
 <style>
+  .top-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 10px;
+    background: white;
+    z-index: 99;
+  }
+
+  .bottom-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 60px;
+    background: white;
+    z-index: 99;
+  }
+
   .app-container {
     position: relative;
     width: 100%;
     min-height: 100vh;
-    padding-bottom: 80px; /* Increased padding for the bottom nav */
+    padding-bottom: 80px;
+    background: #F8FAFC;
   }
 
   main {
     width: 100%;
     min-height: 100vh;
+    padding-top: 10px;
   }
 </style>

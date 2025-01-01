@@ -492,7 +492,6 @@
   }
 </script>
 
-<div class="top-bar"></div>
 <div class="home-container">
   <div class="content">
     {#if currentPage === 'home'}
@@ -668,29 +667,8 @@
     {/if}
   </div>
 </div>
-<div class="bottom-bar"></div>
 
 <style>
-  .top-bar {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 10px;
-    background: white;
-    z-index: 99;
-  }
-
-  .bottom-bar {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 60px;
-    background: white;
-    z-index: 99;
-  }
-
   .home-container {
     padding: 0;
     padding-bottom: 60px;
