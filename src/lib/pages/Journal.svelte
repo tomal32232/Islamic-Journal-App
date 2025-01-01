@@ -473,6 +473,9 @@
     left: 0;
     right: 0;
     bottom: 0;
+    padding-bottom: 6rem;
+    width: 100%;
+    box-sizing: border-box;
   }
 
   .journal-header {
@@ -494,7 +497,8 @@
 
   .week-strip.scrolled {
     padding: 0.5rem 1rem;
-    border-radius: 0 0 12px 12px;
+    margin: 0 10px;
+    border-radius: 12px;
   }
 
   .week-strip.scrolled .day-item {
@@ -555,7 +559,7 @@
   }
 
   h1 {
-    font-size: 2rem;
+    font-size: 1.5rem;
     font-weight: 500;
     margin: 0.5rem 0;
     color: #216974;
