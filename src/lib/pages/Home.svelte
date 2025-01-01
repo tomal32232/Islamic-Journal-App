@@ -688,7 +688,7 @@
   .content {
     width: 100%;
     box-sizing: border-box;
-    padding: 0;
+    padding: 0 10px;
     margin-bottom: 4rem;
   }
 
@@ -701,7 +701,7 @@
     background: #216974;
     color: white;
     padding: 1rem;
-    margin: 10px;
+    margin: 0 0 10px 0;
     border-radius: 12px;
     position: sticky;
     top: 10px;
@@ -711,7 +711,7 @@
 
   .quote-card.scrolled {
     padding: 0.5rem 1rem;
-    margin: 0 10px;
+    margin: 0;
     border-radius: 12px;
   }
 
