@@ -492,7 +492,8 @@
   }
 </script>
 
-<main class="home-container">
+<div class="top-bar"></div>
+<div class="home-container">
   <div class="content">
     {#if currentPage === 'home'}
       <div class="home-content">
@@ -666,9 +667,19 @@
       <Profile {navigateTo} />
     {/if}
   </div>
-</main>
+</div>
 
 <style>
+  .top-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 10px;
+    background: white;
+    z-index: 99;
+  }
+
   .home-container {
     padding: 0;
     padding-bottom: 60px;
