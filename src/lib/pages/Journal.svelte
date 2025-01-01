@@ -235,30 +235,35 @@
     }
   }
 
+  let isSubmitting = false;
+
   async function handleSubmit() {
     if (isLastQuestion) {
-      if (selectedReflection === 'morning') {
-        await saveMorningReflection();
-      } else {
-        await saveEveningReflection();
+      isSubmitting = true;
+      try {
+        if (selectedReflection === 'morning') {
+          await saveMorningReflection();
+        } else {
+          await saveEveningReflection();
+        }
+        selectedReflection = null;
+        currentQuestionIndex = 0;
+        // Force a refresh of the greeting
+        greeting = getGreeting();
+      } catch (error) {
+        console.error('Error submitting reflection:', error);
+      } finally {
+        isSubmitting = false;
       }
-      selectedReflection = null;
-      currentQuestionIndex = 0;
     } else {
       nextQuestion();
     }
   }
 
+  // Add onMount to load initial data
   onMount(async () => {
     await journalStore.loadTodayReflections();
-    
-    // Pre-fill forms if reflections exist
-    if ($journalStore.todayMorningReflection) {
-      morningReflection = { ...$journalStore.todayMorningReflection };
-    }
-    if ($journalStore.todayEveningReflection) {
-      eveningReflection = { ...$journalStore.todayEveningReflection };
-    }
+    weekDays = getCurrentWeek();
   });
 
   // Add this function to handle progress updates
@@ -278,12 +283,16 @@
 
   async function saveMorningReflection() {
     await journalStore.saveMorningReflection(morningReflection);
-    selectedReflection = null;
+    await journalStore.loadTodayReflections(); // Refresh the store data
+    weekDays = getCurrentWeek(); // Refresh the week display
+    morningReflection = { plans: '', newThing: '', affirmation: '' }; // Reset form
   }
 
   async function saveEveningReflection() {
     await journalStore.saveEveningReflection(eveningReflection);
-    selectedReflection = null;
+    await journalStore.loadTodayReflections(); // Refresh the store data
+    weekDays = getCurrentWeek(); // Refresh the week display
+    eveningReflection = { highlights: '', learnings: '', satisfaction: '', barriers: '' }; // Reset form
   }
 </script>
 
@@ -411,10 +420,14 @@
                   </button>
                 {/if}
 
-                <button type="submit" class="submit-btn">
-                  {isLastQuestion ? 'Complete Reflection' : 'Next Question'}
-                  {#if !isLastQuestion}
-                    <CaretRight size={20} />
+                <button type="submit" class="submit-btn" disabled={isSubmitting}>
+                  {#if isSubmitting}
+                    <div class="loading-spinner"></div>
+                  {:else}
+                    {isLastQuestion ? 'Complete Reflection' : 'Next Question'}
+                    {#if !isLastQuestion}
+                      <CaretRight size={20} />
+                    {/if}
                   {/if}
                 </button>
               </div>
@@ -833,5 +846,26 @@
     color: #216974;
     font-size: 0.875rem;
     margin-top: 0.125rem;
+  }
+
+  .submit-btn:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  .loading-spinner {
+    width: 20px;
+    height: 20px;
+    border: 2px solid #ffffff;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
   }
 </style> 
