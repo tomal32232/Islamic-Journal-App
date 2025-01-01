@@ -715,45 +715,37 @@
     border-radius: 0 0 12px 12px;
   }
 
+  .quote-card.scrolled .greeting-content {
+    height: 0;
+    opacity: 0;
+    margin: 0;
+    overflow: hidden;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
   .quote-card.scrolled .quote-section {
-    height: 0;
-    opacity: 0;
-    margin: 0;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-
-  .quote-card.scrolled .datetime {
-    height: 0;
-    opacity: 0;
-    margin: 0;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-
-  .quote-section {
-    text-align: center;
-    height: auto;
-    opacity: 1;
-    margin-top: 0.75rem;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-
-  .datetime {
-    text-align: right;
-    height: auto;
-    opacity: 1;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-
-  .greeting-section {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
+    margin-top: 0;
   }
 
   .greeting-content {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
+    height: auto;
+    opacity: 1;
+    margin-bottom: 0.75rem;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .quote-section {
+    text-align: center;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    margin-top: 0.75rem;
+  }
+
+  .greeting-section {
+    display: flex;
+    flex-direction: column;
   }
 
   .greeting-section h1 {
