@@ -703,16 +703,15 @@
     color: white;
     padding: 1rem;
     border-radius: 12px;
-    margin-bottom: 1rem;
     position: sticky;
-    top: 0;
+    top: 10px;
     z-index: 100;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .quote-card.scrolled {
     padding: 0.5rem 1rem;
-    border-radius: 0 0 12px 12px;
+    border-radius: 12px;
   }
 
   .quote-card.scrolled .greeting-content {
