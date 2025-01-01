@@ -699,20 +699,20 @@
   .content {
     width: 100%;
     box-sizing: border-box;
-    padding: 0 10px;
+    padding: 0;
     margin-bottom: 4rem;
   }
 
   .home-content {
     max-width: 600px;
     margin: 0 auto;
-    padding-top: 20px;
   }
 
   .quote-card {
     background: #216974;
     color: white;
     padding: 1rem;
+    margin: 10px;
     border-radius: 12px;
     position: sticky;
     top: 10px;
@@ -722,6 +722,7 @@
 
   .quote-card.scrolled {
     padding: 0.5rem 1rem;
+    margin: 0 10px;
     border-radius: 12px;
   }
 
