@@ -374,41 +374,59 @@
     isExcusedPeriodActive = !!activeExcusedPeriod;
   }
 
-  onMount(async () => {
-    const cleanup = auth.onAuthStateChanged(async (user) => {
+  let scrollY = 0;
+
+  function handleScroll(event) {
+    const container = event.target;
+    scrollY = container.scrollTop;
+  }
+
+  onMount(() => {
+    const container = document.querySelector('.home-container');
+    if (container) {
+      container.addEventListener('scroll', handleScroll);
+    }
+
+    const cleanup = auth.onAuthStateChanged((user) => {
       userName = capitalizeFirstLetter(user?.displayName?.split(' ')[0]) || 'Guest';
       if (user) {
         console.log('User authenticated:', user.uid);
-        await fetchPrayerTimes();
-        await getPrayerHistory();
-        await loadWeekMoods();
-        await updateExcusedStatus();
-        updatePrayerStatus();
-        // Get initial weekly stats
-        const stats = await getWeeklyStats();
-        if (stats?.dailyCounts) {
-          const todayCount = stats.dailyCounts.find(day => day.isToday);
-          todayTasbihCount = todayCount ? todayCount.count : 0;
-        }
+        Promise.all([
+          fetchPrayerTimes(),
+          getPrayerHistory(),
+          loadWeekMoods(),
+          updateExcusedStatus(),
+          getWeeklyStats().then(stats => {
+            if (stats?.dailyCounts) {
+              const todayCount = stats.dailyCounts.find(day => day.isToday);
+              todayTasbihCount = todayCount ? todayCount.count : 0;
+            }
+          })
+        ]).then(() => {
+          updatePrayerStatus();
+        });
       }
     });
 
-    await getRandomQuote();
-    await getWeeklyStats();
+    Promise.all([
+      getRandomQuote(),
+      getWeeklyStats(),
+      getTodayReadingTime().then(time => {
+        todayReadingTime = time;
+      }),
+      checkExcusedStatus()
+    ]);
     
-    const prayerInterval = setInterval(updatePrayerStatus, 60000);
+    const prayerInterval = setInterval(() => updatePrayerStatus(), 60000);
     const countdownInterval = setInterval(updateCountdown, 1000);
     const notificationInterval = setInterval(checkPrayerNotifications, 60000);
-    
-    todayReadingTime = await getTodayReadingTime();
-    
-    await checkExcusedStatus();
     
     return () => {
       cleanup();
       clearInterval(prayerInterval);
       clearInterval(countdownInterval);
       clearInterval(notificationInterval);
+      container?.removeEventListener('scroll', handleScroll);
     };
   });
 
@@ -478,7 +496,7 @@
   <div class="content">
     {#if currentPage === 'home'}
       <div class="home-content">
-        <div class="quote-card">
+        <div class="quote-card" class:scrolled={scrollY > 50}>
           <div class="greeting-section">
             <div class="greeting-content">
               <div class="greeting-text">
@@ -671,13 +689,13 @@
     width: 100%;
     box-sizing: border-box;
     padding: 0 10px;
-    margin-top: 20px;
     margin-bottom: 4rem;
   }
 
   .home-content {
     max-width: 600px;
     margin: 0 auto;
+    padding-top: 20px;
   }
 
   .quote-card {
@@ -686,6 +704,23 @@
     padding: 1rem;
     border-radius: 12px;
     margin-bottom: 1rem;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    transition: all 0.3s ease;
+  }
+
+  .quote-card.scrolled {
+    padding: 0.5rem 1rem;
+    border-radius: 0;
+  }
+
+  .quote-card.scrolled .quote-section {
+    display: none;
+  }
+
+  .quote-card.scrolled .datetime {
+    display: none;
   }
 
   .greeting-section {
