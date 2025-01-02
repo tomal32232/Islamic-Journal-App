@@ -28,6 +28,7 @@
   import { get } from 'svelte/store';
   import MoodHistoryModal from '../components/MoodHistoryModal.svelte';
   import { Lock } from 'phosphor-svelte';
+  import { LocalNotifications } from '@capacitor/local-notifications';
   const dispatch = createEventDispatcher();
   
   let currentPage = 'home';
@@ -271,20 +272,61 @@
     await updatePrayerStatus();
   }
 
-  function checkPrayerNotifications() {
-    $prayerTimesStore.forEach(prayer => {
-      if (prayer.isPast && !prayer.notified) {
-        // Show notification
-        if (Notification.permission === "granted") {
-          new Notification(`Prayer Reminder`, {
-            body: `Time for ${prayer.name} prayer has passed. Don't forget to mark it.`,
-            icon: '/icon.png'
-          });
-        }
-        // Update store to mark as notified
-        prayer.notified = true;
+  async function checkPrayerNotifications() {
+    try {
+      // First check if notifications are supported
+      if (!LocalNotifications) {
+        console.error('LocalNotifications plugin not available');
+        return;
       }
-    });
+
+      // Check current permission status
+      const permStatus = await LocalNotifications.checkPermissions();
+      console.log('Current notification permission status:', permStatus);
+
+      // Request permissions if not granted
+      if (permStatus.display !== 'granted') {
+        console.log('Requesting notification permissions...');
+        const result = await LocalNotifications.requestPermissions();
+        console.log('Permission request result:', result);
+        
+        if (result.display !== 'granted') {
+          console.log('Notification permission denied');
+          return;
+        }
+      }
+
+      // Schedule notifications for past prayers that haven't been notified
+      for (const prayer of $prayerTimesStore) {
+        if (prayer.isPast && !prayer.notified) {
+          console.log('Scheduling notification for prayer:', prayer.name);
+          
+          try {
+            const notificationId = Math.floor(Date.now() / 1000);
+            await LocalNotifications.schedule({
+              notifications: [{
+                title: 'Prayer Reminder',
+                body: `Time for ${prayer.name} prayer has passed. Don't forget to mark it.`,
+                id: notificationId,
+                schedule: { at: new Date() },
+                sound: null,
+                attachments: null,
+                actionTypeId: '',
+                extra: null
+              }]
+            });
+
+            // Update store to mark as notified
+            prayer.notified = true;
+            console.log('Notification scheduled successfully for:', prayer.name);
+          } catch (error) {
+            console.error('Error scheduling notification for prayer:', prayer.name, error);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error in checkPrayerNotifications:', error);
+    }
   }
 
   async function handleMoodSelect(event) {
