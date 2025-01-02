@@ -434,10 +434,22 @@
   }
 
   let scrollY = 0;
+  let isScrolled = false;
+  const SCROLL_THRESHOLD = 50;
+  const SCROLL_BUFFER = 10;
 
   function handleScroll(event) {
     const container = event.target;
-    scrollY = container.scrollTop;
+    const newScrollY = container.scrollTop;
+    
+    // Add buffer zone to prevent oscillation
+    if (!isScrolled && newScrollY > SCROLL_THRESHOLD + SCROLL_BUFFER) {
+      isScrolled = true;
+    } else if (isScrolled && newScrollY < SCROLL_THRESHOLD - SCROLL_BUFFER) {
+      isScrolled = false;
+    }
+    
+    scrollY = newScrollY;
   }
 
   onMount(() => {
@@ -556,7 +568,7 @@
   <div class="content">
     {#if currentPage === 'home'}
       <div class="home-content">
-        <div class="quote-card" class:scrolled={scrollY > 50}>
+        <div class="quote-card" class:scrolled={isScrolled}>
           <div class="greeting-section">
             <div class="greeting-content">
               <div class="greeting-text">
@@ -748,7 +760,7 @@
   .content {
     width: 100%;
     box-sizing: border-box;
-    padding: 0 10px;
+    padding: 10px 10px 0;
     margin-bottom: 4rem;
   }
 
@@ -766,41 +778,58 @@
     position: sticky;
     top: 10px;
     z-index: 100;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transform-origin: top center;
+    transition: all 0.3s ease;
+    will-change: transform, height;
   }
 
   .quote-card.scrolled {
-    padding: 0.5rem 1rem;
-    margin: 0;
+    padding: 0.75rem 1rem;
     border-radius: 12px;
-  }
-
-  .quote-card.scrolled .greeting-content {
-    height: 0;
-    opacity: 0;
     margin: 0;
-    overflow: hidden;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-
-  .quote-card.scrolled .quote-section {
-    margin-top: 0;
   }
 
   .greeting-content {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    height: auto;
+    max-height: 200px;
     opacity: 1;
     margin-bottom: 0.75rem;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: max-height 0.3s ease, opacity 0.3s ease;
+    overflow: hidden;
+  }
+
+  .quote-card.scrolled .greeting-content {
+    max-height: 0;
+    opacity: 0;
+    margin: 0;
+    pointer-events: none;
+  }
+
+  .calendar-strip {
+    display: flex;
+    justify-content: space-between;
+    margin: 0;
+    padding: 0.25rem 0;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    transform-origin: top center;
+  }
+
+  .quote-card.scrolled + .calendar-strip {
+    opacity: 0;
+    transform: translateY(-100%);
+    pointer-events: none;
   }
 
   .quote-section {
     text-align: center;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: margin 0.3s ease;
     margin-top: 0.75rem;
+  }
+
+  .quote-card.scrolled .quote-section {
+    margin: 0;
   }
 
   .greeting-section {
