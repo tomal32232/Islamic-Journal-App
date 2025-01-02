@@ -54,9 +54,11 @@
   }
 
   async function markPrayer(prayer, status) {
+    const today = new Date().toLocaleDateString('en-CA');
     await savePrayerStatus({
       name: prayer.name,
       time: prayer.time,
+      date: today,
       status
     });
     

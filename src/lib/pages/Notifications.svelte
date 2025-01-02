@@ -36,7 +36,7 @@
         return { ...store, pendingByDate: updatedPendingByDate };
       });
 
-      // Then save to database
+      // Then save to database with proper date
       await savePrayerStatus({
         name: prayer.prayerName,
         time: prayer.time,

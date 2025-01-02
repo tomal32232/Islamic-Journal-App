@@ -8,11 +8,11 @@
       "serverClientId": "398086636891-flpsa3do6ptr8utuq458ao093l0u3lsh.apps.googleusercontent.com",
       "forceCodeForRefreshToken": true
     }
-  },
-  "server": {
-    "androidScheme": "http",
-    "iosScheme": "http",
-    "url": "http://10.0.2.2:5173",
-    "cleartext": true
   }
+  // "server": {
+  //   "androidScheme": "http",
+  //   "iosScheme": "http",
+  //   "url": "http://10.0.2.2:5173",
+  //   "cleartext": true
+  // }
 }

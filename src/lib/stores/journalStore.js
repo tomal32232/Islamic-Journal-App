@@ -81,14 +81,6 @@ function createJournalStore() {
       days.push(date.toISOString().split('T')[0]);
     }
 
-    // Count total completed days (both morning and evening) from all reflections
-    let totalCompletedDays = 0;
-    reflectionsByDate.forEach((reflection) => {
-      if (reflection.morning && reflection.evening) {
-        totalCompletedDays++;
-      }
-    });
-
     // Fill in the progress for each day
     days.forEach((dateStr, index) => {
       const reflection = reflectionsByDate.get(dateStr);
@@ -98,21 +90,20 @@ function createJournalStore() {
           evening: reflection.evening,
           date: dateStr
         };
-        // Only count as completed if both morning and evening are done
-        if (reflection.morning && reflection.evening) {
-          completedDays++;
-          // Calculate streak only for consecutive days up to today
-          if (index === days.length - 1 || // Today
-              (index === days.length - 2 && completedDays > 0)) { // Yesterday if we have a streak
-            streak += 1;
-          }
-        }
       } else {
         dailyProgress[index] = {
           morning: false,
           evening: false,
           date: dateStr
         };
+      }
+    });
+
+    // Count completed days from the last 7 days only
+    let totalCompletedDays = 0;
+    dailyProgress.forEach(day => {
+      if (day.morning && day.evening) {
+        totalCompletedDays++;
       }
     });
 
@@ -123,29 +114,27 @@ function createJournalStore() {
       date: null 
     }));
 
-    // First, add completed days in sequence, but only up to 7 days total
+    // First, add all completed days in sequence
     let progressIndex = 0;
-    let completedDaysShown = 0;
     dailyProgress.forEach((day) => {
-      if (day.morning && day.evening && completedDaysShown < 7) {
+      if (day.morning && day.evening) {
         sortedProgress[progressIndex] = {
           morning: true,
           evening: true,
           date: day.date
         };
         progressIndex++;
-        completedDaysShown++;
       }
     });
 
-    // Add today's progress if it's morning-only
-    const todayProgress = dailyProgress[dailyProgress.length - 1];
-    if (todayProgress.morning && !todayProgress.evening && completedDaysShown < 7) {
-      sortedProgress[progressIndex] = {
-        morning: true,
-        evening: false,
-        date: todayProgress.date
-      };
+    // Calculate streak from consecutive days up to today
+    streak = 0;
+    for (let i = dailyProgress.length - 1; i >= 0; i--) {
+      if (dailyProgress[i].morning && dailyProgress[i].evening) {
+        streak++;
+      } else {
+        break;
+      }
     }
 
     console.log('Days being tracked:', days);
@@ -169,7 +158,6 @@ function createJournalStore() {
         completedDays: totalCompletedDays,
         dailyProgress: sortedProgress,
         totalEntries: snapshot.docs.length,
-        // Reset today's reflections if they don't exist
         todayMorningReflection: todayReflections.morning ? store.todayMorningReflection : null,
         todayEveningReflection: todayReflections.evening ? store.todayEveningReflection : null
       };
@@ -182,7 +170,7 @@ function createJournalStore() {
 
       return newStore;
     });
-    
+
     updateJournalStreak(Math.floor(streak));
   }
 

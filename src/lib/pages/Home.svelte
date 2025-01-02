@@ -30,6 +30,8 @@
   import { Lock } from 'phosphor-svelte';
   import { LocalNotifications } from '@capacitor/local-notifications';
   import NotificationIcon from '../components/NotificationIcon.svelte';
+  import { journalStore } from '../stores/journalStore';
+  import { quranStore, fetchCompleteQuran } from '../services/quranService';
   const dispatch = createEventDispatcher();
   
   let currentPage = 'home';
@@ -40,6 +42,72 @@
   if (hour < 12) greeting = 'Good Morning';
   else if (hour < 17) greeting = 'Good Afternoon';
   else greeting = 'Good Evening';
+
+  // Request notification permissions on mount
+  onMount(async () => {
+    try {
+      // Start loading Quran data immediately
+      fetchCompleteQuran().catch(error => {
+        console.error('Error prefetching Quran data:', error);
+      });
+
+      const permStatus = await LocalNotifications.checkPermissions();
+      console.log('Current notification permission status:', permStatus);
+      if (permStatus.display !== 'granted') {
+        console.log('Requesting notification permissions...');
+        await LocalNotifications.requestPermissions();
+      }
+    } catch (error) {
+      console.error('Error requesting notification permissions:', error);
+    }
+
+    const container = document.querySelector('.home-container');
+    if (container) {
+      container.addEventListener('scroll', handleScroll);
+    }
+
+    const cleanup = auth.onAuthStateChanged((user) => {
+      userName = capitalizeFirstLetter(user?.displayName?.split(' ')[0]) || 'Guest';
+      if (user) {
+        console.log('User authenticated:', user.uid);
+        Promise.all([
+          fetchPrayerTimes(),
+          getPrayerHistory(),
+          loadWeekMoods(),
+          updateExcusedStatus(),
+          getWeeklyStats().then(stats => {
+            if (stats?.dailyCounts) {
+              const todayCount = stats.dailyCounts.find(day => day.isToday);
+              todayTasbihCount = todayCount ? todayCount.count : 0;
+            }
+          })
+        ]).then(() => {
+          updatePrayerStatus();
+        });
+      }
+    });
+
+    Promise.all([
+      getRandomQuote(),
+      getWeeklyStats(),
+      getTodayReadingTime().then(time => {
+        todayReadingTime = time;
+      }),
+      checkExcusedStatus()
+    ]);
+    
+    const prayerInterval = setInterval(() => updatePrayerStatus(), 60000);
+    const countdownInterval = setInterval(updateCountdown, 1000);
+    const notificationInterval = setInterval(checkPrayerNotifications, 60000);
+    
+    return () => {
+      cleanup();
+      clearInterval(prayerInterval);
+      clearInterval(countdownInterval);
+      clearInterval(notificationInterval);
+      container?.removeEventListener('scroll', handleScroll);
+    };
+  });
 
   function navigateTo(page) {
     dispatch('navigate', page);
@@ -263,9 +331,11 @@
       return;
     }
 
+    const today = new Date().toLocaleDateString('en-CA');
     await savePrayerStatus({
       name: prayer.prayerName || prayer.name,
       time: prayer.time,
+      date: prayer.date || today,
       status
     });
     
@@ -452,55 +522,6 @@
     scrollY = newScrollY;
   }
 
-  onMount(() => {
-    const container = document.querySelector('.home-container');
-    if (container) {
-      container.addEventListener('scroll', handleScroll);
-    }
-
-    const cleanup = auth.onAuthStateChanged((user) => {
-      userName = capitalizeFirstLetter(user?.displayName?.split(' ')[0]) || 'Guest';
-      if (user) {
-        console.log('User authenticated:', user.uid);
-        Promise.all([
-          fetchPrayerTimes(),
-          getPrayerHistory(),
-          loadWeekMoods(),
-          updateExcusedStatus(),
-          getWeeklyStats().then(stats => {
-            if (stats?.dailyCounts) {
-              const todayCount = stats.dailyCounts.find(day => day.isToday);
-              todayTasbihCount = todayCount ? todayCount.count : 0;
-            }
-          })
-        ]).then(() => {
-          updatePrayerStatus();
-        });
-      }
-    });
-
-    Promise.all([
-      getRandomQuote(),
-      getWeeklyStats(),
-      getTodayReadingTime().then(time => {
-        todayReadingTime = time;
-      }),
-      checkExcusedStatus()
-    ]);
-    
-    const prayerInterval = setInterval(() => updatePrayerStatus(), 60000);
-    const countdownInterval = setInterval(updateCountdown, 1000);
-    const notificationInterval = setInterval(checkPrayerNotifications, 60000);
-    
-    return () => {
-      cleanup();
-      clearInterval(prayerInterval);
-      clearInterval(countdownInterval);
-      clearInterval(notificationInterval);
-      container?.removeEventListener('scroll', handleScroll);
-    };
-  });
-
   // Add console log to debug
   $: console.log('Prayer History Store:', $prayerHistoryStore);
 
@@ -603,6 +624,9 @@
             <div class="day-item {isToday ? 'active' : ''}">
               <span class="day">{day}</span>
               <span class="date-num">{date}</span>
+              {#if $journalStore.dailyProgress.find(d => d.date === fullDate && d.morning && d.evening)}
+                <div class="completion-mark">✓</div>
+              {/if}
               {#if weekMoods[fullDate]}
                 {@const matchingMood = moods.find(m => m.value === weekMoods[fullDate].mood)}
                 {#if matchingMood}
@@ -675,7 +699,7 @@
         </div>
 
         <div class="next-prayer-card">
-          <h3 class="section-title">Next Prayers</h3>
+          <h3 class="section-title">Next Prayer</h3>
           <div class="next-prayer-content">
             {#if isExcusedPeriodActive}
               <div class="excused-message">
