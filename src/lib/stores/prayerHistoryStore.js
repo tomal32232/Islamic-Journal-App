@@ -16,6 +16,41 @@ import { updatePrayerProgress } from '../services/badgeProgressService';
 import { onMount } from 'svelte';
 import { getCurrentLocation } from '../services/prayerTimes';
 
+// Cache stores
+const locationCache = {
+  coords: null,
+  timestamp: null
+};
+
+const prayerTimesCache = {
+  data: {},  // Store prayer times by date
+  timestamp: null
+};
+
+// Cache expiry time (12 hours)
+const CACHE_EXPIRY = 12 * 60 * 60 * 1000;
+
+// Get cached location or fetch new one
+async function getLocation() {
+  const now = Date.now();
+  
+  // Use cached location if available and not expired
+  if (locationCache.coords && locationCache.timestamp && 
+      now - locationCache.timestamp < CACHE_EXPIRY) {
+    console.log('Using cached location');
+    return locationCache.coords;
+  }
+
+  // Fetch new location
+  console.log('Fetching new location');
+  const coords = await getCurrentLocation();
+  if (coords) {
+    locationCache.coords = coords;
+    locationCache.timestamp = now;
+  }
+  return coords;
+}
+
 export const prayerHistoryStore = writable({
   pendingByDate: {},
   missedByDate: {},
@@ -193,40 +228,44 @@ export async function updatePrayerStatuses() {
   if (!user) return;
 
   const today = new Date();
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-  const yesterdayStr = yesterday.toLocaleDateString('en-CA');
+  today.setHours(0, 0, 0, 0);
+  const todayStr = today.toLocaleDateString('en-CA');
   
   const prayerTimes = await getPrayerTimes(today);
   if (!prayerTimes) return;
 
   const prayers = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
-  const todayStr = today.toLocaleDateString('en-CA');
 
-  // Check yesterday's unmarked prayers first
-  const yesterdayQuery = query(
+  // Check all past prayers first (any date before today)
+  const pastPrayersQuery = query(
     collection(db, 'prayer_history'),
     where('userId', '==', user.uid),
-    where('date', '==', yesterdayStr),
     where('status', 'in', ['pending', 'upcoming'])
   );
 
-  const yesterdaySnapshot = await getDocs(yesterdayQuery);
+  const pastPrayersSnapshot = await getDocs(pastPrayersQuery);
   const batch = [];
 
-  // Mark all pending/upcoming prayers from yesterday as missed
-  yesterdaySnapshot.forEach((doc) => {
-    const prayerRef = doc.ref;
-    batch.push(
-      setDoc(prayerRef, {
-        ...doc.data(),
-        status: 'missed',
-        timestamp: Timestamp.now()
-      }, { merge: true })
-    );
+  // Mark all pending/upcoming prayers from past dates as missed
+  pastPrayersSnapshot.forEach((doc) => {
+    const prayer = doc.data();
+    const prayerDate = new Date(prayer.date);
+    prayerDate.setHours(0, 0, 0, 0);
+
+    if (prayerDate < today) {
+      console.log(`Marking past prayer as missed: ${prayer.prayerName} on ${prayer.date}`);
+      batch.push(
+        setDoc(doc.ref, {
+          ...prayer,
+          status: 'missed',
+          timestamp: Timestamp.now()
+        }, { merge: true })
+      );
+    }
   });
 
   if (batch.length > 0) {
+    console.log(`Marking ${batch.length} past prayers as missed`);
     await Promise.all(batch);
     await getPrayerHistory(); // Refresh the store
   }
@@ -244,7 +283,7 @@ export async function updatePrayerStatuses() {
     return;
   }
 
-  // Process prayers with active excused period
+  // Process today's prayers with active excused period
   for (const prayer of prayers) {
     const prayerTime = prayerTimes[prayer.toLowerCase()];
     if (!prayerTime) continue;
@@ -1040,12 +1079,23 @@ async function getActiveExcusedPeriods() {
 // Add these helper functions
 async function getPrayerTimes(date) {
   try {
-    const coords = await getCurrentLocation();
+    const dateStr = date.toLocaleDateString('en-CA');
+    const now = Date.now();
+
+    // Use cached prayer times if available and not expired
+    if (prayerTimesCache.data[dateStr] && prayerTimesCache.timestamp && 
+        now - prayerTimesCache.timestamp < CACHE_EXPIRY) {
+      console.log(`Using cached prayer times for ${dateStr}`);
+      return prayerTimesCache.data[dateStr];
+    }
+
+    const coords = await getLocation();
     if (!coords) return null;
 
     // Calculate timestamp for the given date
     const timestamp = Math.floor(date.getTime() / 1000);
     
+    console.log(`Fetching prayer times for ${dateStr}`);
     const response = await fetch(
       `https://api.aladhan.com/v1/timings/${timestamp}?latitude=${coords.latitude}&longitude=${coords.longitude}&method=2`
     );
@@ -1057,13 +1107,19 @@ async function getPrayerTimes(date) {
     const data = await response.json();
     const timings = data.data.timings;
     
-    return {
+    const prayerTimes = {
       fajr: formatTo12Hour(timings.Fajr),
       dhuhr: formatTo12Hour(timings.Dhuhr),
       asr: formatTo12Hour(timings.Asr),
       maghrib: formatTo12Hour(timings.Maghrib),
       isha: formatTo12Hour(timings.Isha)
     };
+
+    // Cache the prayer times
+    prayerTimesCache.data[dateStr] = prayerTimes;
+    prayerTimesCache.timestamp = now;
+
+    return prayerTimes;
   } catch (error) {
     console.error('Error fetching prayer times:', error);
     return null;

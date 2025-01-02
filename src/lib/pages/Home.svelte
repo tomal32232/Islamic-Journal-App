@@ -663,7 +663,7 @@
         </div>
 
         <div class="next-prayer-card">
-          <h3 class="section-title">Next Prayer</h3>
+          <h3 class="section-title">Next Prayers</h3>
           <div class="next-prayer-content">
             {#if isExcusedPeriodActive}
               <div class="excused-message">

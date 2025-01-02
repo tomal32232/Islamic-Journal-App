@@ -20,15 +20,12 @@ export async function getCurrentLocation() {
     if (Capacitor.isNativePlatform()) {
       // Request permissions first
       const permissionStatus = await Geolocation.checkPermissions();
-      console.log('Initial permission status:', permissionStatus);
       
       // Check if we have any required permission
       const hasPermission = permissionStatus.location === 'granted' || permissionStatus.coarseLocation === 'granted';
       
       if (!hasPermission) {
-        console.log('Requesting location permission...');
         const requestResult = await Geolocation.requestPermissions();
-        console.log('Permission request result:', requestResult);
         
         // Check if either permission was granted
         const wasGranted = requestResult.location === 'granted' || requestResult.coarseLocation === 'granted';
@@ -37,24 +34,16 @@ export async function getCurrentLocation() {
         }
       }
       
-      // Get position using Capacitor with more options
-      console.log('Getting position...');
-      
       // First try with high accuracy and longer timeout
       try {
-        console.log('Attempting high accuracy location...');
         const position = await Geolocation.getCurrentPosition({
           enableHighAccuracy: true,
           timeout: 30000, // 30 seconds timeout for GPS fix
           maximumAge: 0
         });
         
-        console.log('High accuracy position received:', position);
-        console.log('Location accuracy (meters):', position.coords.accuracy);
-        
         // If accuracy is poor (> 100 meters), try again
         if (position.coords.accuracy > 100) {
-          console.log('Location accuracy too low, waiting for better fix...');
           // Wait 2 seconds and try again
           await new Promise(resolve => setTimeout(resolve, 2000));
           const betterPosition = await Geolocation.getCurrentPosition({
@@ -62,8 +51,6 @@ export async function getCurrentLocation() {
             timeout: 10000,
             maximumAge: 0
           });
-          console.log('Second attempt position:', betterPosition);
-          console.log('Second attempt accuracy (meters):', betterPosition.coords.accuracy);
           
           // Use the more accurate position
           if (betterPosition.coords.accuracy < position.coords.accuracy) {
@@ -85,15 +72,12 @@ export async function getCurrentLocation() {
           accuracy: position.coords.accuracy
         };
       } catch (highAccuracyError) {
-        console.log('High accuracy location failed, falling back to low accuracy:', highAccuracyError);
         // Fall back to low accuracy if high accuracy fails
         const position = await Geolocation.getCurrentPosition({
           enableHighAccuracy: false,
           timeout: 10000,
           maximumAge: 0
         });
-        
-        console.log('Low accuracy position received:', position);
         
         if (!position || !position.coords) {
           throw new Error('No location data received');
@@ -121,7 +105,6 @@ export async function getCurrentLocation() {
         
         navigator.geolocation.getCurrentPosition(
           (position) => {
-            console.log('Web position received:', position);
             resolve({
               latitude: position.coords.latitude,
               longitude: position.coords.longitude,
@@ -129,7 +112,6 @@ export async function getCurrentLocation() {
             });
           },
           (error) => {
-            console.error('Web geolocation error:', error);
             reject(new Error(getGeolocationErrorMessage(error)));
           },
           options
@@ -138,9 +120,7 @@ export async function getCurrentLocation() {
     }
   } catch (error) {
     console.error('Location error:', error);
-    const errorMessage = error.message || 'Unknown error';
-    console.log('Throwing error with message:', errorMessage);
-    throw new Error('Failed to get location: ' + errorMessage);
+    throw new Error('Failed to get location: ' + error.message);
   }
 }
 
