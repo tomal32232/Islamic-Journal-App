@@ -13,7 +13,7 @@
   }
 </script>
 
-{#if pendingCount > 0}
+{#if true}
 <button class="notification-icon" on:click={handleClick} aria-label="Notifications">
   <Bell weight="fill" color="#E09453" size={24} />
   <span class="badge">{pendingCount}</span>
@@ -26,7 +26,7 @@
     top: 1rem;
     right: 1rem;
     z-index: 1000;
-    background: transparent;
+    background: white;
     border: none;
     padding: 8px;
     cursor: pointer;
@@ -34,6 +34,8 @@
     align-items: center;
     justify-content: center;
     transition: transform 0.2s ease;
+    border-radius: 50%;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
   }
 
   .notification-icon:hover {

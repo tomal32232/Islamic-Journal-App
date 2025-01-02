@@ -29,6 +29,7 @@
   import MoodHistoryModal from '../components/MoodHistoryModal.svelte';
   import { Lock } from 'phosphor-svelte';
   import { LocalNotifications } from '@capacitor/local-notifications';
+  import NotificationIcon from '../components/NotificationIcon.svelte';
   const dispatch = createEventDispatcher();
   
   let currentPage = 'home';
@@ -296,18 +297,31 @@
         }
       }
 
-      // Schedule notifications for past prayers that haven't been notified
-      for (const prayer of $prayerTimesStore) {
-        if (prayer.isPast && !prayer.notified) {
-          console.log('Scheduling notification for prayer:', prayer.name);
+      // First update prayer statuses to ensure they're current
+      await updatePrayerStatuses();
+      await getPrayerHistory();
+
+      // Get current time
+      const now = new Date();
+      const todayStr = now.toLocaleDateString('en-CA');
+
+      // Schedule notifications for pending prayers
+      const pendingPrayers = Object.values($prayerHistoryStore.pendingByDate)
+        .reduce((prayers, { prayers: datePrayers }) => [...prayers, ...datePrayers], []);
+
+      console.log('Pending prayers to notify:', pendingPrayers);
+
+      let notificationId = 1;
+      for (const prayer of pendingPrayers) {
+        if (!prayer.notified) {
+          console.log('Scheduling notification for prayer:', prayer.prayerName);
           
           try {
-            const notificationId = Math.floor(Date.now() / 1000);
             await LocalNotifications.schedule({
               notifications: [{
                 title: 'Prayer Reminder',
-                body: `Time for ${prayer.name} prayer has passed. Don't forget to mark it.`,
-                id: notificationId,
+                body: `Time for ${prayer.prayerName} prayer has passed. Don't forget to mark it.`,
+                id: notificationId++,
                 schedule: { at: new Date() },
                 sound: null,
                 attachments: null,
@@ -316,14 +330,17 @@
               }]
             });
 
-            // Update store to mark as notified
+            // Mark as notified in the store
             prayer.notified = true;
-            console.log('Notification scheduled successfully for:', prayer.name);
+            console.log('Notification scheduled successfully for:', prayer.prayerName);
           } catch (error) {
-            console.error('Error scheduling notification for prayer:', prayer.name, error);
+            console.error('Error scheduling notification for prayer:', prayer.prayerName, error);
           }
         }
       }
+
+      // Update UI
+      await updatePrayerStatus();
     } catch (error) {
       console.error('Error in checkPrayerNotifications:', error);
     }
@@ -535,6 +552,7 @@
 </script>
 
 <div class="home-container">
+  <NotificationIcon on:click={() => navigateTo('notifications')} />
   <div class="content">
     {#if currentPage === 'home'}
       <div class="home-content">

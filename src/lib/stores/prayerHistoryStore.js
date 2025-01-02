@@ -1,5 +1,5 @@
 import { writable, get } from 'svelte/store';
-import { auth } from '../firebase';
+import { auth, db } from '../firebase';
 import { 
   doc, 
   setDoc, 
@@ -11,10 +11,10 @@ import {
   Timestamp,
   orderBy 
 } from 'firebase/firestore';
-import { db } from '../firebase';
 import { prayerTimesStore } from './prayerTimes';
 import { updatePrayerProgress } from '../services/badgeProgressService';
 import { onMount } from 'svelte';
+import { getCurrentLocation } from '../services/prayerTimes';
 
 export const prayerHistoryStore = writable({
   pendingByDate: {},
@@ -463,6 +463,25 @@ export async function getPrayerHistory() {
   const querySnapshot = await getDocs(historyQuery);
   console.log('Total prayer records found:', querySnapshot.size);
 
+  // Get unique dates from the prayer history
+  const uniqueDates = new Set();
+  querySnapshot.forEach(doc => {
+    const prayer = doc.data();
+    uniqueDates.add(prayer.date);
+  });
+  console.log('Unique dates found:', Array.from(uniqueDates));
+
+  // Fetch prayer times for all unique dates
+  const prayerTimesByDate = {};
+  for (const date of uniqueDates) {
+    const [year, month, day] = date.split('-').map(Number);
+    const prayerTimes = await getPrayerTimes(new Date(year, month - 1, day));
+    if (prayerTimes) {
+      prayerTimesByDate[date] = prayerTimes;
+      console.log(`Got prayer times for ${date}:`, prayerTimes);
+    }
+  }
+
   const history = [];
   const pendingByDate = {};
   const missedByDate = {};
@@ -483,8 +502,30 @@ export async function getPrayerHistory() {
       ...prayer
     });
     
-    const prayerDateTime = getPrayerDateTime(prayer.date, prayer.time);
+    let prayerDateTime = prayer.time ? getPrayerDateTime(prayer.date, prayer.time) : null;
+    if (!prayerDateTime && prayerTimesByDate[prayer.date]) {
+      // If we don't have the prayer time in the record, get it from prayer times
+      const prayerTime = prayerTimesByDate[prayer.date][prayer.prayerName.toLowerCase()];
+      if (prayerTime) {
+        prayer.time = prayerTime;
+        console.log(`Using prayer time from service for ${prayer.prayerName}: ${prayerTime}`);
+        prayerDateTime = getPrayerDateTime(prayer.date, prayerTime);
+      }
+    }
+    
+    if (!prayerDateTime) {
+      console.error(`No prayer time available for ${prayer.prayerName} on ${prayer.date}`);
+      return;
+    }
+
     const now = new Date();
+
+    console.log(`\nChecking prayer ${prayer.prayerName} for pending status:`, {
+      status: prayer.status,
+      prayerTime: prayerDateTime.toLocaleString(),
+      currentTime: now.toLocaleString(),
+      hasPassed: prayerDateTime < now
+    });
 
     // Skip if prayer is already marked as ontime, late, or excused
     if (['ontime', 'late', 'excused'].includes(prayer.status)) {
@@ -492,10 +533,10 @@ export async function getPrayerHistory() {
       return;
     }
 
-    // Only add to pending if:
-    // 1. Status is 'pending' or prayer time has passed and status is 'upcoming'
-    // 2. Not in an excused period OR before start prayer in excused period
-    if ((prayer.status === 'pending' || (prayer.status === 'upcoming' && prayerDateTime < now)) && 
+    // Add to pending if:
+    // 1. Status is 'pending' OR
+    // 2. Status is 'upcoming' and prayer time has passed
+    if ((prayer.status === 'pending' || prayer.status === 'upcoming') && 
         prayerDateTime < now) {
       // Check if this prayer should be excused
       const shouldExcuse = activeExcusedPeriod && 
@@ -513,18 +554,14 @@ export async function getPrayerHistory() {
             prayers: []
           };
         }
-        // Double check that prayer isn't already marked before adding to pending
-        const existingPrayer = history.find(p => 
-          p.date === prayer.date && 
-          p.prayerName === prayer.prayerName && 
-          ['ontime', 'late', 'excused'].includes(p.status)
-        );
         
-        if (!existingPrayer && !pendingByDate[date].prayers.some(p => p.prayerId === prayer.prayerId)) {
-          pendingByDate[date].prayers.push(prayer);
+        // Add prayer to pending if not already there
+        if (!pendingByDate[date].prayers.some(p => p.prayerId === prayer.prayerId)) {
+          pendingByDate[date].prayers.push({
+            ...prayer,
+            prayerId: prayer.prayerId || `${prayer.date}-${prayer.prayerName.toLowerCase()}`
+          });
           console.log('Added to pending prayers');
-        } else {
-          console.log('Prayer is already marked or in pending list, skipping');
         }
       } else {
         console.log('Prayer will be marked as excused');
@@ -1002,7 +1039,43 @@ async function getActiveExcusedPeriods() {
 
 // Add these helper functions
 async function getPrayerTimes(date) {
-  return get(prayerTimesStore);
+  try {
+    const coords = await getCurrentLocation();
+    if (!coords) return null;
+
+    // Calculate timestamp for the given date
+    const timestamp = Math.floor(date.getTime() / 1000);
+    
+    const response = await fetch(
+      `https://api.aladhan.com/v1/timings/${timestamp}?latitude=${coords.latitude}&longitude=${coords.longitude}&method=2`
+    );
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch prayer times');
+    }
+    
+    const data = await response.json();
+    const timings = data.data.timings;
+    
+    return {
+      fajr: formatTo12Hour(timings.Fajr),
+      dhuhr: formatTo12Hour(timings.Dhuhr),
+      asr: formatTo12Hour(timings.Asr),
+      maghrib: formatTo12Hour(timings.Maghrib),
+      isha: formatTo12Hour(timings.Isha)
+    };
+  } catch (error) {
+    console.error('Error fetching prayer times:', error);
+    return null;
+  }
+}
+
+function formatTo12Hour(time24) {
+  const [hours, minutes] = time24.split(':');
+  const hour = parseInt(hours);
+  const ampm = hour >= 12 ? 'PM' : 'AM';
+  const hour12 = hour % 12 || 12;
+  return `${hour12}:${minutes} ${ampm}`;
 }
 
 async function getPrayerStatus(prayerName, date) {
