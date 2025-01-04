@@ -200,6 +200,14 @@
     selectedPrayer = null;
     await getPrayerHistory();
   }
+
+  function getPrayerStatus(prayerName) {
+    const today = new Date().toLocaleDateString('en-CA');
+    const prayer = $prayerHistoryStore?.history?.find(
+      p => p.date === today && p.prayerName === prayerName
+    );
+    return prayer?.status;
+  }
 </script>
 
 <div class="prayer-container">
@@ -250,12 +258,28 @@
               <span class="prayer-name">{prayer.name}</span>
               <span class="prayer-time">{prayer.time}</span>
               {#if isPrayerPassed(prayer.time)}
-                <button 
-                  class="mark-prayer-btn"
-                  on:click={() => openMarkPrayerSheet(prayer)}
-                >
-                  Mark Prayer
-                </button>
+                {@const status = getPrayerStatus(prayer.name)}
+                {#if status === 'ontime' || status === 'late'}
+                  <button 
+                    class="status-label {status}"
+                    on:click={() => openMarkPrayerSheet(prayer)}
+                  >
+                    {#if status === 'ontime'}
+                      <Check weight="bold" size={14} />
+                      On Time
+                    {:else}
+                      <Clock weight="bold" size={14} />
+                      Late
+                    {/if}
+                  </button>
+                {:else}
+                  <button 
+                    class="mark-prayer-btn"
+                    on:click={() => openMarkPrayerSheet(prayer)}
+                  >
+                    Mark Prayer
+                  </button>
+                {/if}
               {/if}
             </div>
           {/each}
@@ -944,6 +968,33 @@
   .prayer-time-card.current {
     background-color: #FFF3E0;
     transform: scale(1.05);
+  }
+
+  .status-label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 8px;
+    padding: 6px 12px;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+
+  .status-label:hover {
+    opacity: 0.9;
+  }
+
+  .status-label.ontime {
+    background-color: #4CAF50;
+    color: white;
+  }
+
+  .status-label.late {
+    background-color: #FFA726;
+    color: white;
   }
 </style>
 
