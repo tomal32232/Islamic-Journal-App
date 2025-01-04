@@ -192,7 +192,7 @@
     await savePrayerStatus({
       name: selectedPrayer.name,
       time: selectedPrayer.time,
-      status: status === 'on-time' ? 'ontime' : 'late',
+      status,
       date: today
     });
 
@@ -877,7 +877,7 @@
     background-color: rgba(0, 0, 0, 0.5);
     display: flex;
     align-items: flex-end;
-    z-index: 1000;
+    z-index: 9999;
   }
 
   .bottom-sheet {
@@ -886,6 +886,8 @@
     padding: 24px;
     border-radius: 20px 20px 0 0;
     box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.1);
+    position: relative;
+    z-index: 10000;
   }
 
   .bottom-sheet h3 {
