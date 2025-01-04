@@ -12,14 +12,17 @@
   import { nearbyMosquesStore, mosqueLoadingStore, fetchNearbyMosques } from '../services/mosqueService';
   import PrayerHistorySection from '../components/PrayerHistorySection.svelte';
   import QuranReading from '../components/QuranReading.svelte';
-  import { Mosque, Book, HandsPraying } from 'phosphor-svelte';
+  import { Mosque, Book, HandsPraying, Check, Clock } from 'phosphor-svelte';
   import { saveTasbihSession, getWeeklyStats, weeklyStatsStore } from '../stores/tasbihStore';
+  import { fade, slide } from 'svelte/transition';
 
   let timeInterval;
   let currentPrayer = null;
   let nextPrayer = null;
   let activeTab = 'prayer'; // 'prayer', 'quran', or 'tasbih'
   let scrollY = 0;
+  let showBottomSheet = false;
+  let selectedPrayer = null;
 
   // Tasbih state
   const dhikrOptions = [
@@ -79,7 +82,7 @@
     scrollY = container.scrollTop;
   }
 
-  onMount(async () => {
+  onMount(() => {
     const container = document.querySelector('.prayer-container');
     if (container) {
       container.addEventListener('scroll', handleScroll);
@@ -88,15 +91,16 @@
     timeInterval = setInterval(updateNextPrayer, 60000);
     updateNextPrayer();
 
-    const stats = await getWeeklyStats();
-    weeklyStreak = stats?.streak || 0;
+    getWeeklyStats().then(stats => {
+      weeklyStreak = stats?.streak || 0;
+    });
 
-    if (container) {
-      return () => {
-        if (timeInterval) clearInterval(timeInterval);
+    return () => {
+      if (timeInterval) clearInterval(timeInterval);
+      if (container) {
         container.removeEventListener('scroll', handleScroll);
-      };
-    }
+      }
+    };
   });
 
   onDestroy(() => {
@@ -163,6 +167,39 @@
     selectedTarget = target;
     count = 0;
   }
+
+  function isPrayerPassed(prayerTime) {
+    const now = new Date();
+    const [time, period] = prayerTime.split(' ');
+    const [hours, minutes] = time.split(':');
+    let hour = parseInt(hours);
+    if (period === 'PM' && hour !== 12) hour += 12;
+    if (period === 'AM' && hour === 12) hour = 0;
+    const prayerDate = new Date();
+    prayerDate.setHours(hour, parseInt(minutes), 0);
+    return now > prayerDate;
+  }
+
+  function openMarkPrayerSheet(prayer) {
+    selectedPrayer = prayer;
+    showBottomSheet = true;
+  }
+
+  async function markPrayer(status) {
+    if (!selectedPrayer) return;
+
+    const today = new Date().toLocaleDateString('en-CA');
+    await savePrayerStatus({
+      name: selectedPrayer.name,
+      time: selectedPrayer.time,
+      status: status === 'on-time' ? 'ontime' : 'late',
+      date: today
+    });
+
+    showBottomSheet = false;
+    selectedPrayer = null;
+    await getPrayerHistory();
+  }
 </script>
 
 <div class="prayer-container">
@@ -212,6 +249,14 @@
               </div>
               <span class="prayer-name">{prayer.name}</span>
               <span class="prayer-time">{prayer.time}</span>
+              {#if isPrayerPassed(prayer.time)}
+                <button 
+                  class="mark-prayer-btn"
+                  on:click={() => openMarkPrayerSheet(prayer)}
+                >
+                  Mark Prayer
+                </button>
+              {/if}
             </div>
           {/each}
         </div>
@@ -322,6 +367,24 @@
     </div>
   {/if}
 </div>
+
+{#if showBottomSheet}
+  <div class="bottom-sheet-overlay" on:click={() => showBottomSheet = false} transition:fade>
+    <div class="bottom-sheet" on:click|stopPropagation transition:slide={{ duration: 300, axis: 'y' }}>
+      <h3>Mark {selectedPrayer?.name} Prayer</h3>
+      <div class="mark-options">
+        <button class="mark-btn on-time" on:click={() => markPrayer('ontime')}>
+          <Check weight="bold" />
+          Prayed On Time
+        </button>
+        <button class="mark-btn late" on:click={() => markPrayer('late')}>
+          <Clock weight="bold" />
+          Prayed Late
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
 
 <style>
   .prayer-container {
@@ -787,6 +850,98 @@
 
   .quran-section {
     padding-bottom: 6rem;
+  }
+
+  .mark-prayer-btn {
+    margin-top: 8px;
+    padding: 6px 12px;
+    border: none;
+    border-radius: 6px;
+    background-color: #E09453;
+    color: white;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+  }
+
+  .mark-prayer-btn:hover {
+    background-color: #d68642;
+  }
+
+  .bottom-sheet-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: flex-end;
+    z-index: 1000;
+  }
+
+  .bottom-sheet {
+    background-color: white;
+    width: 100%;
+    padding: 24px;
+    border-radius: 20px 20px 0 0;
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.1);
+  }
+
+  .bottom-sheet h3 {
+    margin: 0 0 20px;
+    color: #216974;
+    font-size: 18px;
+    text-align: center;
+  }
+
+  .mark-options {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .mark-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px;
+    border: none;
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: transform 0.2s;
+  }
+
+  .mark-btn:active {
+    transform: scale(0.98);
+  }
+
+  .mark-btn.on-time {
+    background-color: #4CAF50;
+    color: white;
+  }
+
+  .mark-btn.late {
+    background-color: #FFA726;
+    color: white;
+  }
+
+  .prayer-time-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 16px;
+    background-color: #f5f5f5;
+    border-radius: 12px;
+    transition: transform 0.2s;
+  }
+
+  .prayer-time-card.current {
+    background-color: #FFF3E0;
+    transform: scale(1.05);
   }
 </style>
 
