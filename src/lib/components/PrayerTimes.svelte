@@ -132,17 +132,23 @@
 
 <style>
   .prayer-times-container {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-    padding: 1rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 0.75rem;
+    padding: 0.75rem;
+    height: calc(100vh - 120px);
+    overflow-y: auto;
   }
 
   .prayer-card {
     background: white;
-    padding: 1rem;
+    padding: 0.75rem;
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 100px;
   }
 
   .prayer-card.current {
@@ -152,41 +158,45 @@
   .prayer-info {
     display: flex;
     align-items: center;
-    gap: 1rem;
+    gap: 0.75rem;
   }
 
   .prayer-details {
     display: flex;
     flex-direction: column;
+    gap: 0.25rem;
   }
 
   .prayer-name {
     font-weight: 500;
+    font-size: 0.9rem;
   }
 
   .prayer-time {
-    font-size: 0.875rem;
+    font-size: 0.8rem;
     color: #666;
   }
 
   .time-remaining {
-    margin-top: 0.5rem;
-    font-size: 0.875rem;
+    margin-top: 0.375rem;
+    font-size: 0.8rem;
     color: #216974;
   }
 
   .prayer-actions {
     display: flex;
-    gap: 0.5rem;
-    margin-top: 0.5rem;
+    gap: 0.375rem;
+    margin-top: 0.375rem;
+    flex-wrap: wrap;
   }
 
   .status-button {
     flex: 1;
-    padding: 0.5rem;
+    min-width: 100px;
+    padding: 0.375rem;
     border: none;
     border-radius: 4px;
-    font-size: 0.875rem;
+    font-size: 0.8rem;
     cursor: pointer;
   }
 
@@ -201,10 +211,10 @@
   }
 
   .prayer-status {
-    margin-top: 0.5rem;
-    padding: 0.25rem 0.5rem;
+    margin-top: 0.375rem;
+    padding: 0.25rem 0.375rem;
     border-radius: 4px;
-    font-size: 0.875rem;
+    font-size: 0.8rem;
     text-align: center;
   }
 
@@ -221,5 +231,62 @@
   .prayer-status.excused {
     background: rgba(156, 163, 175, 0.1);
     color: #6B7280;
+  }
+
+  @media (max-width: 640px) {
+    .prayer-times-container {
+      grid-template-columns: 1fr;
+      gap: 0.5rem;
+      padding: 0.5rem;
+      height: calc(100vh - 64px);
+    }
+
+    .prayer-card {
+      min-height: unset;
+      padding: 0.5rem;
+    }
+
+    .prayer-info {
+      gap: 0.5rem;
+    }
+
+    .prayer-details {
+      gap: 0.125rem;
+    }
+
+    .prayer-name {
+      font-size: 0.85rem;
+    }
+
+    .prayer-time {
+      font-size: 0.75rem;
+    }
+
+    .time-remaining {
+      margin-top: 0.25rem;
+      font-size: 0.75rem;
+    }
+
+    .prayer-actions {
+      gap: 0.25rem;
+      margin-top: 0.25rem;
+    }
+
+    .status-button {
+      padding: 0.25rem;
+      font-size: 0.75rem;
+      min-width: 80px;
+      flex: 0 1 calc(50% - 0.125rem);
+    }
+
+    .prayer-status {
+      margin-top: 0.25rem;
+      padding: 0.125rem 0.25rem;
+      font-size: 0.75rem;
+    }
+
+    svelte:component {
+      size: 20;
+    }
   }
 </style> 
