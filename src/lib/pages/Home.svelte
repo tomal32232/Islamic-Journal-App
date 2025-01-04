@@ -48,17 +48,17 @@
     try {
       // Start loading Quran data immediately
       fetchCompleteQuran().catch(error => {
-        console.error('Error prefetching Quran data:', error);
+        // console.error('Error prefetching Quran data:', error);
       });
 
       const permStatus = await LocalNotifications.checkPermissions();
-      console.log('Current notification permission status:', permStatus);
+      // console.log('Current notification permission status:', permStatus);
       if (permStatus.display !== 'granted') {
-        console.log('Requesting notification permissions...');
+        // console.log('Requesting notification permissions...');
         await LocalNotifications.requestPermissions();
       }
     } catch (error) {
-      console.error('Error requesting notification permissions:', error);
+      // console.error('Error requesting notification permissions:', error);
     }
 
     const container = document.querySelector('.home-container');
@@ -69,7 +69,7 @@
     const cleanup = auth.onAuthStateChanged((user) => {
       userName = capitalizeFirstLetter(user?.displayName?.split(' ')[0]) || 'Guest';
       if (user) {
-        console.log('User authenticated:', user.uid);
+        // console.log('User authenticated:', user.uid);
         Promise.all([
           fetchPrayerTimes(),
           getPrayerHistory(),
@@ -347,22 +347,22 @@
     try {
       // First check if notifications are supported
       if (!LocalNotifications) {
-        console.error('LocalNotifications plugin not available');
+        // console.error('LocalNotifications plugin not available');
         return;
       }
 
       // Check current permission status
       const permStatus = await LocalNotifications.checkPermissions();
-      console.log('Current notification permission status:', permStatus);
+      // console.log('Current notification permission status:', permStatus);
 
       // Request permissions if not granted
       if (permStatus.display !== 'granted') {
-        console.log('Requesting notification permissions...');
+        // console.log('Requesting notification permissions...');
         const result = await LocalNotifications.requestPermissions();
-        console.log('Permission request result:', result);
+        // console.log('Permission request result:', result);
         
         if (result.display !== 'granted') {
-          console.log('Notification permission denied');
+          // console.log('Notification permission denied');
           return;
         }
       }
@@ -379,12 +379,12 @@
       const pendingPrayers = Object.values($prayerHistoryStore.pendingByDate)
         .reduce((prayers, { prayers: datePrayers }) => [...prayers, ...datePrayers], []);
 
-      console.log('Pending prayers to notify:', pendingPrayers);
+      // console.log('Pending prayers to notify:', pendingPrayers);
 
       let notificationId = 1;
       for (const prayer of pendingPrayers) {
         if (!prayer.notified) {
-          console.log('Scheduling notification for prayer:', prayer.prayerName);
+          // console.log('Scheduling notification for prayer:', prayer.prayerName);
           
           try {
             await LocalNotifications.schedule({
@@ -402,9 +402,9 @@
 
             // Mark as notified in the store
             prayer.notified = true;
-            console.log('Notification scheduled successfully for:', prayer.prayerName);
+            // console.log('Notification scheduled successfully for:', prayer.prayerName);
           } catch (error) {
-            console.error('Error scheduling notification for prayer:', prayer.prayerName, error);
+            // console.error('Error scheduling notification for prayer:', prayer.prayerName, error);
           }
         }
       }
@@ -412,13 +412,13 @@
       // Update UI
       await updatePrayerStatus();
     } catch (error) {
-      console.error('Error in checkPrayerNotifications:', error);
+      // console.error('Error in checkPrayerNotifications:', error);
     }
   }
 
   async function handleMoodSelect(event) {
     const selectedMood = event.detail;
-    console.log('Selected mood:', selectedMood);
+    // console.log('Selected mood:', selectedMood);
     try {
       await saveMood(selectedMood, selectedMood.guidance);
       // Use the local mood template to ensure we have the icon
@@ -435,7 +435,7 @@
       showMoodSelector = false;
       await loadWeekMoods();
     } catch (error) {
-      console.error('Error saving mood:', error);
+      // console.error('Error saving mood:', error);
     }
   }
 
@@ -443,7 +443,7 @@
     try {
       await getMoodHistory(7);
       const moodsFromDb = get(moodHistoryStore);
-      console.log('Loaded moods from database:', moodsFromDb);
+      // console.log('Loaded moods from database:', moodsFromDb);
       weekMoods = moodsFromDb.reduce((acc, mood) => {
         acc[mood.date] = mood;
         return acc;
@@ -452,12 +452,12 @@
       // Check if we have a mood for today
       const today = new Date().toLocaleDateString();
       const todayMood = weekMoods[today];
-      console.log('Today\'s mood from database:', todayMood);
+      // console.log('Today\'s mood from database:', todayMood);
       
       if (todayMood) {
         // Find the matching mood from our local moods array to get the icon
         const matchingMood = moods.find(m => m.value === todayMood.mood);
-        console.log('Local mood template:', matchingMood);
+        // console.log('Local mood template:', matchingMood);
         if (matchingMood) {
           currentMood = {
             value: todayMood.mood,
@@ -465,7 +465,7 @@
             icon: matchingMood.icon,
             description: matchingMood.description
           };
-          console.log('Set current mood to:', currentMood);
+          // console.log('Set current mood to:', currentMood);
           showMoodSelector = false;
         }
       } else {
@@ -474,7 +474,7 @@
         currentMood = null;
       }
     } catch (error) {
-      console.error('Error loading moods:', error);
+      // console.error('Error loading moods:', error);
     }
   }
 
@@ -523,7 +523,7 @@
   }
 
   // Add console log to debug
-  $: console.log('Prayer History Store:', $prayerHistoryStore);
+  // $: console.log('Prayer History Store:', $prayerHistoryStore);
 
   function getCurrentTime() {
     const now = new Date();

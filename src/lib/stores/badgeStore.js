@@ -64,7 +64,7 @@ function createBadgeStore() {
       Object.values(category).forEach(badgeList => {
         badgeList.forEach(badge => {
           if (!earnedBadges.includes(badge.id) && checkBadgeEarned(badge, progress)) {
-            console.log(`Verifying badge ${badge.id} - should be earned`);
+            // console.log(`Verifying badge ${badge.id} - should be earned`);
             earnedBadges.push(badge.id);
             newlyEarnedBadges.push(badge);
           }
@@ -80,21 +80,21 @@ function createBadgeStore() {
     
     // Initialize the store with user's badges from Firestore
     async init(userId) {
-      console.log('Initializing badge store for user:', userId);
+      // console.log('Initializing badge store for user:', userId);
       const userDoc = doc(db, 'users', userId, 'achievements', 'badges');
       
       // Set up real-time listener
       onSnapshot(userDoc, (doc) => {
         if (doc.exists()) {
           const data = doc.data();
-          console.log('Loaded badge data from Firestore:', data);
+          // console.log('Loaded badge data from Firestore:', data);
           
           // Verify earned badges based on progress
           const { earnedBadges, newlyEarnedBadges } = verifyEarnedBadges(data.progress || {}, data.earnedBadges || []);
           
           // If we found badges that should be earned but aren't recorded
           if (newlyEarnedBadges.length > 0) {
-            console.log('Found unrecorded earned badges:', newlyEarnedBadges);
+            // console.log('Found unrecorded earned badges:', newlyEarnedBadges);
             const updatedData = {
               ...data,
               earnedBadges,
@@ -104,8 +104,8 @@ function createBadgeStore() {
             
             // Update Firestore with the corrected earned badges
             setDoc(userDoc, updatedData, { merge: true })
-              .then(() => console.log('Updated earned badges in Firestore'))
-              .catch(error => console.error('Error updating earned badges:', error));
+              // .then(() => console.log('Updated earned badges in Firestore'))
+              // .catch(error => console.error('Error updating earned badges:', error));
             
             set(updatedData);
           } else {
@@ -116,7 +116,7 @@ function createBadgeStore() {
             });
           }
         } else {
-          console.log('No badge document exists, creating initial data');
+          // console.log('No badge document exists, creating initial data');
           const initialData = { earnedBadges: [], progress: {}, lastUpdated: new Date() };
           setDoc(userDoc, initialData);
           set(initialData);
@@ -128,27 +128,27 @@ function createBadgeStore() {
     async updateProgress(type, value, silent = false) {
       const userId = auth.currentUser?.uid;
       if (!userId) {
-        console.error('No user ID available for updating badge progress');
+        // console.error('No user ID available for updating badge progress');
         return;
       }
 
-      console.log('=== Updating Badge Progress ===');
-      console.log('Type:', type);
-      console.log('Value:', value);
+      // console.log('=== Updating Badge Progress ===');
+      // console.log('Type:', type);
+      // console.log('Value:', value);
 
       const userDoc = doc(db, 'users', userId, 'achievements', 'badges');
       
       // First check if the document exists
       const docSnap = await getDoc(userDoc);
       const exists = docSnap.exists();
-      console.log('Document exists:', exists);
+      // console.log('Document exists:', exists);
 
       update(state => {
-        console.log('Current state before update:', {
-          earnedBadges: state.earnedBadges,
-          progress: state.progress,
-          lastUpdated: state.lastUpdated
-        });
+        // console.log('Current state before update:', {
+        //   earnedBadges: state.earnedBadges,
+        //   progress: state.progress,
+        //   lastUpdated: state.lastUpdated
+        // });
         const progress = exists ? { ...docSnap.data().progress } : {};
         const earnedBadges = exists ? [...docSnap.data().earnedBadges] : [];
         
@@ -156,7 +156,7 @@ function createBadgeStore() {
         progress[type] = value;
         progress[`${type}_progress`] = value;
         
-        console.log('Updated progress:', progress);
+        // console.log('Updated progress:', progress);
 
         // Check if any new badges should be earned
         const newlyEarnedBadges = [];
@@ -164,7 +164,7 @@ function createBadgeStore() {
         // Helper function to check if badge should be earned
         const checkAndAddBadge = (badge) => {
           if (earnedBadges.includes(badge.id)) {
-            console.log(`Badge ${badge.id} already earned`);
+            // console.log(`Badge ${badge.id} already earned`);
             return;
           }
           
@@ -173,10 +173,10 @@ function createBadgeStore() {
           const currentValue = progress[badge.requirement.type] || 
                            progress[`${badge.requirement.type}_progress`] || 0;
           
-          console.log(`Checking badge ${badge.id}:`, {
-            currentValue,
-            requirement: badge.requirement
-          });
+          // console.log(`Checking badge ${badge.id}:`, {
+          //   currentValue,
+          //   requirement: badge.requirement
+          // });
 
           switch (badge.requirement.type) {
             case 'streak':
@@ -206,7 +206,7 @@ function createBadgeStore() {
           }
 
           if (earned) {
-            console.log(`Badge ${badge.id} earned!`);
+            // console.log(`Badge ${badge.id} earned!`);
             earnedBadges.push(badge.id);
             newlyEarnedBadges.push(badge);
           }
@@ -225,7 +225,7 @@ function createBadgeStore() {
 
         // Show notifications for newly earned badges
         if (!silent && newlyEarnedBadges.length > 0) {
-          console.log('New badges earned:', newlyEarnedBadges);
+          // console.log('New badges earned:', newlyEarnedBadges);
           newlyEarnedBadges.forEach(badge => {
             toastStore.addToast({
               type: 'badge',
@@ -242,40 +242,40 @@ function createBadgeStore() {
           progress,
           lastUpdated: new Date()
         };
-        console.log('=== Saving to Firestore ===');
-        console.log('Document path:', `users/${userId}/achievements/badges`);
-        console.log('Updated data:', JSON.stringify(updatedData, null, 2));
-        console.log('Changed fields:', Object.keys(updatedData));
-        console.log('Document exists:', exists);
-        console.log('Previous earnedBadges:', exists ? docSnap.data().earnedBadges : []);
-        console.log('New earnedBadges:', earnedBadges);
+        // console.log('=== Saving to Firestore ===');
+        // console.log('Document path:', `users/${userId}/achievements/badges`);
+        // console.log('Updated data:', JSON.stringify(updatedData, null, 2));
+        // console.log('Changed fields:', Object.keys(updatedData));
+        // console.log('Document exists:', exists);
+        // console.log('Previous earnedBadges:', exists ? docSnap.data().earnedBadges : []);
+        // console.log('New earnedBadges:', earnedBadges);
         
         if (!exists) {
           // If document doesn't exist, create it
-          console.log('Creating new badge document');
+          // console.log('Creating new badge document');
           setDoc(userDoc, updatedData)
-            .then(() => console.log('Successfully created badge document'))
-            .catch(error => {
-              console.error('Error creating badge document:', error);
-              console.error('Error details:', {
-                code: error.code,
-                message: error.message,
-                details: error.details
-              });
-            });
+            // .then(() => console.log('Successfully created badge document'))
+            // .catch(error => {
+            //   console.error('Error creating badge document:', error);
+            //   console.error('Error details:', {
+            //     code: error.code,
+            //     message: error.message,
+            //     details: error.details
+            //   });
+            // });
         } else {
           // If document exists, update it
-          console.log('Updating existing badge document');
+          // console.log('Updating existing badge document');
           setDoc(userDoc, updatedData, { merge: true })
-            .then(() => console.log('Successfully updated badge document'))
-            .catch(error => {
-              console.error('Error updating badge document:', error);
-              console.error('Error details:', {
-                code: error.code,
-                message: error.message,
-                details: error.details
-              });
-            });
+            // .then(() => console.log('Successfully updated badge document'))
+            // .catch(error => {
+            //   console.error('Error updating badge document:', error);
+            //   console.error('Error details:', {
+            //     code: error.code,
+            //     message: error.message,
+            //     details: error.details
+            //   });
+            // });
         }
 
         return updatedData;
@@ -289,7 +289,7 @@ function createBadgeStore() {
 
     // Get earned badges with details
     getEarnedBadges(earnedBadgeIds) {
-      console.log('Getting earned badges for IDs:', earnedBadgeIds);
+      // console.log('Getting earned badges for IDs:', earnedBadgeIds);
       const earnedBadges = [];
       
       // Map legacy badge IDs to new format
@@ -308,7 +308,7 @@ function createBadgeStore() {
           });
         });
       });
-      console.log('Processed earned badges:', earnedBadges);
+      // console.log('Processed earned badges:', earnedBadges);
       return earnedBadges;
     },
 

@@ -37,12 +37,12 @@ async function getLocation() {
   // Use cached location if available and not expired
   if (locationCache.coords && locationCache.timestamp && 
       now - locationCache.timestamp < CACHE_EXPIRY) {
-    console.log('Using cached location');
+    // console.log('Using cached location');
     return locationCache.coords;
   }
 
   // Fetch new location
-  console.log('Fetching new location');
+  // console.log('Fetching new location');
   const coords = await getCurrentLocation();
   if (coords) {
     locationCache.coords = coords;
@@ -68,7 +68,7 @@ export async function ensurePrayerData() {
   
   // If we haven't checked today, initialize prayers
   if (lastCheck !== today) {
-    console.log('Initializing prayer data for the next 7 days');
+    // console.log('Initializing prayer data for the next 7 days');
     const prayers = [
       { name: 'Fajr', time: '', icon: 'SunDim', weight: 'regular' },
       { name: 'Dhuhr', time: '', icon: 'Sun', weight: 'fill' },
@@ -105,7 +105,7 @@ export async function initializeTodaysPrayers(prayers) {
     dates.push(date.toLocaleDateString('en-CA'));
   }
 
-  console.log('Initializing prayers for dates:', dates);
+  // console.log('Initializing prayers for dates:', dates);
 
   // Check existing prayers for these dates
   const existingPrayers = new Set();
@@ -132,7 +132,7 @@ export async function initializeTodaysPrayers(prayers) {
       
       // Skip if prayer already exists
       if (existingPrayers.has(prayerId)) {
-        console.log(`Prayer already exists: ${prayerId}`);
+        // console.log(`Prayer already exists: ${prayerId}`);
         continue;
       }
 
@@ -143,7 +143,7 @@ export async function initializeTodaysPrayers(prayers) {
       // For future days, set as upcoming
       const status = date === today && prayerDateTime < now ? 'pending' : 'upcoming';
       
-      console.log(`Creating new prayer: ${prayerId} with status: ${status}`);
+      // console.log(`Creating new prayer: ${prayerId} with status: ${status}`);
       batch.push(
         setDoc(prayerRef, {
           userId: user.uid,
@@ -160,11 +160,11 @@ export async function initializeTodaysPrayers(prayers) {
 
   // Execute all updates
   if (batch.length > 0) {
-    console.log(`Executing batch update for ${batch.length} prayers`);
+    // console.log(`Executing batch update for ${batch.length} prayers`);
     await Promise.all(batch);
     await getPrayerHistory();
   } else {
-    console.log('No new prayers to initialize');
+    // console.log('No new prayers to initialize');
   }
 }
 
@@ -484,14 +484,14 @@ export async function getPrayerHistory() {
   const user = auth.currentUser;
   if (!user) return { history: [], pendingByDate: {}, missedByDate: {} };
 
-  console.log('=== Getting Prayer History ===');
-  console.log('User ID:', user.uid);
+  // console.log('=== Getting Prayer History ===');
+  // console.log('User ID:', user.uid);
 
   // Update prayer statuses first
   await updatePrayerStatuses();
 
   const today = new Date().toLocaleDateString('en-CA');
-  console.log('Today:', today);
+  // console.log('Today:', today);
 
   const historyQuery = query(
     collection(db, 'prayer_history'),
@@ -500,7 +500,7 @@ export async function getPrayerHistory() {
   );
 
   const querySnapshot = await getDocs(historyQuery);
-  console.log('Total prayer records found:', querySnapshot.size);
+  // console.log('Total prayer records found:', querySnapshot.size);
 
   // Get unique dates from the prayer history
   const uniqueDates = new Set();
@@ -508,7 +508,7 @@ export async function getPrayerHistory() {
     const prayer = doc.data();
     uniqueDates.add(prayer.date);
   });
-  console.log('Unique dates found:', Array.from(uniqueDates));
+  // console.log('Unique dates found:', Array.from(uniqueDates));
 
   // Fetch prayer times for all unique dates
   const prayerTimesByDate = {};
@@ -517,7 +517,7 @@ export async function getPrayerHistory() {
     const prayerTimes = await getPrayerTimes(new Date(year, month - 1, day));
     if (prayerTimes) {
       prayerTimesByDate[date] = prayerTimes;
-      console.log(`Got prayer times for ${date}:`, prayerTimes);
+      // console.log(`Got prayer times for ${date}:`, prayerTimes);
     }
   }
 
@@ -527,7 +527,7 @@ export async function getPrayerHistory() {
 
   // Get active excused period first
   const activeExcusedPeriod = await getActiveExcusedPeriod();
-  console.log('Active excused period:', activeExcusedPeriod);
+  // console.log('Active excused period:', activeExcusedPeriod);
 
   const prayers = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
 
@@ -535,11 +535,11 @@ export async function getPrayerHistory() {
     const prayer = doc.data();
     history.push(prayer);
     
-    console.log(`\nProcessing prayer: ${prayer.prayerName} for date ${prayer.date}`);
-    console.log('Prayer details:', {
-      id: doc.id,
-      ...prayer
-    });
+    // console.log(`\nProcessing prayer: ${prayer.prayerName} for date ${prayer.date}`);
+    // console.log('Prayer details:', {
+    //   id: doc.id,
+    //   ...prayer
+    // });
     
     let prayerDateTime = prayer.time ? getPrayerDateTime(prayer.date, prayer.time) : null;
     if (!prayerDateTime && prayerTimesByDate[prayer.date]) {
@@ -547,28 +547,28 @@ export async function getPrayerHistory() {
       const prayerTime = prayerTimesByDate[prayer.date][prayer.prayerName.toLowerCase()];
       if (prayerTime) {
         prayer.time = prayerTime;
-        console.log(`Using prayer time from service for ${prayer.prayerName}: ${prayerTime}`);
+        // console.log(`Using prayer time from service for ${prayer.prayerName}: ${prayerTime}`);
         prayerDateTime = getPrayerDateTime(prayer.date, prayerTime);
       }
     }
     
     if (!prayerDateTime) {
-      console.error(`No prayer time available for ${prayer.prayerName} on ${prayer.date}`);
+      // console.error(`No prayer time available for ${prayer.prayerName} on ${prayer.date}`);
       return;
     }
 
     const now = new Date();
 
-    console.log(`\nChecking prayer ${prayer.prayerName} for pending status:`, {
-      status: prayer.status,
-      prayerTime: prayerDateTime.toLocaleString(),
-      currentTime: now.toLocaleString(),
-      hasPassed: prayerDateTime < now
-    });
+    // console.log(`\nChecking prayer ${prayer.prayerName} for pending status:`, {
+    //   status: prayer.status,
+    //   prayerTime: prayerDateTime.toLocaleString(),
+    //   currentTime: now.toLocaleString(),
+    //   hasPassed: prayerDateTime < now
+    // });
 
     // Skip if prayer is already marked as ontime, late, or excused
     if (['ontime', 'late', 'excused'].includes(prayer.status)) {
-      console.log(`Prayer ${prayer.prayerName} is already marked as ${prayer.status}, skipping`);
+      // console.log(`Prayer ${prayer.prayerName} is already marked as ${prayer.status}, skipping`);
       return;
     }
 
@@ -583,7 +583,7 @@ export async function getPrayerHistory() {
         (prayer.date !== activeExcusedPeriod.startDate || 
          prayers.indexOf(prayer.prayerName) >= prayers.indexOf(activeExcusedPeriod.startPrayer));
 
-      console.log('Should excuse prayer:', shouldExcuse);
+      // console.log('Should excuse prayer:', shouldExcuse);
 
       if (!shouldExcuse) {
         const date = prayer.date;
@@ -600,10 +600,10 @@ export async function getPrayerHistory() {
             ...prayer,
             prayerId: prayer.prayerId || `${prayer.date}-${prayer.prayerName.toLowerCase()}`
           });
-          console.log('Added to pending prayers');
+          // console.log('Added to pending prayers');
         }
       } else {
-        console.log('Prayer will be marked as excused');
+        // console.log('Prayer will be marked as excused');
         // If prayer should be excused, update its status
         savePrayerStatus({
           name: prayer.prayerName,
@@ -623,7 +623,7 @@ export async function getPrayerHistory() {
         };
       }
       missedByDate[date].prayers.push(prayer);
-      console.log('Added to missed prayers');
+      // console.log('Added to missed prayers');
     }
   });
 
@@ -644,11 +644,11 @@ export async function getPrayerHistory() {
     });
   });
 
-  console.log('\n=== Prayer History Summary ===');
-  console.log('Total prayers:', history.length);
-  console.log('Pending prayers by date:', pendingByDate);
-  console.log('Missed prayers by date:', missedByDate);
-  console.log('Full history:', history);
+  // console.log('\n=== Prayer History Summary ===');
+  // console.log('Total prayers:', history.length);
+  // console.log('Pending prayers by date:', pendingByDate);
+  // console.log('Missed prayers by date:', missedByDate);
+  // console.log('Full history:', history);
 
   prayerHistoryStore.set({ history, pendingByDate, missedByDate });
   return { history, pendingByDate, missedByDate };
@@ -669,22 +669,22 @@ export function getPrayerDateTime(date, time) {
 
 // Update function to save excused period with prayer-specific timing
 export async function saveExcusedPeriod(startDate, endDate, startPrayer, endPrayer) {
-  console.log('=== Saving Excused Period ===');
-  console.log('Start Date:', startDate);
-  console.log('End Date:', endDate);
-  console.log('Start Prayer:', startPrayer);
-  console.log('End Prayer:', endPrayer);
+  // console.log('=== Saving Excused Period ===');
+  // console.log('Start Date:', startDate);
+  // console.log('End Date:', endDate);
+  // console.log('Start Prayer:', startPrayer);
+  // console.log('End Prayer:', endPrayer);
 
   const user = auth.currentUser;
   if (!user) {
-    console.log('No user logged in');
+    // console.log('No user logged in');
     return;
   }
 
   // Create a unique ID for the period using timestamp
   const periodId = `${user.uid}-${Date.now()}`;
   const excusedPeriodRef = doc(db, 'excused_periods', periodId);
-  console.log('Saving to Firestore ref:', excusedPeriodRef.path);
+  // console.log('Saving to Firestore ref:', excusedPeriodRef.path);
 
   try {
     await setDoc(excusedPeriodRef, {
@@ -696,11 +696,11 @@ export async function saveExcusedPeriod(startDate, endDate, startPrayer, endPray
       status: 'ongoing', // Add status field
       timestamp: Timestamp.now()
     });
-    console.log('Successfully saved excused period to Firestore');
+    // console.log('Successfully saved excused period to Firestore');
 
     // If end date is provided, mark prayers as excused for the period
     if (endDate && endPrayer) {
-      console.log('Marking prayers as excused for date range');
+      // console.log('Marking prayers as excused for date range');
       const prayers = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
       const start = new Date(startDate);
       const end = new Date(endDate);
@@ -711,67 +711,67 @@ export async function saveExcusedPeriod(startDate, endDate, startPrayer, endPray
         const dateStr = d.toLocaleDateString('en-CA');
         const isStartDate = dateStr === startDate;
         const isEndDate = dateStr === endDate;
-        console.log('Processing date:', dateStr);
+        // console.log('Processing date:', dateStr);
 
         for (let i = 0; i < prayers.length; i++) {
           // Skip prayers before startPrayer on start date
           if (isStartDate && i < startPrayerIndex) {
-            console.log(`Skipping ${prayers[i]} on start date`);
+            // console.log(`Skipping ${prayers[i]} on start date`);
             continue;
           }
           // Skip prayers after endPrayer on end date
           if (isEndDate && i > endPrayerIndex) {
-            console.log(`Skipping ${prayers[i]} on end date`);
+            // console.log(`Skipping ${prayers[i]} on end date`);
             continue;
           }
 
           // Check existing prayer status
           const existingStatus = await getPrayerStatus(prayers[i], dateStr);
-          console.log(`Existing status for ${prayers[i]} on ${dateStr}:`, existingStatus);
+          // console.log(`Existing status for ${prayers[i]} on ${dateStr}:`, existingStatus);
 
           // Only mark as excused if it's not already marked as ontime or late
           if (existingStatus !== 'ontime' && existingStatus !== 'late') {
-            console.log(`Marking ${prayers[i]} as excused for ${dateStr}`);
+            // console.log(`Marking ${prayers[i]} as excused for ${dateStr}`);
             await savePrayerStatus({
               name: prayers[i],
               date: dateStr,
               status: 'excused'
             });
           } else {
-            console.log(`Keeping existing status (${existingStatus}) for ${prayers[i]} on ${dateStr}`);
+            // console.log(`Keeping existing status (${existingStatus}) for ${prayers[i]} on ${dateStr}`);
           }
         }
       }
     } else {
       // If no end date, just mark prayers from start date and prayer
-      console.log('Marking prayers as excused from start time (ongoing period)');
+      // console.log('Marking prayers as excused from start time (ongoing period)');
       const prayers = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
       const startPrayerIndex = prayers.indexOf(startPrayer);
       const today = new Date().toLocaleDateString('en-CA');
 
       if (startDate === today) {
-        console.log('Marking today\'s remaining prayers as excused');
+        // console.log('Marking today\'s remaining prayers as excused');
         for (let i = startPrayerIndex; i < prayers.length; i++) {
           // Check existing prayer status
           const existingStatus = await getPrayerStatus(prayers[i], startDate);
-          console.log(`Existing status for ${prayers[i]} on ${startDate}:`, existingStatus);
+          // console.log(`Existing status for ${prayers[i]} on ${startDate}:`, existingStatus);
 
           // Only mark as excused if it's not already marked as ontime or late
           if (existingStatus !== 'ontime' && existingStatus !== 'late') {
-            console.log(`Marking ${prayers[i]} as excused for ${startDate}`);
+            // console.log(`Marking ${prayers[i]} as excused for ${startDate}`);
             await savePrayerStatus({
               name: prayers[i],
               date: startDate,
               status: 'excused'
             });
           } else {
-            console.log(`Keeping existing status (${existingStatus}) for ${prayers[i]} on ${startDate}`);
+            // console.log(`Keeping existing status (${existingStatus}) for ${prayers[i]} on ${startDate}`);
           }
         }
       }
     }
   } catch (error) {
-    console.error('Error saving excused period:', error);
+    // console.error('Error saving excused period:', error);
     throw error;
   }
 }
@@ -923,26 +923,26 @@ export async function endExcusedPeriod(periodId, endDate, endPrayer) {
 
 // Add function to check if a prayer should be marked as excused
 export async function shouldMarkPrayerExcused(date, prayerName) {
-  console.log('=== Checking if prayer should be excused ===');
-  console.log('Date:', date);
-  console.log('Prayer:', prayerName);
+  // console.log('=== Checking if prayer should be excused ===');
+  // console.log('Date:', date);
+  // console.log('Prayer:', prayerName);
 
   const user = auth.currentUser;
   if (!user) {
-    console.log('No user logged in');
+    // console.log('No user logged in');
     return false;
   }
 
   // Get prayer time for the given prayer
   const prayerTimes = await getPrayerTimes(new Date(date));
   if (!prayerTimes) {
-    console.log('No prayer times available');
+    // console.log('No prayer times available');
     return false;
   }
 
   const prayerTime = prayerTimes[prayerName.toLowerCase()];
   if (!prayerTime) {
-    console.log('No time found for prayer:', prayerName);
+    // console.log('No time found for prayer:', prayerName);
     return false;
   }
 
@@ -952,7 +952,7 @@ export async function shouldMarkPrayerExcused(date, prayerName) {
 
   // If prayer time hasn't come yet, it shouldn't be excused
   if (prayerDateTime > now) {
-    console.log('Prayer time has not come yet, should not be excused');
+    // console.log('Prayer time has not come yet, should not be excused');
     return false;
   }
 
@@ -966,11 +966,11 @@ export async function shouldMarkPrayerExcused(date, prayerName) {
 
   try {
     const querySnapshot = await getDocs(q);
-    console.log('Found excused periods:', querySnapshot.size);
+    // console.log('Found excused periods:', querySnapshot.size);
 
     for (const doc of querySnapshot.docs) {
       const period = doc.data();
-      console.log('Checking period:', period);
+      // console.log('Checking period:', period);
 
       // For ongoing periods
       if (period.status === 'ongoing') {
@@ -983,7 +983,7 @@ export async function shouldMarkPrayerExcused(date, prayerName) {
 
         // If prayer date is after or equal to period start date
         if (prayerDate >= periodStart) {
-          console.log('Prayer is within ongoing period');
+          // console.log('Prayer is within ongoing period');
           // If it's the start date, check if prayer is after start prayer
           if (period.startDate === date) {
             const prayers = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
@@ -1026,20 +1026,20 @@ export async function shouldMarkPrayerExcused(date, prayerName) {
       }
     }
     
-    console.log('No matching excused period found');
+    // console.log('No matching excused period found');
     return false;
   } catch (error) {
-    console.error('Error checking excused status:', error);
+    // console.error('Error checking excused status:', error);
     return false;
   }
 }
 
 // Add this function to get all active excused periods
 async function getActiveExcusedPeriods() {
-  console.log('=== Getting Active Excused Periods ===');
+  // console.log('=== Getting Active Excused Periods ===');
   const user = auth.currentUser;
   if (!user) {
-    console.log('No user logged in');
+    // console.log('No user logged in');
     return [];
   }
 
@@ -1068,10 +1068,10 @@ async function getActiveExcusedPeriods() {
       })
       .filter(period => !period.endDate); // Only return active periods
     
-    console.log('Found active periods:', periods);
+    // console.log('Found active periods:', periods);
     return periods;
   } catch (error) {
-    console.error('Error getting active excused periods:', error);
+    // console.error('Error getting active excused periods:', error);
     return [];
   }
 }
@@ -1085,7 +1085,7 @@ async function getPrayerTimes(date) {
     // Use cached prayer times if available and not expired
     if (prayerTimesCache.data[dateStr] && prayerTimesCache.timestamp && 
         now - prayerTimesCache.timestamp < CACHE_EXPIRY) {
-      console.log(`Using cached prayer times for ${dateStr}`);
+      // console.log(`Using cached prayer times for ${dateStr}`);
       return prayerTimesCache.data[dateStr];
     }
 
@@ -1095,7 +1095,7 @@ async function getPrayerTimes(date) {
     // Calculate timestamp for the given date
     const timestamp = Math.floor(date.getTime() / 1000);
     
-    console.log(`Fetching prayer times for ${dateStr}`);
+    // console.log(`Fetching prayer times for ${dateStr}`);
     const response = await fetch(
       `https://api.aladhan.com/v1/timings/${timestamp}?latitude=${coords.latitude}&longitude=${coords.longitude}&method=2`
     );
@@ -1121,7 +1121,7 @@ async function getPrayerTimes(date) {
 
     return prayerTimes;
   } catch (error) {
-    console.error('Error fetching prayer times:', error);
+    // console.error('Error fetching prayer times:', error);
     return null;
   }
 }
