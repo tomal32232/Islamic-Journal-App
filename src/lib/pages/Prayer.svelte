@@ -23,6 +23,7 @@
   let scrollY = 0;
   let showBottomSheet = false;
   let selectedPrayer = null;
+  let isClosing = false;
 
   // Tasbih state
   const dhikrOptions = [
@@ -41,6 +42,9 @@
   let isCounterMode = false;
   let weeklyStreak = 0;
   let target = 33;
+
+  // Add loading state
+  let isLoading = false;
 
   function getNextPrayer(prayers) {
     const now = new Date();
@@ -90,6 +94,13 @@
 
     timeInterval = setInterval(updateNextPrayer, 60000);
     updateNextPrayer();
+
+    // Initial data load
+    Promise.all([
+      getPrayerHistory(),
+      fetchPrayerTimes(),
+      updatePrayerStatuses()
+    ]);
 
     getWeeklyStats().then(stats => {
       weeklyStreak = stats?.streak || 0;
@@ -185,20 +196,55 @@
     showBottomSheet = true;
   }
 
+  async function closeBottomSheet() {
+    isClosing = true;
+    // Wait for animation to complete
+    await new Promise(resolve => setTimeout(resolve, 300));
+    showBottomSheet = false;
+    isClosing = false;
+  }
+
   async function markPrayer(status) {
     if (!selectedPrayer) return;
 
     const today = new Date().toLocaleDateString('en-CA');
-    await savePrayerStatus({
-      name: selectedPrayer.name,
-      time: selectedPrayer.time,
-      status,
-      date: today
-    });
+    isLoading = true;
+    
+    try {
+      // First save the prayer status
+      await savePrayerStatus({
+        name: selectedPrayer.name,
+        time: selectedPrayer.time,
+        status,
+        date: today
+      });
 
-    showBottomSheet = false;
-    selectedPrayer = null;
-    await getPrayerHistory();
+      // Close the popup immediately after saving
+      showBottomSheet = false;
+      selectedPrayer = null;
+
+      // Then refresh the data
+      await Promise.all([
+        getPrayerHistory(),
+        fetchPrayerTimes(),
+        updatePrayerStatuses()
+      ]);
+
+      // Force a UI update
+      prayerHistoryStore.update(store => ({ ...store }));
+    } finally {
+      isLoading = false;
+    }
+  }
+
+  // Add this function to handle manual refresh
+  async function refreshPrayerData() {
+    await Promise.all([
+      getPrayerHistory(),
+      fetchPrayerTimes(),
+      updatePrayerStatuses()
+    ]);
+    prayerHistoryStore.update(store => ({ ...store }));
   }
 
   function getPrayerStatus(prayerName) {
@@ -393,17 +439,42 @@
 </div>
 
 {#if showBottomSheet}
-  <div class="bottom-sheet-overlay" on:click={() => showBottomSheet = false} transition:fade>
-    <div class="bottom-sheet" on:click|stopPropagation transition:slide={{ duration: 300, axis: 'y' }}>
+  <div 
+    class="bottom-sheet-overlay" 
+    on:click={closeBottomSheet} 
+    transition:fade
+  >
+    <div 
+      class="bottom-sheet" 
+      class:sliding-down={isClosing}
+      on:click|stopPropagation 
+      transition:slide={{ duration: 300, axis: 'y' }}
+    >
       <h3>Mark {selectedPrayer?.name} Prayer</h3>
       <div class="mark-options">
-        <button class="mark-btn on-time" on:click={() => markPrayer('ontime')}>
-          <Check weight="bold" />
-          Prayed On Time
+        <button 
+          class="mark-btn on-time" 
+          on:click={() => markPrayer('ontime')}
+          disabled={isLoading}
+        >
+          {#if isLoading}
+            <div class="loading-spinner"></div>
+          {:else}
+            <Check weight="bold" />
+            Prayed On Time
+          {/if}
         </button>
-        <button class="mark-btn late" on:click={() => markPrayer('late')}>
-          <Clock weight="bold" />
-          Prayed Late
+        <button 
+          class="mark-btn late" 
+          on:click={() => markPrayer('late')}
+          disabled={isLoading}
+        >
+          {#if isLoading}
+            <div class="loading-spinner"></div>
+          {:else}
+            <Clock weight="bold" />
+            Prayed Late
+          {/if}
         </button>
       </div>
     </div>
@@ -912,6 +983,12 @@
     box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.1);
     position: relative;
     z-index: 10000;
+    transform: translateY(0);
+    transition: transform 0.3s ease-in-out;
+  }
+
+  .bottom-sheet.sliding-down {
+    transform: translateY(100%);
   }
 
   .bottom-sheet h3 {
@@ -995,6 +1072,26 @@
   .status-label.late {
     background-color: #FFA726;
     color: white;
+  }
+
+  .mark-btn:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+  }
+
+  .loading-spinner {
+    width: 20px;
+    height: 20px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top-color: white;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
   }
 </style>
 
