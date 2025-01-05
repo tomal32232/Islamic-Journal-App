@@ -18,7 +18,7 @@ import { onMount } from 'svelte';
 import { getCurrentLocation } from '../services/prayerTimes';
 
 // Cache configuration
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes in milliseconds
+const CACHE_DURATION = 30 * 60 * 1000; // Increased to 30 minutes
 export const cache = {
   prayerHistory: null,
   lastFetched: null
@@ -35,8 +35,8 @@ const prayerTimesCache = {
   timestamp: null
 };
 
-// Cache expiry time (12 hours)
-const CACHE_EXPIRY = 12 * 60 * 60 * 1000;
+// Cache expiry time (24 hours for prayer times)
+const CACHE_EXPIRY = 24 * 60 * 60 * 1000;
 
 // Get cached location or fetch new one
 async function getLocation() {
@@ -510,56 +510,109 @@ export function convertPrayerTimeToDate(timeStr) {
 }
 
 export async function getPrayerHistory() {
-  const user = auth.currentUser;
-  if (!user) {
-    prayerHistoryStore.set({ history: [], pendingByDate: {}, missedByDate: {} });
-    return { history: [], pendingByDate: {}, missedByDate: {} };
+  const now = Date.now();
+  
+  // Return cached data if it's still valid
+  if (cache.prayerHistory && cache.lastFetched && (now - cache.lastFetched < CACHE_DURATION)) {
+    return cache.prayerHistory;
   }
 
   try {
-    // Check cache first
-    if (cache.prayerHistory && cache.lastFetched && (Date.now() - cache.lastFetched < CACHE_DURATION)) {
-      prayerHistoryStore.set(cache.prayerHistory);
-      return cache.prayerHistory;
+    const user = auth.currentUser;
+    if (!user) {
+      const emptyResult = { history: [], pendingByDate: {}, missedByDate: {} };
+      prayerHistoryStore.set(emptyResult);
+      return emptyResult;
     }
 
-    // Update prayer statuses first
-    await updatePrayerStatuses();
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const sevenDaysAgoStr = sevenDaysAgo.toLocaleDateString('en-CA');
+    
+    // Query prayer_history collection
+    const prayerHistoryRef = collection(db, 'prayer_history');
+    
+    let querySnapshot;
+    
+    // Try the indexed query first
+    try {
+      const q = query(
+        prayerHistoryRef,
+        where('userId', '==', user.uid),
+        where('date', '>=', sevenDaysAgoStr),
+        orderBy('date', 'desc')
+      );
+      
+      querySnapshot = await getDocs(q);
+    } catch (indexError) {
+      console.log('Falling back to simple query due to index error:', indexError);
+      const q = query(
+        prayerHistoryRef,
+        where('userId', '==', user.uid)
+      );
+      
+      const snapshot = await getDocs(q);
+      // Filter results in memory
+      const filteredDocs = snapshot.docs.filter(doc => {
+        const data = doc.data();
+        return data.date >= sevenDaysAgoStr;
+      }).sort((a, b) => b.data().date.localeCompare(a.data().date));
+      
+      querySnapshot = { docs: filteredDocs };
+    }
 
-    const today = new Date().toLocaleDateString('en-CA');
-
-    const historyQuery = query(
-      collection(db, 'prayer_history'),
-      where('userId', '==', user.uid),
-      where('status', 'in', ['pending', 'missed', 'ontime', 'late', 'excused', 'upcoming'])
-    );
-
-    const querySnapshot = await getDocs(historyQuery);
-    const history = [];
-    querySnapshot.forEach(doc => {
-      history.push({ id: doc.id, ...doc.data() });
-    });
-
-    // Create the result object
-    const result = {
-      history,
-      pendingByDate: {},
-      missedByDate: {}
-    };
-
-    // Update the cache
+    // Process results even if prayer times are not available yet
+    const result = processQueryResults(querySnapshot);
+    
+    // Update cache and store
     cache.prayerHistory = result;
-    cache.lastFetched = Date.now();
-
-    // Update the store
+    cache.lastFetched = now;
     prayerHistoryStore.set(result);
-    console.log('Prayer history updated with:', result);
-
+    
     return result;
   } catch (error) {
     console.error('Error fetching prayer history:', error);
-    return { history: [], pendingByDate: {}, missedByDate: {} };
+    const emptyResult = { history: [], pendingByDate: {}, missedByDate: {} };
+    prayerHistoryStore.set(emptyResult);
+    return emptyResult;
   }
+}
+
+// Helper function to process query results
+function processQueryResults(querySnapshot) {
+  const history = [];
+  const pendingByDate = {};
+  const missedByDate = {};
+  
+  if (querySnapshot && querySnapshot.docs) {
+    querySnapshot.docs.forEach((doc) => {
+      const data = doc.data();
+      if (!data) return;
+      
+      history.push({ id: doc.id, ...data });
+      
+      // Organize pending and missed prayers by date
+      if (data.status === 'pending') {
+        if (!pendingByDate[data.date]) {
+          pendingByDate[data.date] = { prayers: [] };
+        }
+        pendingByDate[data.date].prayers.push({
+          prayerName: data.prayerName,
+          time: data.time || ''  // Handle missing time
+        });
+      } else if (data.status === 'missed') {
+        if (!missedByDate[data.date]) {
+          missedByDate[data.date] = { prayers: [] };
+        }
+        missedByDate[data.date].prayers.push({
+          prayerName: data.prayerName,
+          time: data.time || ''  // Handle missing time
+        });
+      }
+    });
+  }
+
+  return { history, pendingByDate, missedByDate };
 }
 
 export function getPrayerDateTime(date, time) {

@@ -38,45 +38,26 @@ export async function getCurrentLocation() {
       try {
         const position = await Geolocation.getCurrentPosition({
           enableHighAccuracy: true,
-          timeout: 30000, // 30 seconds timeout for GPS fix
-          maximumAge: 0
+          timeout: 10000,
+          maximumAge: 300000
         });
-        
-        // If accuracy is poor (> 100 meters), try again
-        if (position.coords.accuracy > 100) {
-          // Wait 2 seconds and try again
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          const betterPosition = await Geolocation.getCurrentPosition({
-            enableHighAccuracy: true,
-            timeout: 10000,
-            maximumAge: 0
-          });
-          
-          // Use the more accurate position
-          if (betterPosition.coords.accuracy < position.coords.accuracy) {
-            return {
-              latitude: betterPosition.coords.latitude,
-              longitude: betterPosition.coords.longitude,
-              accuracy: betterPosition.coords.accuracy
-            };
-          }
+
+        // Extract coordinates from position object
+        if (position && position.coords) {
+          return {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            accuracy: position.coords.accuracy
+          };
         }
-        
-        if (!position || !position.coords) {
-          throw new Error('No location data received');
-        }
-        
-        return {
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-          accuracy: position.coords.accuracy
-        };
+        throw new Error('Invalid position data received');
       } catch (highAccuracyError) {
+        console.log('High accuracy failed, trying low accuracy:', highAccuracyError);
         // Fall back to low accuracy if high accuracy fails
         const position = await Geolocation.getCurrentPosition({
           enableHighAccuracy: false,
           timeout: 10000,
-          maximumAge: 0
+          maximumAge: 300000
         });
         
         if (!position || !position.coords) {
@@ -99,8 +80,8 @@ export async function getCurrentLocation() {
         
         const options = {
           enableHighAccuracy: true,
-          timeout: 30000,
-          maximumAge: 0
+          timeout: 10000,
+          maximumAge: 300000
         };
         
         navigator.geolocation.getCurrentPosition(
@@ -145,55 +126,92 @@ export async function fetchPrayerTimes() {
     console.log('Fetching location...');
     const coords = await getCurrentLocation();
     console.log('Location received:', coords);
+    
+    if (!coords || typeof coords.latitude !== 'number' || typeof coords.longitude !== 'number') {
+      console.error('Invalid coordinates:', coords);
+      throw new Error('Invalid location data received');
+    }
+    
     console.log('Location accuracy (meters):', coords.accuracy);
     
-    // Get location name
+    // Get location name with retry
     console.log('Fetching location name...');
-    const response = await fetch(
-      `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${coords.latitude}&longitude=${coords.longitude}&localityLanguage=en`
-    );
-    const locationData = await response.json();
-    console.log('Location data:', locationData);
-    locationStore.set(`${locationData.city}, ${locationData.countryName}`);
+    let locationData;
+    try {
+      const response = await fetch(
+        `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${coords.latitude}&longitude=${coords.longitude}&localityLanguage=en`
+      );
+      locationData = await response.json();
+      console.log('Location data:', locationData);
+      locationStore.set(`${locationData.city || 'Unknown City'}, ${locationData.countryName || 'Unknown Country'}`);
+    } catch (error) {
+      console.error('Error fetching location name:', error);
+      locationStore.set('Location name unavailable');
+    }
     
-    // Get prayer times
+    // Get prayer times with retry
     const date = new Date();
     const timestamp = Math.floor(date.getTime() / 1000);
     
     console.log('Fetching prayer times...');
-    const prayerResponse = await fetch(
-      `https://api.aladhan.com/v1/timings/${timestamp}?latitude=${coords.latitude}&longitude=${coords.longitude}&method=2`
-    );
+    let retries = 3;
+    let lastError;
     
-    if (!prayerResponse.ok) {
-      throw new Error('Failed to fetch prayer times');
+    while (retries > 0) {
+      try {
+        const prayerResponse = await fetch(
+          `https://api.aladhan.com/v1/timings/${timestamp}?latitude=${coords.latitude}&longitude=${coords.longitude}&method=2`
+        );
+        
+        if (!prayerResponse.ok) {
+          throw new Error(`HTTP error! status: ${prayerResponse.status}`);
+        }
+        
+        const data = await prayerResponse.json();
+        console.log('Prayer times received:', data);
+        
+        if (!data || !data.data || !data.data.timings) {
+          throw new Error('Invalid prayer times data format');
+        }
+        
+        const timings = data.data.timings;
+        
+        const prayers = [
+          { 
+            name: 'Fajr', 
+            time: formatTo12Hour(timings.Fajr), 
+            done: false, 
+            icon: 'SunDim', 
+            weight: 'regular',
+            isPast: isPrayerPast(timings.Fajr),
+            fetchDate: date.toISOString()
+          },
+          { name: 'Dhuhr', time: formatTo12Hour(timings.Dhuhr), done: false, icon: 'Sun', weight: 'fill', isPast: isPrayerPast(timings.Dhuhr), fetchDate: date.toISOString() },
+          { name: 'Asr', time: formatTo12Hour(timings.Asr), done: false, icon: 'CloudSun', weight: 'regular', isPast: isPrayerPast(timings.Asr), fetchDate: date.toISOString() },
+          { name: 'Maghrib', time: formatTo12Hour(timings.Maghrib), done: false, icon: 'SunHorizon', weight: 'regular', isPast: isPrayerPast(timings.Maghrib), fetchDate: date.toISOString() },
+          { name: 'Isha', time: formatTo12Hour(timings.Isha), done: false, icon: 'MoonStars', weight: 'regular', isPast: isPrayerPast(timings.Isha), fetchDate: date.toISOString() }
+        ];
+        
+        prayerTimesStore.set(prayers);
+        return;
+      } catch (error) {
+        console.error(`Prayer times fetch attempt ${4 - retries} failed:`, error);
+        lastError = error;
+        retries--;
+        if (retries > 0) {
+          // Wait before retrying
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
     }
     
-    const data = await prayerResponse.json();
-    console.log('Prayer times received:', data);
-    const timings = data.data.timings;
-    
-    const prayers = [
-      { 
-        name: 'Fajr', 
-        time: formatTo12Hour(timings.Fajr), 
-        done: false, 
-        icon: 'SunDim', 
-        weight: 'regular',
-        isPast: isPrayerPast(timings.Fajr),
-        fetchDate: date.toISOString()
-      },
-      { name: 'Dhuhr', time: formatTo12Hour(timings.Dhuhr), done: false, icon: 'Sun', weight: 'fill', isPast: isPrayerPast(timings.Dhuhr), fetchDate: date.toISOString() },
-      { name: 'Asr', time: formatTo12Hour(timings.Asr), done: false, icon: 'CloudSun', weight: 'regular', isPast: isPrayerPast(timings.Asr), fetchDate: date.toISOString() },
-      { name: 'Maghrib', time: formatTo12Hour(timings.Maghrib), done: false, icon: 'SunHorizon', weight: 'regular', isPast: isPrayerPast(timings.Maghrib), fetchDate: date.toISOString() },
-      { name: 'Isha', time: formatTo12Hour(timings.Isha), done: false, icon: 'MoonStars', weight: 'regular', isPast: isPrayerPast(timings.Isha), fetchDate: date.toISOString() }
-    ];
-    
-    prayerTimesStore.set(prayers);
+    // If we get here, all retries failed
+    throw lastError || new Error('Failed to fetch prayer times after all retries');
   } catch (error) {
     console.error('Error fetching prayer times:', error);
-    errorStore.set(error.message || 'Unable to fetch prayer times. Please check your location settings.');
+    errorStore.set(error.message || 'Unable to fetch prayer times. Please check your internet connection.');
     locationStore.set('Location unavailable');
+    prayerTimesStore.set([]);
   } finally {
     loadingStore.set(false);
   }

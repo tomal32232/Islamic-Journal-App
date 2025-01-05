@@ -33,6 +33,7 @@
         isToday: i === 0
       });
     }
+    console.log('Generated week days:', days);
     return days;
   }
 
@@ -40,6 +41,11 @@
     const days = getCurrentWeekDays();
     const prayers = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
     const grid = [];
+    
+    console.log('\n=== Starting Grid Generation ===');
+    console.log('Prayer History Store:', $prayerHistoryStore);
+    console.log('Prayer Times Store:', $prayerTimesStore);
+    console.log('Days to process:', days);
     
     // Reset weekly stats
     weeklyStats = {
@@ -49,75 +55,152 @@
       excused: 0
     };
 
-    // Get prayer history
-    const prayerHistory = await getPrayerHistory();
-    
-    // Process each day
-    for (const day of days) {
-      const dayPrayers = [];
-      const dayDate = day.date;
-      
-      // Find prayers for this day
-      const dayHistory = prayerHistory.filter(prayer => 
-        new Date(prayer.date).toLocaleDateString('en-CA') === dayDate
-      );
-      
-      // Process each prayer type
-      for (const prayerName of prayers) {
-        const prayer = dayHistory.find(p => p.prayerName === prayerName);
+    // Get the date range for the last 7 days
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const sevenDaysAgo = new Date(today);
+    sevenDaysAgo.setDate(today.getDate() - 6);
+    console.log('Date range:', { from: sevenDaysAgo.toISOString(), to: today.toISOString() });
+
+    // Get user's account creation date
+    const user = auth.currentUser;
+    const accountCreationDateTime = new Date(user.metadata.creationTime);
+    console.log('Account creation date:', accountCreationDateTime.toISOString());
+
+    for (const prayer of prayers) {
+      console.log(`\n=== Processing prayer: ${prayer} ===`);
+      const row = {
+        name: prayer,
+        icon: $prayerTimesStore.find(p => p.name === prayer)?.icon || 'Sun',
+        weight: $prayerTimesStore.find(p => p.name === prayer)?.weight || 'regular',
+        days: []
+      };
+      console.log('Row initial data:', row);
+
+      for (const day of days) {
+        console.log(`\nChecking ${prayer} for ${day.date}`);
+        const prayerRecord = $prayerHistoryStore.history.find(
+          h => h.date === day.date && h.prayerName === prayer
+        );
+        console.log('Found prayer record:', prayerRecord);
+
+        const now = new Date();
+        const todayStr = new Date().toLocaleDateString('en-CA');
+        const prayerTime = $prayerTimesStore.find(p => p.name === prayer)?.time || '00:00 AM';
+        const prayerDateTime = getPrayerDateTime(day.date, prayerTime);
+        console.log('Prayer datetime:', prayerDateTime.toISOString());
         
-        let status = prayer ? prayer.status : 'upcoming';
-        if (status === 'pending' && new Date(prayer.date) < new Date()) {
-          status = 'missed';
+        let status = 'pending';
+        const prayerDate = new Date(day.date);
+        prayerDate.setHours(0, 0, 0, 0);
+
+        if (prayerRecord) {
+          status = prayerRecord.status;
+          console.log(`Found record status: ${status}`);
+          
+          if (prayerDate >= sevenDaysAgo && prayerDate <= today) {
+            if (status === 'ontime') weeklyStats.ontime++;
+            else if (status === 'late') weeklyStats.late++;
+            else if (status === 'missed') weeklyStats.missed++;
+            else if (status === 'excused') weeklyStats.excused++;
+            console.log('Updated weekly stats:', weeklyStats);
+          }
+        } else {
+          const isExcused = await shouldMarkPrayerExcused(day.date, prayer);
+          console.log(`No record found. Checking if excused: ${isExcused}`);
+          
+          if (isExcused) {
+            status = 'excused';
+            if (prayerDate >= sevenDaysAgo && prayerDate <= today) {
+              weeklyStats.excused++;
+            }
+          } else if (day.date === todayStr) {
+            const currentTime = new Date();
+            const prayerData = $prayerTimesStore.find(p => p.name === prayer);
+            
+            if (!prayerData || !prayerData.time) {
+              console.log(`No prayer time data for ${prayer}`);
+              status = 'none';
+            } else {
+              console.log(`Processing ${prayer} - Current: ${currentTime.toISOString()}, Prayer: ${prayerTime}`);
+              
+              if (currentTime > prayerDateTime) {
+                status = 'pending';
+                if (!$prayerHistoryStore.pendingByDate[day.date]) {
+                  $prayerHistoryStore.pendingByDate[day.date] = { prayers: [] };
+                }
+                if (!$prayerHistoryStore.pendingByDate[day.date].prayers.some(p => p.prayerName === prayer)) {
+                  $prayerHistoryStore.pendingByDate[day.date].prayers.push({
+                    prayerName: prayer,
+                    time: prayerTime
+                  });
+                }
+                console.log(`${prayer} is past time - marked pending`);
+              } else {
+                status = 'none';
+                console.log(`${prayer} is upcoming - marked none`);
+              }
+            }
+          } else if (day.date < todayStr) {
+            if (prayerDateTime >= accountCreationDateTime) {
+              status = 'missed';
+              if (prayerDate >= sevenDaysAgo) {
+                weeklyStats.missed++;
+                console.log(`Marked as missed and updated stats`);
+              }
+            } else {
+              status = 'none';
+              console.log(`Before account creation - marked none`);
+            }
+          } else {
+            status = 'none';
+            console.log(`Future date - marked none`);
+          }
         }
-        
-        // Update weekly stats
-        if (status === 'ontime') weeklyStats.ontime++;
-        else if (status === 'late') weeklyStats.late++;
-        else if (status === 'missed') weeklyStats.missed++;
-        else if (status === 'excused') weeklyStats.excused++;
-        
-        dayPrayers.push({
-          name: prayerName,
+
+        console.log(`Final status for ${prayer} on ${day.date}: ${status}`);
+        row.days.push({
+          date: day.date,
           status,
-          time: prayer?.time || '',
-          icon: iconMap[prayerName] || 'Circle'
+          isToday: day.isToday
         });
       }
-      
-      grid.push({
-        ...day,
-        prayers: dayPrayers
-      });
+      grid.push(row);
     }
-    
-    weeklyGrid = grid;
+
+    console.log('\n=== Grid Generation Complete ===');
+    console.log('Final weekly stats:', weeklyStats);
+    console.log('Generated grid:', grid);
+    return { days, grid, weeklyStats };
   }
 
   onMount(async () => {
-    await generatePrayerGrid();
-    
-    // Subscribe to prayer history changes
-    const unsubscribe = prayerHistoryStore.subscribe(() => {
-      generatePrayerGrid().catch(error => {
-        // console.error('Error updating prayer grid:', error);
-      });
-    });
-    
-    return () => {
-      unsubscribe();
-    };
+    console.log('\n=== WeeklyPrayerHistory Mounted ===');
+    console.log('Fetching initial data...');
+    await Promise.all([
+      getPrayerHistory(),
+      fetchPrayerTimes()
+    ]);
+    console.log('Initial prayer history:', $prayerHistoryStore);
+    console.log('Initial prayer times:', $prayerTimesStore);
+    await updateGrid();
   });
 
   async function updateGrid() {
+    console.log('\n=== Updating Grid ===');
     if ($prayerHistoryStore.history) {
+      console.log('Prayer history available, generating grid...');
       const gridData = await generatePrayerGrid();
       weeklyGrid = gridData.grid;
       weeklyStats = gridData.weeklyStats;
+      console.log('Grid updated successfully');
+    } else {
+      console.log('No prayer history available');
     }
   }
 
   $: if ($prayerHistoryStore.history) {
+    console.log('\n=== Prayer History Store Changed ===');
     updateGrid();
   }
 </script>
