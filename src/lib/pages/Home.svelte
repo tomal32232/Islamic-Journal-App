@@ -172,6 +172,7 @@
 
   let upcomingPrayer = null;
   let pendingPrayers = [];
+  let isLoadingPrayers = true;
 
   let upcomingCountdown = '';
   let countdownEnded = false;
@@ -306,38 +307,47 @@
   }
 
   async function updatePrayerStatus() {
-    // Check if we need to fetch new prayer times (after midnight)
-    const now = new Date();
-    const lastFetchDate = $prayerTimesStore[0]?.fetchDate;
-    if (!lastFetchDate || new Date(lastFetchDate).getDate() !== now.getDate()) {
-      await fetchPrayerTimes();
-    }
+    isLoadingPrayers = true;
+    try {
+      // Check if we need to fetch new prayer times (after midnight)
+      const now = new Date();
+      const lastFetchDate = $prayerTimesStore[0]?.fetchDate;
+      if (!lastFetchDate || new Date(lastFetchDate).getDate() !== now.getDate()) {
+        await fetchPrayerTimes();
+      }
 
-    await updatePrayerStatuses();
-    
-    // Use the same counting logic as NotificationIcon
-    pendingPrayers = Object.values($prayerHistoryStore.pendingByDate)
-      .reduce((prayers, { prayers: datePrayers }) => [...prayers, ...datePrayers], []);
-    
-    upcomingPrayer = null;
-    
-    // Check if all prayers for today have passed
-    let allPrayersPassed = true;
-    for (const prayer of $prayerTimesStore) {
-      if (!prayer?.time) continue;
-      const prayerTime = convertPrayerTimeToDate(prayer.time);
-      if (prayerTime > now) {
-        allPrayersPassed = false;
-        if (!upcomingPrayer) {
-          upcomingPrayer = prayer;
-          break;
+      await updatePrayerStatuses();
+      
+      // Use the same counting logic as NotificationIcon
+      pendingPrayers = Object.values($prayerHistoryStore.pendingByDate)
+        .reduce((prayers, { prayers: datePrayers }) => [...prayers, ...datePrayers], []);
+      
+      upcomingPrayer = null;
+      
+      // Check if all prayers for today have passed
+      let allPrayersPassed = true;
+      if ($prayerTimesStore && $prayerTimesStore.length > 0) {
+        for (const prayer of $prayerTimesStore) {
+          if (!prayer?.time) continue;
+          const prayerTime = convertPrayerTimeToDate(prayer.time);
+          if (prayerTime > now) {
+            allPrayersPassed = false;
+            if (!upcomingPrayer) {
+              upcomingPrayer = prayer;
+              break;
+            }
+          }
         }
       }
-    }
 
-    // If all prayers have passed, set upcomingPrayer to null to show appropriate message
-    if (allPrayersPassed) {
-      upcomingPrayer = null;
+      // If all prayers have passed, set upcomingPrayer to null to show appropriate message
+      if (allPrayersPassed) {
+        upcomingPrayer = null;
+      }
+    } catch (error) {
+      console.error('Error updating prayer status:', error);
+    } finally {
+      isLoadingPrayers = false;
     }
   }
 
@@ -717,7 +727,11 @@
         <div class="next-prayer-card">
           <h3 class="section-title">Next Prayer</h3>
           <div class="next-prayer-content">
-            {#if isExcusedPeriodActive}
+            {#if isLoadingPrayers}
+              <div class="loading-message">
+                <p>Loading prayer times...</p>
+              </div>
+            {:else if isExcusedPeriodActive}
               <div class="excused-message">
                 <p>You are currently excused from prayers.</p>
                 <label class="toggle-switch">
@@ -1562,6 +1576,13 @@
   }
 
   .no-prayer-message {
+    text-align: center;
+    padding: 1rem;
+    color: #666;
+    font-size: 0.875rem;
+  }
+
+  .loading-message {
     text-align: center;
     padding: 1rem;
     color: #666;
