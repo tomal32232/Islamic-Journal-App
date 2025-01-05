@@ -1,5 +1,5 @@
 <script>
-  import { House, Mosque, Scroll, Book, User } from 'phosphor-svelte';
+  import { House, Mosque, ChartLine, Book, User } from 'phosphor-svelte';
   
   export let activeTab = 'home';
   
@@ -24,11 +24,11 @@
       </button>
       
       <button 
-        class="nav-item {activeTab === 'tasbih' ? 'active' : ''}" 
-        on:click={() => setActiveTab('tasbih')}
+        class="nav-item {activeTab === 'tracker' ? 'active' : ''}" 
+        on:click={() => setActiveTab('tracker')}
       >
-        <Scroll weight={activeTab === 'tasbih' ? 'fill' : 'regular'} size={20} />
-        <span>Tasbih</span>
+        <ChartLine weight={activeTab === 'tracker' ? 'fill' : 'regular'} size={20} />
+        <span>Tracker</span>
       </button>
     </div>
 
@@ -67,12 +67,11 @@
     right: 16px;
     z-index: 1000;
     padding: 0 16px;
-    background: rgba(255, 255, 255, 0.95);
+    background: rgba(23, 23, 23, 0.95);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
     border-radius: 32px;
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.1);
-    border: 1px solid rgba(33, 105, 116, 0.1);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
     height: 64px;
     max-width: 400px;
     margin: 0 auto;
@@ -132,10 +131,9 @@
     border: none;
   }
 
-  @media (prefers-color-scheme: dark) {
+  @media (prefers-color-scheme: light) {
     .bottom-nav {
-      background: rgba(23, 23, 23, 0.95);
-      border-color: rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.95);
     }
   }
 </style> 

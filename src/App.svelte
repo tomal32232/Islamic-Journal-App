@@ -7,7 +7,7 @@
   import NotificationIcon from './lib/components/NotificationIcon.svelte';
   import Badges from './lib/pages/Badges.svelte';
   import Profile from './lib/pages/Profile.svelte';
-  import Tasbih from './lib/pages/Tasbih.svelte';
+  import Tracker from './lib/pages/Tracker.svelte';
   import Journal from './lib/pages/Journal.svelte';
   import Prayer from './lib/pages/Prayer.svelte';
   import BottomNav from './lib/components/BottomNav.svelte';
@@ -16,7 +16,6 @@
 
   let user = null;
   let activeTab = 'home';
-  let isCounterMode = false;
 
   onMount(() => {
     // Listen for auth state changes
@@ -38,10 +37,6 @@
   function navigateTo(page) {
     activeTab = page;
   }
-
-  function handleCounterModeChange(event) {
-    isCounterMode = event.detail.isCounterMode;
-  }
 </script>
 
 {#if user}
@@ -62,8 +57,8 @@
         <Favorites onBack={() => navigateTo('profile')} />
       {:else if activeTab === 'profile'}
         <Profile {navigateTo} />
-      {:else if activeTab === 'tasbih'}
-        <Tasbih on:countermodechange={handleCounterModeChange} />
+      {:else if activeTab === 'tracker'}
+        <Tracker />
       {:else if activeTab === 'journal'}
         <Journal />
       {:else if activeTab === 'prayer'}
@@ -72,9 +67,7 @@
         <Home />
       {/if}
     </main>
-    {#if !isCounterMode}
-      <BottomNav {activeTab} on:tabChange={handleTabChange} />
-    {/if}
+    <BottomNav {activeTab} on:tabChange={handleTabChange} />
   </div>
   <div class="bottom-bar"></div>
 {:else}
