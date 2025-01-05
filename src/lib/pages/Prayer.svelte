@@ -7,7 +7,7 @@
     fetchPrayerTimes,
     getCurrentLocation 
   } from '../services/prayerTimes';
-  import { savePrayerStatus, getPrayerHistory, prayerHistoryStore, initializeMonthlyPrayers, updatePrayerStatuses } from '../stores/prayerHistoryStore';
+  import { savePrayerStatus, getPrayerHistory, prayerHistoryStore, initializeMonthlyPrayers, updatePrayerStatuses, cache as prayerHistoryCache } from '../stores/prayerHistoryStore';
   import { iconMap } from '../utils/icons';
   import { nearbyMosquesStore, mosqueLoadingStore, fetchNearbyMosques } from '../services/mosqueService';
   import PrayerHistorySection from '../components/PrayerHistorySection.svelte';
@@ -48,6 +48,7 @@
 
   function getNextPrayer(prayers) {
     const now = new Date();
+    const today = now.toLocaleDateString('en-CA');
     const currentTime = now.getHours() * 60 + now.getMinutes();
 
     // Convert prayer times to minutes for comparison
@@ -57,18 +58,26 @@
       let hour = parseInt(hours);
       if (period === 'PM' && hour !== 12) hour += 12;
       if (period === 'AM' && hour === 12) hour = 0;
+      
+      // Get full date for this prayer time
+      const prayerDate = new Date();
+      prayerDate.setHours(hour, parseInt(minutes), 0);
+      
       return {
         ...prayer,
-        minutes: hour * 60 + parseInt(minutes)
+        minutes: hour * 60 + parseInt(minutes),
+        date: prayerDate.toLocaleDateString('en-CA')
       };
     });
 
-    // Find the next prayer
-    let next = prayerMinutes.find(prayer => prayer.minutes > currentTime);
+    // Find the next prayer for today only
+    let next = prayerMinutes.find(prayer => 
+      prayer.date === today && prayer.minutes > currentTime
+    );
     
-    // If no next prayer today, get the first prayer (it will be tomorrow's)
+    // If no next prayer today, return null
     if (!next) {
-      next = prayerMinutes[0];
+      return null;
     }
 
     return next;
@@ -86,6 +95,22 @@
     scrollY = container.scrollTop;
   }
 
+  function getPrayerStatus(prayerName) {
+    const today = new Date().toLocaleDateString('en-CA');
+    const prayer = $prayerHistoryStore?.history?.find(
+      p => p.date === today && p.prayerName === prayerName
+    );
+    console.log(`Getting status for ${prayerName}:`, prayer?.status);
+    return prayer?.status;
+  }
+
+  // Add reactive statement to handle prayer history updates
+  $: if ($prayerHistoryStore?.history) {
+    console.log('Prayer history updated:', $prayerHistoryStore.history);
+    // Force component update
+    $prayerTimesStore = [...$prayerTimesStore];
+  }
+
   onMount(() => {
     const container = document.querySelector('.prayer-container');
     if (container) {
@@ -95,12 +120,17 @@
     timeInterval = setInterval(updateNextPrayer, 60000);
     updateNextPrayer();
 
-    // Initial data load
+    // Initial data load - wait for all promises to resolve
     Promise.all([
       getPrayerHistory(),
       fetchPrayerTimes(),
       updatePrayerStatuses()
-    ]);
+    ]).then(() => {
+      // Force a UI update after initial data load
+      $prayerTimesStore = [...$prayerTimesStore];
+    }).catch(error => {
+      console.error('Error loading initial data:', error);
+    });
 
     getWeeklyStats().then(stats => {
       weeklyStreak = stats?.streak || 0;
@@ -125,8 +155,9 @@
   }
 
   function handleCustomTarget() {
-    if (customTarget && !isNaN(customTarget)) {
-      selectedTarget = parseInt(customTarget);
+    const numValue = customTarget ? parseInt(customTarget) : null;
+    if (numValue && !isNaN(numValue)) {
+      selectedTarget = numValue;
       count = 0;
     }
   }
@@ -230,8 +261,15 @@
         updatePrayerStatuses()
       ]);
 
-      // Force a UI update
-      prayerHistoryStore.update(store => ({ ...store }));
+      // Force a UI update by creating a new array
+      $prayerTimesStore = [...$prayerTimesStore];
+      
+      // Invalidate the prayer history cache to force a fresh fetch
+      prayerHistoryCache.prayerHistory = null;
+      prayerHistoryCache.lastFetched = null;
+      
+      // Fetch fresh data
+      await getPrayerHistory();
     } finally {
       isLoading = false;
     }
@@ -247,12 +285,34 @@
     prayerHistoryStore.update(store => ({ ...store }));
   }
 
-  function getPrayerStatus(prayerName) {
-    const today = new Date().toLocaleDateString('en-CA');
-    const prayer = $prayerHistoryStore?.history?.find(
-      p => p.date === today && p.prayerName === prayerName
-    );
-    return prayer?.status;
+  function shouldShowMarkButton(prayer) {
+    const now = new Date();
+    const today = now.toLocaleDateString('en-CA');
+    
+    // Get the prayer date by converting its time to a full date
+    const [time, period] = prayer.time.split(' ');
+    const [hours, minutes] = time.split(':');
+    let hour = parseInt(hours);
+    if (period === 'PM' && hour !== 12) hour += 12;
+    if (period === 'AM' && hour === 12) hour = 0;
+    
+    const prayerDate = new Date();
+    prayerDate.setHours(hour, parseInt(minutes), 0);
+    
+    // Check if the prayer is from today
+    const prayerDateStr = prayerDate.toLocaleDateString('en-CA');
+    if (prayerDateStr !== today) {
+      return false; // Don't show mark button for prayers not from today
+    }
+    
+    // Check if prayer has already been marked
+    const status = getPrayerStatus(prayer.name);
+    if (status === 'ontime' || status === 'late') {
+      return false; // Already marked, don't show mark button
+    }
+    
+    // For today's prayers that have passed and haven't been marked, show mark button
+    return isPrayerPassed(prayer.time);
   }
 </script>
 
@@ -303,29 +363,26 @@
               </div>
               <span class="prayer-name">{prayer.name}</span>
               <span class="prayer-time">{prayer.time}</span>
-              {#if isPrayerPassed(prayer.time)}
-                {@const status = getPrayerStatus(prayer.name)}
-                {#if status === 'ontime' || status === 'late'}
-                  <button 
-                    class="status-label {status}"
-                    on:click={() => openMarkPrayerSheet(prayer)}
-                  >
-                    {#if status === 'ontime'}
-                      <Check weight="bold" size={14} />
-                      On Time
-                    {:else}
-                      <Clock weight="bold" size={14} />
-                      Late
-                    {/if}
-                  </button>
-                {:else}
-                  <button 
-                    class="mark-prayer-btn"
-                    on:click={() => openMarkPrayerSheet(prayer)}
-                  >
-                    Mark Prayer
-                  </button>
-                {/if}
+              {#if getPrayerStatus(prayer.name) === 'ontime' || getPrayerStatus(prayer.name) === 'late'}
+                <button 
+                  class="status-label {getPrayerStatus(prayer.name)}"
+                  on:click={() => openMarkPrayerSheet(prayer)}
+                >
+                  {#if getPrayerStatus(prayer.name) === 'ontime'}
+                    <Check weight="bold" size={14} />
+                    On Time
+                  {:else}
+                    <Clock weight="bold" size={14} />
+                    Late
+                  {/if}
+                </button>
+              {:else if shouldShowMarkButton(prayer)}
+                <button 
+                  class="mark-prayer-btn"
+                  on:click={() => openMarkPrayerSheet(prayer)}
+                >
+                  Mark Prayer
+                </button>
               {/if}
             </div>
           {/each}

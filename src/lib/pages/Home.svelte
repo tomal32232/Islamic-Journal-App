@@ -306,22 +306,38 @@
   }
 
   async function updatePrayerStatus() {
+    // Check if we need to fetch new prayer times (after midnight)
+    const now = new Date();
+    const lastFetchDate = $prayerTimesStore[0]?.fetchDate;
+    if (!lastFetchDate || new Date(lastFetchDate).getDate() !== now.getDate()) {
+      await fetchPrayerTimes();
+    }
+
     await updatePrayerStatuses();
     
     // Use the same counting logic as NotificationIcon
     pendingPrayers = Object.values($prayerHistoryStore.pendingByDate)
       .reduce((prayers, { prayers: datePrayers }) => [...prayers, ...datePrayers], []);
     
-    const now = new Date();
     upcomingPrayer = null;
     
+    // Check if all prayers for today have passed
+    let allPrayersPassed = true;
     for (const prayer of $prayerTimesStore) {
       if (!prayer?.time) continue;
       const prayerTime = convertPrayerTimeToDate(prayer.time);
-      if (prayerTime > now && !upcomingPrayer) {
-        upcomingPrayer = prayer;
-        break;
+      if (prayerTime > now) {
+        allPrayersPassed = false;
+        if (!upcomingPrayer) {
+          upcomingPrayer = prayer;
+          break;
+        }
       }
+    }
+
+    // If all prayers have passed, set upcomingPrayer to null to show appropriate message
+    if (allPrayersPassed) {
+      upcomingPrayer = null;
     }
   }
 

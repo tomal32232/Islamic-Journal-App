@@ -9,12 +9,20 @@ import {
   getDocs,
   getDoc,
   Timestamp,
-  orderBy 
+  orderBy,
+  writeBatch 
 } from 'firebase/firestore';
 import { prayerTimesStore } from './prayerTimes';
 import { updatePrayerProgress } from '../services/badgeProgressService';
 import { onMount } from 'svelte';
 import { getCurrentLocation } from '../services/prayerTimes';
+
+// Cache configuration
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes in milliseconds
+export const cache = {
+  prayerHistory: null,
+  lastFetched: null
+};
 
 // Cache stores
 const locationCache = {
@@ -182,20 +190,23 @@ export async function initializeMonthlyPrayers(prayers) {
 
   // Check existing prayers
   const existingPrayers = new Set();
-  for (const date of dates) {
-    const historyQuery = query(
-      collection(db, 'prayer_history'),
-      where('userId', '==', user.uid),
-      where('date', '==', date)
-    );
-    const snapshot = await getDocs(historyQuery);
-    snapshot.forEach(doc => {
-      existingPrayers.add(`${doc.data().date}-${doc.data().prayerName.toLowerCase()}`);
-    });
-  }
+  const historyQuery = query(
+    collection(db, 'prayer_history'),
+    where('userId', '==', user.uid),
+    where('date', 'in', dates)
+  );
+  
+  const snapshot = await getDocs(historyQuery);
+  snapshot.forEach(doc => {
+    existingPrayers.add(`${doc.data().date}-${doc.data().prayerName.toLowerCase()}`);
+  });
 
-  // Initialize missing prayers
-  const batch = [];
+  // Initialize missing prayers using batching
+  const batchSize = 500; // Firestore batch limit
+  const batches = [];
+  let currentBatch = writeBatch(db);
+  let operationCount = 0;
+
   for (const date of dates) {
     for (const prayer of prayers) {
       const prayerId = `${date}-${prayer.name.toLowerCase()}`;
@@ -204,22 +215,37 @@ export async function initializeMonthlyPrayers(prayers) {
       if (existingPrayers.has(prayerId)) continue;
 
       const prayerRef = doc(collection(db, 'prayer_history'));
-      batch.push(
-        setDoc(prayerRef, {
-          userId: user.uid,
-          prayerId,
-          prayerName: prayer.name,
-          time: prayer.time,
-          status: 'pending',
-          date: date,
-          timestamp: Timestamp.now()
-        })
-      );
+      currentBatch.set(prayerRef, {
+        userId: user.uid,
+        prayerId,
+        prayerName: prayer.name,
+        time: prayer.time,
+        status: 'pending',
+        date: date,
+        timestamp: Timestamp.now()
+      });
+
+      operationCount++;
+
+      // If we reach batch limit, add the batch to batches array and create a new one
+      if (operationCount === batchSize) {
+        batches.push(currentBatch);
+        currentBatch = writeBatch(db);
+        operationCount = 0;
+      }
     }
   }
 
-  // Execute all updates
-  await Promise.all(batch);
+  // Add the last batch if it has any operations
+  if (operationCount > 0) {
+    batches.push(currentBatch);
+  }
+
+  // Commit all batches sequentially
+  for (const batch of batches) {
+    await batch.commit();
+  }
+
   await getPrayerHistory();
 }
 
@@ -424,6 +450,9 @@ export async function savePrayerStatus(prayerData) {
       timestamp: Timestamp.now()
     }, { merge: true });
 
+    // Invalidate cache after updating
+    invalidatePrayerHistoryCache();
+
     // Update local store
     const store = get(prayerHistoryStore);
     
@@ -482,176 +511,55 @@ export function convertPrayerTimeToDate(timeStr) {
 
 export async function getPrayerHistory() {
   const user = auth.currentUser;
-  if (!user) return { history: [], pendingByDate: {}, missedByDate: {} };
-
-  // console.log('=== Getting Prayer History ===');
-  // console.log('User ID:', user.uid);
-
-  // Update prayer statuses first
-  await updatePrayerStatuses();
-
-  const today = new Date().toLocaleDateString('en-CA');
-  // console.log('Today:', today);
-
-  const historyQuery = query(
-    collection(db, 'prayer_history'),
-    where('userId', '==', user.uid),
-    where('status', 'in', ['pending', 'missed', 'ontime', 'late', 'excused', 'upcoming'])
-  );
-
-  const querySnapshot = await getDocs(historyQuery);
-  // console.log('Total prayer records found:', querySnapshot.size);
-
-  // Get unique dates from the prayer history
-  const uniqueDates = new Set();
-  querySnapshot.forEach(doc => {
-    const prayer = doc.data();
-    uniqueDates.add(prayer.date);
-  });
-  // console.log('Unique dates found:', Array.from(uniqueDates));
-
-  // Fetch prayer times for all unique dates
-  const prayerTimesByDate = {};
-  for (const date of uniqueDates) {
-    const [year, month, day] = date.split('-').map(Number);
-    const prayerTimes = await getPrayerTimes(new Date(year, month - 1, day));
-    if (prayerTimes) {
-      prayerTimesByDate[date] = prayerTimes;
-      // console.log(`Got prayer times for ${date}:`, prayerTimes);
-    }
+  if (!user) {
+    prayerHistoryStore.set({ history: [], pendingByDate: {}, missedByDate: {} });
+    return { history: [], pendingByDate: {}, missedByDate: {} };
   }
 
-  const history = [];
-  const pendingByDate = {};
-  const missedByDate = {};
-
-  // Get active excused period first
-  const activeExcusedPeriod = await getActiveExcusedPeriod();
-  // console.log('Active excused period:', activeExcusedPeriod);
-
-  const prayers = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
-
-  querySnapshot.forEach(doc => {
-    const prayer = doc.data();
-    history.push(prayer);
-    
-    // console.log(`\nProcessing prayer: ${prayer.prayerName} for date ${prayer.date}`);
-    // console.log('Prayer details:', {
-    //   id: doc.id,
-    //   ...prayer
-    // });
-    
-    let prayerDateTime = prayer.time ? getPrayerDateTime(prayer.date, prayer.time) : null;
-    if (!prayerDateTime && prayerTimesByDate[prayer.date]) {
-      // If we don't have the prayer time in the record, get it from prayer times
-      const prayerTime = prayerTimesByDate[prayer.date][prayer.prayerName.toLowerCase()];
-      if (prayerTime) {
-        prayer.time = prayerTime;
-        // console.log(`Using prayer time from service for ${prayer.prayerName}: ${prayerTime}`);
-        prayerDateTime = getPrayerDateTime(prayer.date, prayerTime);
-      }
-    }
-    
-    if (!prayerDateTime) {
-      // console.error(`No prayer time available for ${prayer.prayerName} on ${prayer.date}`);
-      return;
+  try {
+    // Check cache first
+    if (cache.prayerHistory && cache.lastFetched && (Date.now() - cache.lastFetched < CACHE_DURATION)) {
+      prayerHistoryStore.set(cache.prayerHistory);
+      return cache.prayerHistory;
     }
 
-    const now = new Date();
+    // Update prayer statuses first
+    await updatePrayerStatuses();
 
-    // console.log(`\nChecking prayer ${prayer.prayerName} for pending status:`, {
-    //   status: prayer.status,
-    //   prayerTime: prayerDateTime.toLocaleString(),
-    //   currentTime: now.toLocaleString(),
-    //   hasPassed: prayerDateTime < now
-    // });
+    const today = new Date().toLocaleDateString('en-CA');
 
-    // Skip if prayer is already marked as ontime, late, or excused
-    if (['ontime', 'late', 'excused'].includes(prayer.status)) {
-      // console.log(`Prayer ${prayer.prayerName} is already marked as ${prayer.status}, skipping`);
-      return;
-    }
+    const historyQuery = query(
+      collection(db, 'prayer_history'),
+      where('userId', '==', user.uid),
+      where('status', 'in', ['pending', 'missed', 'ontime', 'late', 'excused', 'upcoming'])
+    );
 
-    // Add to pending if:
-    // 1. Status is 'pending' OR
-    // 2. Status is 'upcoming' and prayer time has passed
-    if ((prayer.status === 'pending' || prayer.status === 'upcoming') && 
-        prayerDateTime < now) {
-      // Check if this prayer should be excused
-      const shouldExcuse = activeExcusedPeriod && 
-        prayer.date >= activeExcusedPeriod.startDate &&
-        (prayer.date !== activeExcusedPeriod.startDate || 
-         prayers.indexOf(prayer.prayerName) >= prayers.indexOf(activeExcusedPeriod.startPrayer));
-
-      // console.log('Should excuse prayer:', shouldExcuse);
-
-      if (!shouldExcuse) {
-        const date = prayer.date;
-        if (!pendingByDate[date]) {
-          pendingByDate[date] = {
-            isToday: date === today,
-            prayers: []
-          };
-        }
-        
-        // Add prayer to pending if not already there
-        if (!pendingByDate[date].prayers.some(p => p.prayerId === prayer.prayerId)) {
-          pendingByDate[date].prayers.push({
-            ...prayer,
-            prayerId: prayer.prayerId || `${prayer.date}-${prayer.prayerName.toLowerCase()}`
-          });
-          // console.log('Added to pending prayers');
-        }
-      } else {
-        // console.log('Prayer will be marked as excused');
-        // If prayer should be excused, update its status
-        savePrayerStatus({
-          name: prayer.prayerName,
-          date: prayer.date,
-          time: prayer.time,
-          status: 'excused'
-        });
-      }
-    }
-
-    // Add to missed if status is 'missed'
-    if (prayer.status === 'missed') {
-      const date = prayer.date;
-      if (!missedByDate[date]) {
-        missedByDate[date] = {
-          prayers: []
-        };
-      }
-      missedByDate[date].prayers.push(prayer);
-      // console.log('Added to missed prayers');
-    }
-  });
-
-  // Sort prayers within each date
-  Object.values(pendingByDate).forEach(dateGroup => {
-    dateGroup.prayers.sort((a, b) => {
-      const timeA = getPrayerDateTime(a.date, a.time);
-      const timeB = getPrayerDateTime(b.date, b.time);
-      return timeA.getTime() - timeB.getTime();
+    const querySnapshot = await getDocs(historyQuery);
+    const history = [];
+    querySnapshot.forEach(doc => {
+      history.push({ id: doc.id, ...doc.data() });
     });
-  });
 
-  Object.values(missedByDate).forEach(dateGroup => {
-    dateGroup.prayers.sort((a, b) => {
-      const timeA = getPrayerDateTime(a.date, a.time);
-      const timeB = getPrayerDateTime(b.date, b.time);
-      return timeB.getTime() - timeA.getTime(); // Reverse chronological for missed prayers
-    });
-  });
+    // Create the result object
+    const result = {
+      history,
+      pendingByDate: {},
+      missedByDate: {}
+    };
 
-  // console.log('\n=== Prayer History Summary ===');
-  // console.log('Total prayers:', history.length);
-  // console.log('Pending prayers by date:', pendingByDate);
-  // console.log('Missed prayers by date:', missedByDate);
-  // console.log('Full history:', history);
+    // Update the cache
+    cache.prayerHistory = result;
+    cache.lastFetched = Date.now();
 
-  prayerHistoryStore.set({ history, pendingByDate, missedByDate });
-  return { history, pendingByDate, missedByDate };
+    // Update the store
+    prayerHistoryStore.set(result);
+    console.log('Prayer history updated with:', result);
+
+    return result;
+  } catch (error) {
+    console.error('Error fetching prayer history:', error);
+    return { history: [], pendingByDate: {}, missedByDate: {} };
+  }
 }
 
 export function getPrayerDateTime(date, time) {
@@ -1149,4 +1057,10 @@ async function getPrayerStatus(prayerName, date) {
   if (querySnapshot.empty) return null;
 
   return querySnapshot.docs[0].data().status;
+} 
+
+// Add cache invalidation function
+export function invalidatePrayerHistoryCache() {
+  cache.prayerHistory = null;
+  cache.lastFetched = null;
 } 
