@@ -126,7 +126,14 @@
         }
       });
     } else if (currentPage === 'home') {
-      updateStats();
+      console.log('Returning to home page, checking if update needed...');
+      // Only update if we don't have prayer data
+      if (!upcomingPrayer && (!$prayerTimesStore || $prayerTimesStore.length === 0)) {
+        console.log('No prayer data found, updating stats...');
+        updateStats();
+      } else {
+        console.log('Using cached prayer data');
+      }
     }
   }
 
@@ -307,16 +314,45 @@
   }
 
   async function updatePrayerStatus() {
+    console.log('Starting updatePrayerStatus...');
+    console.log('Current prayer times store:', $prayerTimesStore);
+    console.log('Current prayer history store:', $prayerHistoryStore);
+    
     isLoadingPrayers = true;
     try {
-      // Check if we need to fetch new prayer times (after midnight)
-      const now = new Date();
-      const lastFetchDate = $prayerTimesStore[0]?.fetchDate;
-      if (!lastFetchDate || new Date(lastFetchDate).getDate() !== now.getDate()) {
+      // Check if we have data in the store
+      if (!$prayerTimesStore || $prayerTimesStore.length === 0) {
+        console.log('No prayer times in store, fetching...');
+        // Only fetch if we don't have any data
         await fetchPrayerTimes();
+      } else {
+        // Check if we need to fetch new prayer times (after midnight)
+        const now = new Date();
+        const lastFetchDate = $prayerTimesStore[0]?.fetchDate;
+        console.log('Last fetch date:', lastFetchDate);
+        if (lastFetchDate && new Date(lastFetchDate).getDate() !== now.getDate()) {
+          console.log('New day detected, fetching new prayer times...');
+          await fetchPrayerTimes();
+        } else {
+          console.log('Using cached prayer times');
+        }
       }
 
-      await updatePrayerStatuses();
+      // Only update prayer statuses if we have no history data
+      if (!$prayerHistoryStore?.history) {
+        console.log('No prayer history in store, fetching...');
+        await getPrayerHistory();
+      } else {
+        console.log('Using cached prayer history');
+      }
+
+      // Skip updatePrayerStatuses if we already have data
+      if (!$prayerHistoryStore?.pendingByDate) {
+        console.log('Updating prayer statuses...');
+        await updatePrayerStatuses();
+      } else {
+        console.log('Using cached prayer statuses');
+      }
       
       // Use the same counting logic as NotificationIcon
       pendingPrayers = Object.values($prayerHistoryStore.pendingByDate)
@@ -327,6 +363,7 @@
       // Check if all prayers for today have passed
       let allPrayersPassed = true;
       if ($prayerTimesStore && $prayerTimesStore.length > 0) {
+        const now = new Date();
         for (const prayer of $prayerTimesStore) {
           if (!prayer?.time) continue;
           const prayerTime = convertPrayerTimeToDate(prayer.time);
@@ -334,6 +371,7 @@
             allPrayersPassed = false;
             if (!upcomingPrayer) {
               upcomingPrayer = prayer;
+              console.log('Found upcoming prayer:', prayer);
               break;
             }
           }
@@ -342,12 +380,14 @@
 
       // If all prayers have passed, set upcomingPrayer to null to show appropriate message
       if (allPrayersPassed) {
+        console.log('All prayers have passed for today');
         upcomingPrayer = null;
       }
     } catch (error) {
       console.error('Error updating prayer status:', error);
     } finally {
       isLoadingPrayers = false;
+      console.log('Finished updatePrayerStatus');
     }
   }
 
