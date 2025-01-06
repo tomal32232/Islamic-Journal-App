@@ -71,12 +71,22 @@
       const prayers = prayersByDate[date];
       console.log(`Checking date ${date}, prayers:`, prayers);
       
-      // Check if all 5 prayers are completed for the day
+      // Check if all 5 prayers are either completed or excused for the day
       const isComplete = prayers.length === 5 && 
         prayers.every(prayer => 
-          ['ontime', 'late', 'excused'].includes(prayer.status)
+          ['ontime', 'late'].includes(prayer.status) || prayer.status === 'excused'
         );
-      console.log(`Date ${date} complete?`, isComplete, 'prayers length:', prayers.length);
+
+      // Count how many prayers are excused
+      const excusedCount = prayers.filter(prayer => prayer.status === 'excused').length;
+      
+      // If all prayers are excused, don't increase streak but don't break it either
+      if (prayers.length === 5 && excusedCount === 5) {
+        console.log(`Date ${date} all prayers excused, maintaining streak at ${currentStreak}`);
+        continue;
+      }
+
+      console.log(`Date ${date} complete?`, isComplete, 'prayers length:', prayers.length, 'excused:', excusedCount);
 
       if (isComplete) {
         currentStreak++;
