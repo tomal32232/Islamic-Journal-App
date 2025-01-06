@@ -19,6 +19,9 @@
   let mostCommonMood = '';
   let bestMood = '';
   let bestPrayerMood = '';
+  let moodStreak = 0;
+  let longestMoodStreak = 0;
+  let bestMoodCount = 0;
 
   onMount(async () => {
     await Promise.all([
@@ -174,28 +177,84 @@
 
     // Process mood history
     if ($moodHistoryStore) {
+      console.log('Mood History:', $moodHistoryStore);
       const moodCounts = {};
       let bestMoodScore = 0;
       let bestPrayerMoodScore = 0;
+      
+      // Sort moods by date
+      const sortedMoods = [...$moodHistoryStore].sort((a, b) => 
+        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+      );
+      console.log('Sorted Moods:', sortedMoods);
 
-      Object.entries($moodHistoryStore).forEach(([date, mood]) => {
-        const moodDate = new Date(date);
-        if (moodDate >= sevenDaysAgo && moodDate <= today) {
-          moodCounts[mood.mood] = (moodCounts[mood.mood] || 0) + 1;
-          
-          if (mood.prayerName === 'Fajr' && moodCounts[mood.mood] > bestPrayerMoodScore) {
-            bestPrayerMood = mood.mood;
-            bestPrayerMoodScore = moodCounts[mood.mood];
-          }
+      // Group moods by date
+      const moodsByDate = {};
+      sortedMoods.forEach(mood => {
+        const date = new Date(mood.timestamp).toLocaleDateString('en-CA');
+        if (!moodsByDate[date]) {
+          moodsByDate[date] = [];
+        }
+        moodsByDate[date].push(mood);
+        
+        // Count mood frequencies
+        moodCounts[mood.mood] = (moodCounts[mood.mood] || 0) + 1;
+        if (moodCounts[mood.mood] > bestMoodScore) {
+          bestMood = mood.mood;
+          bestMoodScore = moodCounts[mood.mood];
         }
       });
+      console.log('Moods By Date:', moodsByDate);
+      console.log('Mood Counts:', moodCounts);
+
+      // Calculate mood streak
+      let currentStreak = 0;
+      let maxStreak = 0;
+      
+      // Get dates in order (past to present)
+      const dates = Object.keys(moodsByDate)
+        .filter(date => new Date(date) <= today)
+        .sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+      console.log('Filtered Mood Dates:', dates);
+
+      // Start with the most recent date
+      for (let i = dates.length - 1; i >= 0; i--) {
+        const currentDate = new Date(dates[i]);
+        
+        if (i === dates.length - 1) {
+          // First date in the streak
+          currentStreak = 1;
+          console.log(`Starting streak with date ${dates[i]}`);
+        } else {
+          // Check gap with next date
+          const nextDate = new Date(dates[i + 1]);
+          const dayDiff = Math.floor(
+            (nextDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24)
+          );
+          console.log(`Checking gap between ${dates[i]} and ${dates[i + 1]}, dayDiff:`, dayDiff);
+
+          if (dayDiff === 1) {
+            // Consecutive day, increase streak
+            currentStreak++;
+            console.log(`Consecutive day found, streak increased to ${currentStreak}`);
+          } else {
+            // Gap found, start new streak
+            currentStreak = 1;
+            console.log(`Gap of ${dayDiff} days found, resetting streak to 1`);
+          }
+        }
+        
+        maxStreak = Math.max(maxStreak, currentStreak);
+      }
+
+      moodStreak = currentStreak;
+      longestMoodStreak = maxStreak;
+      console.log('Final Mood Streak:', moodStreak, 'Longest Mood Streak:', longestMoodStreak);
 
       // Find most common mood
       mostCommonMood = Object.entries(moodCounts)
         .sort((a, b) => b[1] - a[1])[0]?.[0] || 'Peaceful';
-      
-      // Find best mood (can be customized based on your mood scoring system)
-      bestMood = 'Grateful'; // Default or calculate based on your scoring
+      console.log('Most Common Mood:', mostCommonMood, 'Best Mood:', bestMood);
     }
   }
 </script>
@@ -263,11 +322,11 @@
     <div class="insight-card">
       <div class="card-header">
         <Brain weight="fill" size={24} />
-        <h2>Prayer Streak</h2>
+        <h2>Mood Streak</h2>
       </div>
       <div class="card-content">
-        <div class="big-number">{prayerStreak} Days</div>
-        <div class="sub-text">Best mood: {bestMood}</div>
+        <div class="big-number">{moodStreak} Days</div>
+        <div class="sub-text">Longest: {longestMoodStreak} days</div>
       </div>
     </div>
 
@@ -278,7 +337,7 @@
       </div>
       <div class="card-content">
         <div class="big-number">{mostCommonMood}</div>
-        <div class="sub-text">During Fajr prayer</div>
+        <div class="sub-text">Best mood: {bestMood}</div>
       </div>
     </div>
   </div>
