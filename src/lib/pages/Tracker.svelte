@@ -31,13 +31,67 @@
   function calculateInsights() {
     if (!$prayerHistoryStore.history) return;
 
+    console.log('Prayer History:', $prayerHistoryStore.history);
+
     // Calculate prayer streak and on-time rate
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const sevenDaysAgo = new Date(today);
     sevenDaysAgo.setDate(today.getDate() - 7);
 
+    // Sort prayers by date in descending order
+    const sortedPrayers = [...$prayerHistoryStore.history].sort((a, b) => 
+      new Date(b.date).getTime() - new Date(a.date).getTime()
+    );
+    console.log('Sorted Prayers:', sortedPrayers);
+
+    // Group prayers by date
+    const prayersByDate = {};
+    sortedPrayers.forEach(prayer => {
+      if (!prayersByDate[prayer.date]) {
+        prayersByDate[prayer.date] = [];
+      }
+      prayersByDate[prayer.date].push(prayer);
+    });
+    console.log('Prayers By Date:', prayersByDate);
+
+    // Calculate streak
     let currentStreak = 0;
+    let maxStreak = 0;
+    let streakBroken = false;
+
+    // Get dates in order (past to present)
+    const dates = Object.keys(prayersByDate)
+      .filter(date => new Date(date) <= today)  // Only past and current dates
+      .sort((a, b) => new Date(a).getTime() - new Date(b).getTime());  // Past to present
+    console.log('Filtered dates in order:', dates);
+
+    // Calculate streak from past to present
+    for (const date of dates) {
+      const prayers = prayersByDate[date];
+      console.log(`Checking date ${date}, prayers:`, prayers);
+      
+      // Check if all 5 prayers are completed for the day
+      const isComplete = prayers.length === 5 && 
+        prayers.every(prayer => 
+          ['ontime', 'late', 'excused'].includes(prayer.status)
+        );
+      console.log(`Date ${date} complete?`, isComplete, 'prayers length:', prayers.length);
+
+      if (isComplete) {
+        currentStreak++;
+        maxStreak = Math.max(maxStreak, currentStreak);
+        console.log(`Streak increased to ${currentStreak}`);
+      } else {
+        currentStreak = 0;  // Reset streak on incomplete day
+        console.log(`Streak reset at date ${date}`);
+      }
+    }
+
+    prayerStreak = currentStreak;
+    longestStreak = maxStreak;
+    console.log('Final streak:', prayerStreak, 'Longest streak:', longestStreak);
+
     let totalPrayers = 0;
     let onTimePrayers = 0;
     const prayerCounts = {
