@@ -10,11 +10,11 @@
   let onTimeRate = 0;
   let onTimeChange = 0;
   let prayerAnalysis = {
-    Fajr: 0,
-    Dhuhr: 0,
-    Asr: 0,
-    Maghrib: 0,
-    Isha: 0
+    Fajr: { rate: 0, change: 0 },
+    Dhuhr: { rate: 0, change: 0 },
+    Asr: { rate: 0, change: 0 },
+    Maghrib: { rate: 0, change: 0 },
+    Isha: { rate: 0, change: 0 }
   };
   let mostCommonMood = '';
   let bestMood = '';
@@ -105,11 +105,11 @@
     let totalPrayers = 0;
     let onTimePrayers = 0;
     const prayerCounts = {
-      Fajr: { total: 0, completed: 0 },
-      Dhuhr: { total: 0, completed: 0 },
-      Asr: { total: 0, completed: 0 },
-      Maghrib: { total: 0, completed: 0 },
-      Isha: { total: 0, completed: 0 }
+      Fajr: { total: 0, completed: 0, lastWeekTotal: 0, lastWeekCompleted: 0 },
+      Dhuhr: { total: 0, completed: 0, lastWeekTotal: 0, lastWeekCompleted: 0 },
+      Asr: { total: 0, completed: 0, lastWeekTotal: 0, lastWeekCompleted: 0 },
+      Maghrib: { total: 0, completed: 0, lastWeekTotal: 0, lastWeekCompleted: 0 },
+      Isha: { total: 0, completed: 0, lastWeekTotal: 0, lastWeekCompleted: 0 }
     };
 
     // Process prayer history
@@ -121,24 +121,25 @@
     $prayerHistoryStore.history.forEach(prayer => {
       const prayerDate = new Date(prayer.date);
       if (prayerDate >= sevenDaysAgo && prayerDate <= today) {
-        // Count all prayers in the total, regardless of status
+        // Current week data
         prayerCounts[prayer.prayerName].total++;
-        
-        // Count as completed if ontime, late, or excused
         if (['ontime', 'late', 'excused'].includes(prayer.status)) {
           prayerCounts[prayer.prayerName].completed++;
         }
 
-        // For on-time rate calculation (keeping this separate)
         if (prayer.status === 'ontime') {
           currentWeekOnTime++;
         }
         currentWeekPrayers++;
       } else {
-        // Check last week's data
+        // Last week's data
         const lastWeekStart = new Date(sevenDaysAgo);
         lastWeekStart.setDate(lastWeekStart.getDate() - 7);
         if (prayerDate >= lastWeekStart && prayerDate < sevenDaysAgo) {
+          prayerCounts[prayer.prayerName].lastWeekTotal++;
+          if (['ontime', 'late', 'excused'].includes(prayer.status)) {
+            prayerCounts[prayer.prayerName].lastWeekCompleted++;
+          }
           if (prayer.status === 'ontime') {
             lastWeekOnTime++;
           }
@@ -155,12 +156,20 @@
     onTimeChange = Math.round(currentWeekRate - lastWeekRate);
     onTimeRate = Math.round(currentWeekRate);
 
-    // Calculate completion rate for each prayer
+    // Calculate completion rate and growth for each prayer
     Object.keys(prayerCounts).forEach(prayer => {
       const total = prayerCounts[prayer].total;
       const completed = prayerCounts[prayer].completed;
-      console.log(`${prayer} - Total: ${total}, Completed: ${completed}`);
-      prayerAnalysis[prayer] = total > 0 ? Math.round((completed / total) * 100) : 0;
+      const lastWeekTotal = prayerCounts[prayer].lastWeekTotal;
+      const lastWeekCompleted = prayerCounts[prayer].lastWeekCompleted;
+
+      const currentRate = total > 0 ? (completed / total) * 100 : 0;
+      const lastWeekRate = lastWeekTotal > 0 ? (lastWeekCompleted / lastWeekTotal) * 100 : 0;
+      
+      prayerAnalysis[prayer] = {
+        rate: Math.round(currentRate),
+        change: Math.round(currentRate - lastWeekRate)
+      };
     });
 
     // Process mood history
@@ -230,13 +239,20 @@
       <h2>Prayer Time Analysis</h2>
     </div>
     <div class="prayer-analysis">
-      {#each Object.entries(prayerAnalysis) as [prayer, rate]}
+      {#each Object.entries(prayerAnalysis) as [prayer, stats]}
         <div class="prayer-row">
           <span class="prayer-name">{prayer}</span>
           <div class="progress-bar-container">
-            <div class="progress-bar" style="width: {rate}%"></div>
+            <div class="progress-bar" style="width: {stats.rate}%"></div>
           </div>
-          <span class="prayer-rate">{rate}%</span>
+          <div class="prayer-stats">
+            <span class="prayer-rate">{stats.rate}%</span>
+            {#if stats.change !== 0}
+              <span class="change-rate {stats.change >= 0 ? 'positive' : 'negative'}">
+                {stats.change >= 0 ? '+' : ''}{stats.change}%
+              </span>
+            {/if}
+          </div>
         </div>
       {/each}
     </div>
@@ -436,6 +452,30 @@
     font-size: 0.875rem;
     color: #666;
     margin: 0;
+  }
+
+  .prayer-stats {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 100px;
+    justify-content: flex-end;
+  }
+
+  .change-rate {
+    font-size: 0.75rem;
+    padding: 0.125rem 0.25rem;
+    border-radius: 4px;
+  }
+
+  .change-rate.positive {
+    color: #22C55E;
+    background: rgba(34, 197, 94, 0.1);
+  }
+
+  .change-rate.negative {
+    color: #EF4444;
+    background: rgba(239, 68, 68, 0.1);
   }
 
   @media (max-width: 480px) {
