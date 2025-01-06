@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { 
     prayerHistoryStore, 
     getPrayerHistory, 
@@ -17,7 +17,19 @@
     missed: 0,
     excused: 0
   };
-  
+
+  // Add cache for grid data
+  let gridCache = {
+    data: null,
+    timestamp: null,
+    historyHash: null
+  };
+
+  // Function to generate a simple hash of prayer history
+  function getPrayerHistoryHash(history) {
+    return history.map(p => `${p.date}-${p.prayerName}-${p.status}`).join('|');
+  }
+
   function getCurrentWeekDays() {
     const today = new Date();
     const days = [];
@@ -42,10 +54,13 @@
     const prayers = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
     const grid = [];
     
-    console.log('\n=== Starting Grid Generation ===');
-    console.log('Prayer History Store:', $prayerHistoryStore);
-    console.log('Prayer Times Store:', $prayerTimesStore);
-    console.log('Days to process:', days);
+    // Check if we can use cached data
+    const currentHistoryHash = getPrayerHistoryHash($prayerHistoryStore.history);
+    if (gridCache.data && 
+        gridCache.historyHash === currentHistoryHash && 
+        Date.now() - gridCache.timestamp < 60000) { // Cache valid for 1 minute
+      return gridCache.data;
+    }
     
     // Reset weekly stats
     weeklyStats = {
@@ -60,35 +75,28 @@
     today.setHours(0, 0, 0, 0);
     const sevenDaysAgo = new Date(today);
     sevenDaysAgo.setDate(today.getDate() - 6);
-    console.log('Date range:', { from: sevenDaysAgo.toISOString(), to: today.toISOString() });
 
     // Get user's account creation date
     const user = auth.currentUser;
     const accountCreationDateTime = new Date(user.metadata.creationTime);
-    console.log('Account creation date:', accountCreationDateTime.toISOString());
 
     for (const prayer of prayers) {
-      console.log(`\n=== Processing prayer: ${prayer} ===`);
       const row = {
         name: prayer,
         icon: $prayerTimesStore.find(p => p.name === prayer)?.icon || 'Sun',
         weight: $prayerTimesStore.find(p => p.name === prayer)?.weight || 'regular',
         days: []
       };
-      console.log('Row initial data:', row);
 
       for (const day of days) {
-        console.log(`\nChecking ${prayer} for ${day.date}`);
         const prayerRecord = $prayerHistoryStore.history.find(
           h => h.date === day.date && h.prayerName === prayer
         );
-        console.log('Found prayer record:', prayerRecord);
 
         const now = new Date();
         const todayStr = new Date().toLocaleDateString('en-CA');
         const prayerTime = $prayerTimesStore.find(p => p.name === prayer)?.time || '00:00 AM';
         const prayerDateTime = getPrayerDateTime(day.date, prayerTime);
-        console.log('Prayer datetime:', prayerDateTime.toISOString());
         
         let status = 'pending';
         const prayerDate = new Date(day.date);
@@ -96,18 +104,15 @@
 
         if (prayerRecord) {
           status = prayerRecord.status;
-          console.log(`Found record status: ${status}`);
           
           if (prayerDate >= sevenDaysAgo && prayerDate <= today) {
             if (status === 'ontime') weeklyStats.ontime++;
             else if (status === 'late') weeklyStats.late++;
             else if (status === 'missed') weeklyStats.missed++;
             else if (status === 'excused') weeklyStats.excused++;
-            console.log('Updated weekly stats:', weeklyStats);
           }
         } else {
           const isExcused = await shouldMarkPrayerExcused(day.date, prayer);
-          console.log(`No record found. Checking if excused: ${isExcused}`);
           
           if (isExcused) {
             status = 'excused';
@@ -119,11 +124,8 @@
             const prayerData = $prayerTimesStore.find(p => p.name === prayer);
             
             if (!prayerData || !prayerData.time) {
-              console.log(`No prayer time data for ${prayer}`);
               status = 'none';
             } else {
-              console.log(`Processing ${prayer} - Current: ${currentTime.toISOString()}, Prayer: ${prayerTime}`);
-              
               if (currentTime > prayerDateTime) {
                 status = 'pending';
                 if (!$prayerHistoryStore.pendingByDate[day.date]) {
@@ -135,10 +137,8 @@
                     time: prayerTime
                   });
                 }
-                console.log(`${prayer} is past time - marked pending`);
               } else {
                 status = 'none';
-                console.log(`${prayer} is upcoming - marked none`);
               }
             }
           } else if (day.date < todayStr) {
@@ -146,19 +146,15 @@
               status = 'missed';
               if (prayerDate >= sevenDaysAgo) {
                 weeklyStats.missed++;
-                console.log(`Marked as missed and updated stats`);
               }
             } else {
               status = 'none';
-              console.log(`Before account creation - marked none`);
             }
           } else {
             status = 'none';
-            console.log(`Future date - marked none`);
           }
         }
 
-        console.log(`Final status for ${prayer} on ${day.date}: ${status}`);
         row.days.push({
           date: day.date,
           status,
@@ -168,9 +164,13 @@
       grid.push(row);
     }
 
-    console.log('\n=== Grid Generation Complete ===');
-    console.log('Final weekly stats:', weeklyStats);
-    console.log('Generated grid:', grid);
+    // Update cache
+    gridCache = {
+      data: { days, grid, weeklyStats },
+      timestamp: Date.now(),
+      historyHash: currentHistoryHash
+    };
+
     return { days, grid, weeklyStats };
   }
 
@@ -199,10 +199,24 @@
     }
   }
 
+  let updateTimeout;
+  let lastUpdateTime = 0;
+  const UPDATE_THROTTLE = 2000; // 2 seconds throttle
+
   $: if ($prayerHistoryStore.history) {
-    console.log('\n=== Prayer History Store Changed ===');
-    updateGrid();
+    const now = Date.now();
+    if (now - lastUpdateTime >= UPDATE_THROTTLE) {
+      clearTimeout(updateTimeout);
+      updateTimeout = setTimeout(() => {
+        updateGrid();
+        lastUpdateTime = now;
+      }, 1000);
+    }
   }
+
+  onDestroy(() => {
+    clearTimeout(updateTimeout);
+  });
 </script>
 
 <div class="prayer-history">
