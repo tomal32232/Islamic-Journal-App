@@ -103,17 +103,40 @@
     };
 
     // Process prayer history
+    let currentWeekPrayers = 0;
+    let currentWeekOnTime = 0;
+    let lastWeekPrayers = 0;
+    let lastWeekOnTime = 0;
+    
     $prayerHistoryStore.history.forEach(prayer => {
       const prayerDate = new Date(prayer.date);
       if (prayerDate >= sevenDaysAgo && prayerDate <= today) {
         prayerCounts[prayer.prayerName].total++;
         if (prayer.status === 'ontime') {
           prayerCounts[prayer.prayerName].onTime++;
-          onTimePrayers++;
+          currentWeekOnTime++;
         }
-        totalPrayers++;
+        currentWeekPrayers++;
+      } else {
+        // Check last week's data
+        const lastWeekStart = new Date(sevenDaysAgo);
+        lastWeekStart.setDate(lastWeekStart.getDate() - 7);
+        if (prayerDate >= lastWeekStart && prayerDate < sevenDaysAgo) {
+          if (prayer.status === 'ontime') {
+            lastWeekOnTime++;
+          }
+          lastWeekPrayers++;
+        }
       }
     });
+
+    // Calculate on-time rates
+    const currentWeekRate = currentWeekPrayers > 0 ? (currentWeekOnTime / currentWeekPrayers) * 100 : 0;
+    const lastWeekRate = lastWeekPrayers > 0 ? (lastWeekOnTime / lastWeekPrayers) * 100 : 0;
+    
+    // Calculate the change in percentage points
+    onTimeChange = Math.round(currentWeekRate - lastWeekRate);
+    onTimeRate = Math.round(currentWeekRate);
 
     // Calculate on-time rate for each prayer
     Object.keys(prayerCounts).forEach(prayer => {
@@ -121,9 +144,6 @@
       const onTime = prayerCounts[prayer].onTime;
       prayerAnalysis[prayer] = total > 0 ? Math.round((onTime / total) * 100) : 0;
     });
-
-    // Calculate overall on-time rate
-    onTimeRate = totalPrayers > 0 ? Math.round((onTimePrayers / totalPrayers) * 100) : 0;
 
     // Process mood history
     if ($moodHistoryStore) {
