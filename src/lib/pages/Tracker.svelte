@@ -87,8 +87,8 @@
 
   const patternIcons = {
     Fajr: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
-      <circle cx="12" cy="12" r="5"/>
+      <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
+      <path d="M12 16a4 4 0 100-8 4 4 0 000 8z"/>
     </svg>`,
     Dhuhr: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <circle cx="12" cy="12" r="5"/>
@@ -96,12 +96,12 @@
     </svg>`,
     Asr: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
-      <path d="M12 16a4 4 0 100-8 4 4 0 000 8z"/>
+      <path d="M12 16a4 4 0 100-8 4 4 0 000 8z" fill="currentColor" fill-opacity="0.2"/>
     </svg>`,
     Maghrib: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <path d="M17 12a5 5 0 10-10 0"/>
       <path d="M12 1v2M4.22 4.22l1.42 1.42M1 12h2M21 12h2M18.36 5.64l1.42-1.42"/>
-      <path d="M17 12H7M12 17v-5"/>
+      <path d="M17 12H7"/>
     </svg>`,
     Isha: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
@@ -439,7 +439,7 @@
         if (bestMood) {
           insights.push({
             type: 'prayer-mood',
-            icon: getPrayerIcon(prayer),
+            icon: patternIcons[prayer],
             title: `${prayer} Reflection`,
             description: `Most ${capitalizeFirstLetter(bestMood[0])} after ${prayer} prayer`
           });
@@ -471,10 +471,6 @@
       }
 
       return insights.slice(0, 3); // Return top 3 insights
-    }
-
-    function getPrayerIcon(prayerName) {
-      return patternIcons[prayerName] || patternIcons.Fajr;
     }
 
     // Add pattern analysis
