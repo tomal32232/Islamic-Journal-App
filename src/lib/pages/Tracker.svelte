@@ -105,11 +105,11 @@
     let totalPrayers = 0;
     let onTimePrayers = 0;
     const prayerCounts = {
-      Fajr: { total: 0, onTime: 0 },
-      Dhuhr: { total: 0, onTime: 0 },
-      Asr: { total: 0, onTime: 0 },
-      Maghrib: { total: 0, onTime: 0 },
-      Isha: { total: 0, onTime: 0 }
+      Fajr: { total: 0, completed: 0 },
+      Dhuhr: { total: 0, completed: 0 },
+      Asr: { total: 0, completed: 0 },
+      Maghrib: { total: 0, completed: 0 },
+      Isha: { total: 0, completed: 0 }
     };
 
     // Process prayer history
@@ -121,9 +121,16 @@
     $prayerHistoryStore.history.forEach(prayer => {
       const prayerDate = new Date(prayer.date);
       if (prayerDate >= sevenDaysAgo && prayerDate <= today) {
+        // Count all prayers in the total, regardless of status
         prayerCounts[prayer.prayerName].total++;
+        
+        // Count as completed if ontime, late, or excused
+        if (['ontime', 'late', 'excused'].includes(prayer.status)) {
+          prayerCounts[prayer.prayerName].completed++;
+        }
+
+        // For on-time rate calculation (keeping this separate)
         if (prayer.status === 'ontime') {
-          prayerCounts[prayer.prayerName].onTime++;
           currentWeekOnTime++;
         }
         currentWeekPrayers++;
@@ -148,11 +155,12 @@
     onTimeChange = Math.round(currentWeekRate - lastWeekRate);
     onTimeRate = Math.round(currentWeekRate);
 
-    // Calculate on-time rate for each prayer
+    // Calculate completion rate for each prayer
     Object.keys(prayerCounts).forEach(prayer => {
       const total = prayerCounts[prayer].total;
-      const onTime = prayerCounts[prayer].onTime;
-      prayerAnalysis[prayer] = total > 0 ? Math.round((onTime / total) * 100) : 0;
+      const completed = prayerCounts[prayer].completed;
+      console.log(`${prayer} - Total: ${total}, Completed: ${completed}`);
+      prayerAnalysis[prayer] = total > 0 ? Math.round((completed / total) * 100) : 0;
     });
 
     // Process mood history
