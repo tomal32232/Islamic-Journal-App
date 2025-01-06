@@ -392,7 +392,7 @@
 
   .prayer-row {
     display: grid;
-    grid-template-columns: 80px 1fr 50px;
+    grid-template-columns: 80px 1fr 120px;
     align-items: center;
     gap: 1rem;
   }
@@ -421,6 +421,7 @@
     font-size: 0.875rem;
     color: #666;
     text-align: right;
+    min-width: 45px;
   }
 
   .patterns-list {
@@ -458,14 +459,16 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    min-width: 100px;
     justify-content: flex-end;
+    white-space: nowrap;
   }
 
   .change-rate {
     font-size: 0.75rem;
     padding: 0.125rem 0.25rem;
     border-radius: 4px;
+    min-width: 45px;
+    text-align: center;
   }
 
   .change-rate.positive {
