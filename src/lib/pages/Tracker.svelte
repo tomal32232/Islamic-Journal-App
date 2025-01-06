@@ -85,6 +85,37 @@
     }
   ];
 
+  const patternIcons = {
+    Fajr: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+      <circle cx="12" cy="12" r="5"/>
+    </svg>`,
+    Dhuhr: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="12" cy="12" r="5"/>
+      <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+    </svg>`,
+    Asr: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+      <path d="M12 16a4 4 0 100-8 4 4 0 000 8z"/>
+    </svg>`,
+    Maghrib: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M17 12a5 5 0 10-10 0"/>
+      <path d="M12 1v2M4.22 4.22l1.42 1.42M1 12h2M21 12h2M18.36 5.64l1.42-1.42"/>
+      <path d="M17 12H7M12 17v-5"/>
+    </svg>`,
+    Isha: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
+    </svg>`,
+    Morning: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="12" cy="12" r="4"/>
+      <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
+    </svg>`,
+    Evening: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
+      <path d="M12 17v-5M7 12h10"/>
+    </svg>`
+  };
+
   function capitalizeFirstLetter(string) {
     if (!string) return '';
     const words = string.split('_');
@@ -410,7 +441,7 @@
             type: 'prayer-mood',
             icon: getPrayerIcon(prayer),
             title: `${prayer} Reflection`,
-            description: `Most ${bestMood[0]} after ${prayer} prayer`
+            description: `Most ${capitalizeFirstLetter(bestMood[0])} after ${prayer} prayer`
           });
         }
       });
@@ -424,7 +455,7 @@
       if (morningMood) {
         insights.push({
           type: 'time-mood',
-          icon: '🌅',
+          icon: patternIcons.Morning,
           title: 'Morning Mindset',
           description: `Most ${capitalizeFirstLetter(morningMood[0])} in the mornings`
         });
@@ -433,7 +464,7 @@
       if (eveningMood) {
         insights.push({
           type: 'time-mood',
-          icon: '🌙',
+          icon: patternIcons.Evening,
           title: 'Evening Energy',
           description: `Feeling ${capitalizeFirstLetter(eveningMood[0])} in the evenings`
         });
@@ -443,14 +474,7 @@
     }
 
     function getPrayerIcon(prayerName) {
-      const icons = {
-        'Fajr': '🌅',
-        'Dhuhr': '☀️',
-        'Asr': '🌤️',
-        'Maghrib': '🌅',
-        'Isha': '🌙'
-      };
-      return icons[prayerName] || '🕌';
+      return patternIcons[prayerName] || patternIcons.Fajr;
     }
 
     // Add pattern analysis
@@ -561,7 +585,9 @@
     <div class="patterns-list">
       {#each calculateInsights() as pattern}
         <div class="pattern-item">
-          <span class="pattern-icon">{pattern.icon}</span>
+          <span class="pattern-icon">
+            {@html pattern.icon}
+          </span>
           <div class="pattern-content">
             <h3>{pattern.title}</h3>
             <p>{pattern.description}</p>
@@ -711,7 +737,17 @@
   }
 
   .pattern-icon {
-    font-size: 1.5rem;
+    width: 1.5rem;
+    height: 1.5rem;
+    color: #216974;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .pattern-icon :global(svg) {
+    width: 100%;
+    height: 100%;
   }
 
   .pattern-content h3 {
