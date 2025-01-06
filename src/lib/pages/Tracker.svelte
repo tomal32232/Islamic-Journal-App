@@ -670,11 +670,11 @@
   }
 
   .sub-text.positive {
-    color: #22C55E;
+    color: #216974;
   }
 
   .sub-text.negative {
-    color: #EF4444;
+    color: #D4AF37;
   }
 
   .prayer-analysis {
@@ -705,7 +705,7 @@
 
   .progress-bar {
     height: 100%;
-    background: #22C55E;
+    background: #D4AF37;
     border-radius: 4px;
     transition: width 0.3s ease;
   }
@@ -775,13 +775,13 @@
   }
 
   .change-rate.positive {
-    color: #22C55E;
-    background: rgba(34, 197, 94, 0.1);
+    color: #216974;
+    background: rgba(33, 105, 116, 0.1);
   }
 
   .change-rate.negative {
-    color: #EF4444;
-    background: rgba(239, 68, 68, 0.1);
+    color: #D4AF37;
+    background: rgba(212, 175, 55, 0.1);
   }
 
   .mood-display {
