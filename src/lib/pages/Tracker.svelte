@@ -23,6 +23,74 @@
   let longestMoodStreak = 0;
   let bestMoodCount = 0;
 
+  const moods = [
+    { 
+      icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M12 21C16.9706 21 21 16.9706 21 12C21 7.02944 16.9706 3 12 3C7.02944 3 3 7.02944 3 12C3 16.9706 7.02944 21 12 21Z"/>
+        <path d="M8 14C8 14 9.5 16 12 16C14.5 16 16 14 16 14"/>
+        <path d="M15 9H15.01"/>
+        <path d="M9 9H9.01"/>
+      </svg>`,
+      name: 'Grateful',
+      value: 'grateful'
+    },
+    {
+      icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z"/>
+        <path d="M8 12H16"/>
+        <path d="M12 8V16"/>
+      </svg>`,
+      name: 'Seeking Peace',
+      value: 'seeking_peace'
+    },
+    {
+      icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M12 21C16.9706 21 21 16.9706 21 12C21 7.02944 16.9706 3 12 3C7.02944 3 3 7.02944 3 12C3 16.9706 7.02944 21 12 21Z"/>
+        <path d="M8 14C8 14 9.5 16 12 16C14.5 16 16 14 16 14"/>
+        <path d="M15 9H15.01"/>
+        <path d="M9 9H9.01"/>
+      </svg>`,
+      name: 'Hopeful',
+      value: 'hopeful'
+    },
+    {
+      icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M12 21C16.9706 21 21 16.9706 21 12C21 7.02944 16.9706 3 12 3C7.02944 3 3 7.02944 3 12C3 16.9706 7.02944 21 12 21Z"/>
+        <path d="M8 16C8 16 9.5 14 12 14C14.5 14 16 16 16 16"/>
+        <path d="M12 7V11"/>
+        <path d="M12 12L12 12.01"/>
+      </svg>`,
+      name: 'Anxious',
+      value: 'anxious'
+    },
+    {
+      icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M12 21C16.9706 21 21 16.9706 21 12C21 7.02944 16.9706 3 12 3C7.02944 3 3 7.02944 3 12C3 16.9706 7.02944 21 12 21Z"/>
+        <path d="M12 7V11"/>
+        <path d="M12 12L12 12.01"/>
+        <path d="M8 15H16"/>
+      </svg>`,
+      name: 'Reflecting',
+      value: 'reflecting'
+    },
+    {
+      icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M12 21C16.9706 21 21 16.9706 21 12C21 7.02944 16.9706 3 12 3C7.02944 3 3 7.02944 3 12C3 16.9706 7.02944 21 12 21Z"/>
+        <path d="M8 14C8 14 9.5 16 12 16C14.5 16 16 14 16 14"/>
+        <path d="M15 9H15.01"/>
+        <path d="M9 9H9.01"/>
+      </svg>`,
+      name: 'Blessed',
+      value: 'blessed'
+    }
+  ];
+
+  function capitalizeFirstLetter(string) {
+    if (!string) return '';
+    const words = string.split('_');
+    return words.map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+  }
+
   onMount(async () => {
     await Promise.all([
       getPrayerHistory(),
@@ -336,8 +404,18 @@
         <h2>Most Common Mood</h2>
       </div>
       <div class="card-content">
-        <div class="big-number">{mostCommonMood}</div>
-        <div class="sub-text">Best mood: {bestMood}</div>
+        <div class="mood-display">
+          {#if mostCommonMood}
+            {@const matchingMood = moods.find(m => m.value === mostCommonMood)}
+            {#if matchingMood}
+              <div class="mood-icon small">
+                {@html matchingMood.icon}
+              </div>
+            {/if}
+            <div class="big-number">{capitalizeFirstLetter(mostCommonMood)}</div>
+          {/if}
+        </div>
+        <div class="sub-text">Best mood: {capitalizeFirstLetter(bestMood)}</div>
       </div>
     </div>
   </div>
@@ -538,6 +616,24 @@
   .change-rate.negative {
     color: #EF4444;
     background: rgba(239, 68, 68, 0.1);
+  }
+
+  .mood-display {
+    display: flex;
+    align-items: left;
+    gap: 0.5rem;
+    justify-content: left;
+  }
+
+  .mood-icon.small {
+    width: 1.5rem;
+    height: 1.5rem;
+    color: #216974;
+  }
+
+  .mood-icon.small :global(svg) {
+    width: 100%;
+    height: 100%;
   }
 
   @media (max-width: 480px) {
