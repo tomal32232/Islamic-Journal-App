@@ -13,14 +13,13 @@ export async function getQuranHistory() {
     }
     console.log('Getting Quran history for user:', user.uid);
 
-    const quranRef = collection(db, 'quran_history');
+    const readingSessionsRef = collection(db, 'readingSessions');
     console.log('Collection reference created');
 
     const q = query(
-      quranRef,
+      readingSessionsRef,
       where('userId', '==', user.uid),
-      where('status', 'in', ['completed', 'partial']),
-      orderBy('timestamp', 'desc')
+      orderBy('startTime', 'desc')
     );
     console.log('Query created:', q);
 
@@ -33,12 +32,14 @@ export async function getQuranHistory() {
       console.log('Document data:', {
         id: doc.id,
         ...data,
-        timestamp: data.timestamp?.toDate()
+        startTime: data.startTime,
+        endTime: data.endTime
       });
       history.push({ 
         id: doc.id, 
         ...data,
-        timestamp: data.timestamp?.toDate() || new Date()
+        startTime: data.startTime,
+        endTime: data.endTime
       });
     });
     console.log('Full processed history:', history);
@@ -56,32 +57,6 @@ export async function getQuranHistory() {
   }
 }
 
-export async function saveQuranReading(readingData) {
-  try {
-    const user = auth.currentUser;
-    if (!user) return;
-
-    const quranRef = collection(db, 'quran_history');
-    const data = {
-      userId: user.uid,
-      timestamp: Timestamp.now(),
-      status: readingData.status,
-      versesRead: readingData.versesRead || 0,
-      timeSpent: readingData.timeSpent || 0,
-      surah: readingData.surah,
-      fromVerse: readingData.fromVerse,
-      toVerse: readingData.toVerse,
-      notes: readingData.notes || ''
-    };
-
-    await addDoc(quranRef, data);
-    await getQuranHistory();
-  } catch (error) {
-    console.error('Error saving Quran reading:', error);
-    throw error;
-  }
-}
-
 export async function addTestQuranReading() {
   try {
     const user = auth.currentUser;
@@ -91,33 +66,52 @@ export async function addTestQuranReading() {
     }
     console.log('Adding test reading for user:', user.uid);
 
-    const quranRef = collection(db, 'quran_history');
+    const readingSessionsRef = collection(db, 'readingSessions');
+    console.log('Created collection reference');
+
+    const startTime = new Date();
+    const endTime = new Date(startTime.getTime() + 15 * 60 * 1000); // 15 minutes later
+
     const data = {
       userId: user.uid,
-      timestamp: Timestamp.now(),
-      status: 'completed',
-      versesRead: 10,
-      timeSpent: 15,
-      surah: 1,
-      fromVerse: 1,
-      toVerse: 10,
-      notes: 'Test reading'
+      startTime: startTime.toISOString(),
+      endTime: endTime.toISOString(),
+      duration: 15 * 60, // 15 minutes in seconds
+      surahNumber: 1,
+      surahName: 'Al-Fatiha'
     };
-    console.log('Test reading data:', data);
+    console.log('Prepared test reading data:', data);
 
-    const docRef = await addDoc(quranRef, data);
-    console.log('Test reading added with ID:', docRef.id);
+    try {
+      const docRef = await addDoc(readingSessionsRef, data);
+      console.log('Successfully added test reading with ID:', docRef.id);
 
-    // Verify the data was saved by fetching it
-    const savedData = await getQuranHistory();
-    console.log('Updated Quran history after test:', savedData);
+      // Verify the data was saved by fetching it
+      const savedData = await getQuranHistory();
+      console.log('Updated Quran history after test:', savedData);
+      
+      if (savedData && savedData.length > 0) {
+        console.log('Successfully verified saved data');
+        return docRef.id;
+      } else {
+        console.log('Warning: Data was saved but not retrieved');
+      }
+    } catch (writeError) {
+      console.error('Error writing to Firestore:', writeError);
+      console.error('Write error details:', {
+        code: writeError.code,
+        message: writeError.message,
+        stack: writeError.stack
+      });
+      throw writeError;
+    }
   } catch (error) {
-    console.error('Error adding test reading:', error);
-    // Log the full error details
+    console.error('Error in addTestQuranReading:', error);
     console.error('Error details:', {
       code: error.code,
       message: error.message,
       stack: error.stack
     });
+    throw error;
   }
 } 

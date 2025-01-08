@@ -482,27 +482,40 @@
 
     // Calculate Quran streak
     if ($quranHistoryStore) {
-      console.log('Quran History:', $quranHistoryStore);
+      console.log('Raw Quran History Store:', JSON.stringify($quranHistoryStore));
+      console.log('Quran History Type:', typeof $quranHistoryStore);
+      console.log('Is Array?', Array.isArray($quranHistoryStore));
       
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
-      // Sort Quran readings by date in descending order
-      const sortedReadings = [...$quranHistoryStore].sort((a, b) => 
-        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+      // Sort reading sessions by date in descending order
+      const sortedReadings = Array.isArray($quranHistoryStore) ? [...$quranHistoryStore] : [];
+      console.log('Sorted Readings Length:', sortedReadings.length);
+      sortedReadings.sort((a, b) => 
+        new Date(b.endTime || b.timestamp).getTime() - new Date(a.endTime || a.timestamp).getTime()
       );
-      console.log('Sorted Quran Readings:', sortedReadings);
+      console.log('Sorted Quran Readings:', JSON.stringify(sortedReadings));
 
-      // Group readings by date
+      // Group readings by date and sum up reading time
       const readingsByDate = {};
       sortedReadings.forEach(reading => {
-        const date = new Date(reading.timestamp).toLocaleDateString('en-CA');
-        if (!readingsByDate[date]) {
-          readingsByDate[date] = [];
+        console.log('Processing reading:', JSON.stringify(reading));
+        const readingDate = new Date(reading.endTime || reading.timestamp);
+        readingDate.setHours(0, 0, 0, 0);
+        const dateKey = readingDate.toLocaleDateString('en-CA');
+        console.log('Reading date key:', dateKey);
+        if (!readingsByDate[dateKey]) {
+          readingsByDate[dateKey] = {
+            readings: [],
+            totalTime: 0
+          };
         }
-        readingsByDate[date].push(reading);
+        readingsByDate[dateKey].readings.push(reading);
+        readingsByDate[dateKey].totalTime += (reading.duration || 0);
+        console.log(`Updated total time for ${dateKey}:`, readingsByDate[dateKey].totalTime);
       });
-      console.log('Readings By Date:', readingsByDate);
+      console.log('Readings By Date:', JSON.stringify(readingsByDate));
 
       // Calculate streak
       let currentStreak = 0;
@@ -510,45 +523,50 @@
 
       // Get dates in order (past to present)
       const dates = Object.keys(readingsByDate)
-        .filter(date => new Date(date) <= today)
         .sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
       console.log('Filtered Quran Dates:', dates);
 
-      // Calculate streak from past to present
-      for (let i = dates.length - 1; i >= 0; i--) {
-        const currentDate = new Date(dates[i]);
-        const dayReadings = readingsByDate[dates[i]];
+      // If we have any readings
+      if (dates.length > 0) {
+        // Get the most recent date
+        const mostRecentDate = new Date(dates[dates.length - 1]);
+        mostRecentDate.setHours(0, 0, 0, 0);
+        const todayKey = today.toLocaleDateString('en-CA');
         
-        // Check if there's at least one completed or substantial partial reading
-        const hasValidReading = dayReadings.some(reading => 
-          reading.status === 'completed' || 
-          (reading.status === 'partial' && reading.versesRead >= 10)
-        );
-        console.log(`Date ${dates[i]} has valid reading:`, hasValidReading, 'readings:', dayReadings);
-        
-        if (i === dates.length - 1) {
-          // First date in the streak
-          currentStreak = hasValidReading ? 1 : 0;
-          console.log(`Starting streak at ${currentStreak}`);
-        } else {
-          // Check gap with next date
-          const nextDate = new Date(dates[i + 1]);
-          const dayDiff = Math.floor(
-            (nextDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24)
-          );
-          console.log(`Gap between ${dates[i]} and ${dates[i + 1]}:`, dayDiff, 'days');
-
-          if (dayDiff === 1 && hasValidReading) {
-            // Consecutive day with valid reading
-            currentStreak++;
-            console.log(`Streak increased to ${currentStreak}`);
-          } else {
-            // Gap found or no valid reading
-            currentStreak = hasValidReading ? 1 : 0;
-            console.log(`Streak reset to ${currentStreak}`);
-          }
+        // Start with 1 if the most recent reading is from today and total time >= 5 minutes
+        if (readingsByDate[todayKey] && readingsByDate[todayKey].totalTime >= 300) { // 300 seconds = 5 minutes
+          currentStreak = 1;
+          console.log('Found valid reading time for today:', readingsByDate[todayKey].totalTime, 'seconds');
         }
-        
+
+        // Check previous days
+        let checkDate = new Date(today);
+        checkDate.setDate(checkDate.getDate() - 1); // Start checking from yesterday
+
+        while (true) {
+          const dateKey = checkDate.toLocaleDateString('en-CA');
+          const dayData = readingsByDate[dateKey];
+          
+          if (dayData) {
+            // Check if total reading time is at least 5 minutes (300 seconds)
+            const hasValidReading = dayData.totalTime >= 300;
+            
+            if (hasValidReading) {
+              currentStreak++;
+              console.log(`Found valid reading time for ${dateKey}: ${dayData.totalTime} seconds, streak now ${currentStreak}`);
+            } else {
+              console.log(`Insufficient reading time for ${dateKey}: ${dayData.totalTime} seconds`);
+              break;
+            }
+          } else {
+            console.log(`No readings found for ${dateKey}`);
+            break;
+          }
+
+          // Move to previous day
+          checkDate.setDate(checkDate.getDate() - 1);
+        }
+
         maxStreak = Math.max(maxStreak, currentStreak);
       }
 
