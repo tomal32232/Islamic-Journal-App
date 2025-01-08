@@ -4,6 +4,7 @@
   import { prayerHistoryStore, getPrayerHistory } from '../stores/prayerHistoryStore';
   import { moodHistoryStore, getMoodHistory } from '../stores/moodStore';
   import { auth } from '../firebase';
+  import { quranHistoryStore, getQuranHistory } from '../stores/quranHistoryStore';
 
   let prayerStreak = 0;
   let longestStreak = 0;
@@ -22,6 +23,8 @@
   let moodStreak = 0;
   let longestMoodStreak = 0;
   let bestMoodCount = 0;
+  let quranStreak = 0;
+  let longestQuranStreak = 0;
 
   const moods = [
     { 
@@ -125,7 +128,8 @@
   onMount(async () => {
     await Promise.all([
       getPrayerHistory(),
-      getMoodHistory()
+      getMoodHistory(),
+      getQuranHistory()
     ]);
     calculateInsights();
   });
@@ -475,6 +479,66 @@
 
     // Add pattern analysis
     const patterns = analyzeMoodPatterns();
+
+    // Calculate Quran streak
+    if ($quranHistoryStore) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      // Sort Quran readings by date in descending order
+      const sortedReadings = [...$quranHistoryStore].sort((a, b) => 
+        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+      );
+
+      // Group readings by date
+      const readingsByDate = {};
+      sortedReadings.forEach(reading => {
+        const date = new Date(reading.timestamp).toLocaleDateString('en-CA');
+        if (!readingsByDate[date]) {
+          readingsByDate[date] = [];
+        }
+        readingsByDate[date].push(reading);
+      });
+
+      // Calculate streak
+      let currentStreak = 0;
+      let maxStreak = 0;
+
+      // Get dates in order (past to present)
+      const dates = Object.keys(readingsByDate)
+        .filter(date => new Date(date) <= today)
+        .sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+
+      // Calculate streak from past to present
+      for (let i = dates.length - 1; i >= 0; i--) {
+        const currentDate = new Date(dates[i]);
+        
+        if (i === dates.length - 1) {
+          // First date in the streak
+          currentStreak = 1;
+        } else {
+          // Check gap with next date
+          const nextDate = new Date(dates[i + 1]);
+          const dayDiff = Math.floor(
+            (nextDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24)
+          );
+
+          if (dayDiff === 1) {
+            // Consecutive day, increase streak
+            currentStreak++;
+          } else {
+            // Gap found, start new streak
+            currentStreak = 1;
+          }
+        }
+        
+        maxStreak = Math.max(maxStreak, currentStreak);
+      }
+
+      quranStreak = currentStreak;
+      longestQuranStreak = maxStreak;
+    }
+
     return patterns;
   }
 </script>
@@ -507,6 +571,23 @@
         <div class="sub-text {onTimeChange >= 0 ? 'positive' : 'negative'}">
           {onTimeChange >= 0 ? '+' : ''}{onTimeChange}% from last week
         </div>
+      </div>
+    </div>
+
+    <!-- Quran Streak Card -->
+    <div class="analysis-card quran-streak">
+      <div class="card-header">
+        <svg class="quran-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+          <path d="M12 11c0-2.5-2-3-2-3s2-.5 2-3"/>
+          <path d="M12 13c0 2.5 2 3 2 3s-2 .5-2 3"/>
+        </svg>
+        <h2>Quran Streak</h2>
+      </div>
+      <div class="card-content">
+        <div class="big-number">{quranStreak} Days</div>
+        <div class="sub-text">Longest: {longestQuranStreak} days</div>
       </div>
     </div>
   </div>
@@ -821,5 +902,14 @@
     color: #666;
     font-style: italic;
     margin: 1rem 0;
+  }
+
+  .quran-streak {
+    margin-bottom: 1.5rem;
+  }
+
+  .quran-icon {
+    width: 24px;
+    height: 24px;
   }
 </style> 
