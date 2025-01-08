@@ -96,4 +96,31 @@ async function scheduleNotification(prayerName, scheduleTime) {
     } catch (error) {
         console.error('Error scheduling notification:', error);
     }
+}
+
+// Function to test notification
+async function testNotification() {
+    const nextPrayer = getNextPrayer();
+    if (!nextPrayer) return;
+    
+    try {
+        // Schedule the notification for 1 second in the future
+        const scheduleTime = new Date(Date.now() + 1000);
+        
+        await LocalNotifications.schedule({
+            notifications: [
+                {
+                    title: 'Prayer Time',
+                    body: `It's time for ${nextPrayer.name} prayer`,
+                    id: Math.floor(Math.random() * 100000),
+                    schedule: { at: scheduleTime },
+                    smallIcon: 'ic_launcher_foreground',
+                    actionTypeId: '',
+                    extra: null
+                }
+            ]
+        });
+    } catch (error) {
+        console.error('Error scheduling test notification:', error);
+    }
 } 

@@ -685,13 +685,16 @@
     if (!nextPrayer) return;
     
     try {
+      // Schedule the notification for 1 second in the future
+      const scheduleTime = new Date(Date.now() + 1000);
+      
       await LocalNotifications.schedule({
         notifications: [
           {
             title: 'Prayer Time',
             body: `It's time for ${nextPrayer.name} prayer`,
             id: Math.floor(Math.random() * 100000),
-            schedule: { at: new Date() },
+            schedule: { at: scheduleTime },
             smallIcon: 'ic_launcher_foreground',
             actionTypeId: '',
             extra: null
