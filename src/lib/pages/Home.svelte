@@ -32,6 +32,8 @@
   import NotificationIcon from '../components/NotificationIcon.svelte';
   import { journalStore } from '../stores/journalStore';
   import { quranStore, fetchCompleteQuran } from '../services/quranService';
+  import { notificationPermissionStore, checkNotificationPermission } from '../services/notificationService';
+  import NotificationPermissionDialog from '../components/NotificationPermissionDialog.svelte';
   const dispatch = createEventDispatcher();
   
   let currentPage = 'home';
@@ -43,6 +45,8 @@
   else if (hour < 17) greeting = 'Good Afternoon';
   else greeting = 'Good Evening';
 
+  let showPermissionDialog = false;
+
   // Request notification permissions on mount
   onMount(async () => {
     try {
@@ -51,14 +55,13 @@
         // console.error('Error prefetching Quran data:', error);
       });
 
-      const permStatus = await LocalNotifications.checkPermissions();
-      // console.log('Current notification permission status:', permStatus);
-      if (permStatus.display !== 'granted') {
-        // console.log('Requesting notification permissions...');
-        await LocalNotifications.requestPermissions();
+      // Check notification permission
+      const permStatus = await checkNotificationPermission();
+      if (permStatus === 'prompt') {
+        showPermissionDialog = true;
       }
     } catch (error) {
-      // console.error('Error requesting notification permissions:', error);
+      console.error('Error in onMount:', error);
     }
 
     const container = document.querySelector('.home-container');
@@ -705,6 +708,10 @@
       console.error('Error scheduling test notification:', error);
     }
   }
+
+  function handlePermissionResult(event) {
+    showPermissionDialog = false;
+  }
 </script>
 
 <div class="home-container">
@@ -896,6 +903,10 @@
     {/if}
   </div>
 </div>
+
+{#if showPermissionDialog}
+  <NotificationPermissionDialog on:permissionResult={handlePermissionResult} />
+{/if}
 
 <style>
   .home-container {

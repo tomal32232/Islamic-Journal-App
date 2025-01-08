@@ -1,18 +1,49 @@
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { fetchPrayerTimes, prayerTimesStore } from './prayerTimes';
 import { App } from '@capacitor/app';
+import { writable } from 'svelte/store';
 
 let prayerTimes = [];
 prayerTimesStore.subscribe(value => {
     prayerTimes = value;
 });
 
+// Store to track notification permission status
+export const notificationPermissionStore = writable('prompt');
+
+export async function checkNotificationPermission() {
+    try {
+        const permStatus = await LocalNotifications.checkPermissions();
+        notificationPermissionStore.set(permStatus.display);
+        return permStatus.display;
+    } catch (error) {
+        console.error('Error checking notification permission:', error);
+        return 'denied';
+    }
+}
+
+export async function requestNotificationPermission() {
+    try {
+        const result = await LocalNotifications.requestPermissions();
+        notificationPermissionStore.set(result.display);
+        
+        if (result.display === 'granted') {
+            // If permission granted, set up notifications
+            await setupNotifications();
+        }
+        
+        return result.display;
+    } catch (error) {
+        console.error('Error requesting notification permission:', error);
+        return 'denied';
+    }
+}
+
 export async function setupNotifications() {
     try {
-        // Request permission for notifications
-        const permissionStatus = await LocalNotifications.requestPermissions();
-        if (permissionStatus.display !== 'granted') {
-            throw new Error('Notification permission not granted');
+        const permissionStatus = await checkNotificationPermission();
+        if (permissionStatus !== 'granted') {
+            return;
         }
 
         // Set up app lifecycle listeners
