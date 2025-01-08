@@ -4,7 +4,7 @@
   import { prayerHistoryStore, getPrayerHistory } from '../stores/prayerHistoryStore';
   import { moodHistoryStore, getMoodHistory } from '../stores/moodStore';
   import { auth } from '../firebase';
-  import { quranHistoryStore, getQuranHistory } from '../stores/quranHistoryStore';
+  import { quranHistoryStore, getQuranHistory, addTestQuranReading } from '../stores/quranHistoryStore';
 
   let prayerStreak = 0;
   let longestStreak = 0;
@@ -482,6 +482,8 @@
 
     // Calculate Quran streak
     if ($quranHistoryStore) {
+      console.log('Quran History:', $quranHistoryStore);
+      
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
@@ -489,6 +491,7 @@
       const sortedReadings = [...$quranHistoryStore].sort((a, b) => 
         new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
       );
+      console.log('Sorted Quran Readings:', sortedReadings);
 
       // Group readings by date
       const readingsByDate = {};
@@ -499,6 +502,7 @@
         }
         readingsByDate[date].push(reading);
       });
+      console.log('Readings By Date:', readingsByDate);
 
       // Calculate streak
       let currentStreak = 0;
@@ -508,27 +512,40 @@
       const dates = Object.keys(readingsByDate)
         .filter(date => new Date(date) <= today)
         .sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+      console.log('Filtered Quran Dates:', dates);
 
       // Calculate streak from past to present
       for (let i = dates.length - 1; i >= 0; i--) {
         const currentDate = new Date(dates[i]);
+        const dayReadings = readingsByDate[dates[i]];
+        
+        // Check if there's at least one completed or substantial partial reading
+        const hasValidReading = dayReadings.some(reading => 
+          reading.status === 'completed' || 
+          (reading.status === 'partial' && reading.versesRead >= 10)
+        );
+        console.log(`Date ${dates[i]} has valid reading:`, hasValidReading, 'readings:', dayReadings);
         
         if (i === dates.length - 1) {
           // First date in the streak
-          currentStreak = 1;
+          currentStreak = hasValidReading ? 1 : 0;
+          console.log(`Starting streak at ${currentStreak}`);
         } else {
           // Check gap with next date
           const nextDate = new Date(dates[i + 1]);
           const dayDiff = Math.floor(
             (nextDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24)
           );
+          console.log(`Gap between ${dates[i]} and ${dates[i + 1]}:`, dayDiff, 'days');
 
-          if (dayDiff === 1) {
-            // Consecutive day, increase streak
+          if (dayDiff === 1 && hasValidReading) {
+            // Consecutive day with valid reading
             currentStreak++;
+            console.log(`Streak increased to ${currentStreak}`);
           } else {
-            // Gap found, start new streak
-            currentStreak = 1;
+            // Gap found or no valid reading
+            currentStreak = hasValidReading ? 1 : 0;
+            console.log(`Streak reset to ${currentStreak}`);
           }
         }
         
@@ -537,6 +554,7 @@
 
       quranStreak = currentStreak;
       longestQuranStreak = maxStreak;
+      console.log('Final Quran Streak:', quranStreak, 'Longest:', longestQuranStreak);
     }
 
     return patterns;
@@ -591,6 +609,15 @@
       </div>
     </div>
   </div>
+
+  {#if import.meta.env.DEV}
+    <button 
+      class="test-button"
+      on:click={addTestQuranReading}
+    >
+      Add Test Quran Reading
+    </button>
+  {/if}
 
   <!-- Prayer Time Analysis -->
   <div class="analysis-card">
@@ -911,5 +938,19 @@
   .quran-icon {
     width: 24px;
     height: 24px;
+  }
+
+  .test-button {
+    background: #216974;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+    cursor: pointer;
+  }
+
+  .test-button:hover {
+    opacity: 0.9;
   }
 </style> 
