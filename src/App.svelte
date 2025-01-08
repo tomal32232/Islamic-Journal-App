@@ -13,6 +13,7 @@
   import BottomNav from './lib/components/BottomNav.svelte';
   import { ensurePrayerData } from './lib/stores/prayerHistoryStore';
   import Favorites from './lib/pages/Favorites.svelte';
+  import { setupNotifications } from './lib/services/notificationService';
 
   let user = null;
   let activeTab = 'home';
@@ -28,6 +29,14 @@
     });
 
     return () => unsubscribe();
+  });
+
+  onMount(async () => {
+    try {
+        await setupNotifications();
+    } catch (error) {
+        console.error('Failed to setup notifications:', error);
+    }
   });
 
   function handleTabChange(event) {

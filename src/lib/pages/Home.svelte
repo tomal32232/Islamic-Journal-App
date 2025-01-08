@@ -648,6 +648,60 @@
       return `${mins}m`;
     }
   }
+
+  // Function to get the next prayer
+  function getNextPrayer() {
+    if (!$prayerTimesStore || $prayerTimesStore.length === 0) return null;
+    
+    const now = new Date();
+    const currentTime = Number(now.getHours()) * 60 + Number(now.getMinutes());
+    
+    for (const prayer of $prayerTimesStore) {
+      const [time, period] = prayer.time.split(' ');
+      const [hours, minutes] = time.split(':');
+      let prayerHours = Number(parseInt(hours));
+      
+      // Convert to 24-hour format
+      if (period === 'PM' && prayerHours !== 12) {
+        prayerHours += 12;
+      } else if (period === 'AM' && prayerHours === 12) {
+        prayerHours = 0;
+      }
+      
+      const prayerTime = prayerHours * 60 + Number(parseInt(minutes));
+      
+      if (prayerTime > currentTime) {
+        return prayer;
+      }
+    }
+    
+    // If no prayer is found for today, return the first prayer of tomorrow
+    return $prayerTimesStore[0];
+  }
+
+  // Function to test notification
+  async function testNotification() {
+    const nextPrayer = getNextPrayer();
+    if (!nextPrayer) return;
+    
+    try {
+      await LocalNotifications.schedule({
+        notifications: [
+          {
+            title: 'Prayer Time',
+            body: `It's time for ${nextPrayer.name} prayer`,
+            id: Math.floor(Math.random() * 100000),
+            schedule: { at: new Date() },
+            smallIcon: 'ic_launcher_foreground',
+            actionTypeId: '',
+            extra: null
+          }
+        ]
+      });
+    } catch (error) {
+      console.error('Error scheduling test notification:', error);
+    }
+  }
 </script>
 
 <div class="home-container">
@@ -804,6 +858,12 @@
                   {/if}
                 </div>
               </div>
+              <button 
+                class="test-notification-btn"
+                on:click={testNotification}
+              >
+                Test Notification
+              </button>
             {:else}
               <div class="no-prayer-message">
                 <p>All prayers for today have passed. The next prayer times will be shown after midnight.</p>
@@ -1627,6 +1687,51 @@
     padding: 1rem;
     color: #666;
     font-size: 0.875rem;
+  }
+
+  .test-notification-btn {
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    margin-top: 12px;
+    width: 100%;
+    transition: background-color 0.2s ease;
+  }
+  
+  .test-notification-btn:hover {
+    background-color: #45a049;
+  }
+  
+  .test-notification-btn:active {
+    background-color: #3d8b40;
+  }
+  
+  .next-prayer-card {
+    background: white;
+    padding: 16px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-bottom: 16px;
+  }
+  
+  .prayer-info {
+    margin-bottom: 8px;
+  }
+  
+  .prayer-info h3 {
+    margin: 0;
+    color: #333;
+    font-size: 18px;
+  }
+  
+  .prayer-info p {
+    margin: 4px 0 0;
+    color: #666;
+    font-size: 16px;
   }
 </style>
 
