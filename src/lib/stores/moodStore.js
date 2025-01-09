@@ -6,7 +6,7 @@ import { fetchRandomGuidanceForMood } from '../services/moodGuidanceService';
 
 export const moodHistoryStore = writable([]);
 
-export async function saveMood(mood, guidance = null) {
+export async function saveMood(mood, guidance = null, period = 'morning') {
   try {
     const user = auth.currentUser;
     if (!user) {
@@ -19,6 +19,7 @@ export async function saveMood(mood, guidance = null) {
     const moodData = {
       userId: user.uid,
       mood: mood.value,
+      period, // 'morning' or 'evening'
       timestamp: new Date().toISOString(),
       date: new Date().toLocaleDateString(),
       guidance: moodGuidance
@@ -69,7 +70,7 @@ export async function getMoodHistory(days = 30) {
   }
 }
 
-export async function getMoodForDate(date) {
+export async function getMoodForDate(date, period = 'morning') {
   try {
     const user = auth.currentUser;
     if (!user) return null;
@@ -79,6 +80,7 @@ export async function getMoodForDate(date) {
       moodsRef,
       where('userId', '==', user.uid),
       where('date', '==', date),
+      where('period', '==', period),
       orderBy('timestamp', 'desc'),
       limit(1)
     );
@@ -94,4 +96,55 @@ export async function getMoodForDate(date) {
     console.error('Error getting mood for date:', error);
     return null;
   }
+}
+
+// Helper function to determine if it's time to show the mood selector
+export function shouldShowMoodSelector(prayerTimes) {
+  if (!prayerTimes || prayerTimes.length === 0) return false;
+
+  const now = new Date();
+  const currentTime = now.getTime();
+
+  // Get Fajr and Dhuhr times
+  const fajrPrayer = prayerTimes.find(p => p.name === 'Fajr');
+  const dhuhrPrayer = prayerTimes.find(p => p.name === 'Dhuhr');
+  const ishaPrayer = prayerTimes.find(p => p.name === 'Isha');
+
+  if (!fajrPrayer || !dhuhrPrayer || !ishaPrayer) return false;
+
+  // Convert prayer times to Date objects
+  const fajrTime = convertPrayerTimeToDate(fajrPrayer.time);
+  const dhuhrTime = convertPrayerTimeToDate(dhuhrPrayer.time);
+  const ishaTime = convertPrayerTimeToDate(ishaPrayer.time);
+  
+  // Set end time for morning mood (before Dhuhr)
+  const morningEndTime = dhuhrTime;
+  
+  // Set end time for evening mood (11:59 PM)
+  const eveningEndTime = new Date(now);
+  eveningEndTime.setHours(23, 59, 59, 999);
+
+  // Check if we're in the morning window (after Fajr, before Dhuhr)
+  const isMorningWindow = currentTime >= fajrTime.getTime() && currentTime < morningEndTime.getTime();
+  
+  // Check if we're in the evening window (after Isha, before midnight)
+  const isEveningWindow = currentTime >= ishaTime.getTime() && currentTime < eveningEndTime.getTime();
+
+  return {
+    showMorningMood: isMorningWindow,
+    showEveningMood: isEveningWindow
+  };
+}
+
+function convertPrayerTimeToDate(timeStr) {
+  const [time, period] = timeStr.split(' ');
+  const [hours, minutes] = time.split(':');
+  const date = new Date();
+  let hour = parseInt(hours);
+  
+  if (period === 'PM' && hour !== 12) hour += 12;
+  if (period === 'AM' && hour === 12) hour = 0;
+  
+  date.setHours(hour, parseInt(minutes), 0, 0);
+  return date;
 } 

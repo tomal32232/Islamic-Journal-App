@@ -25,7 +25,7 @@
   import { weeklyStatsStore, getWeeklyStats } from '../stores/tasbihStore';
   import { quoteStore, getRandomQuote } from '../services/quoteService';
   import MoodSelector from '../components/MoodSelector.svelte';
-  import { moodHistoryStore, saveMood, getMoodHistory, getMoodForDate } from '../stores/moodStore';
+  import { moodHistoryStore, saveMood, getMoodHistory, getMoodForDate, shouldShowMoodSelector } from '../stores/moodStore';
   import { get } from 'svelte/store';
   import MoodHistoryModal from '../components/MoodHistoryModal.svelte';
   import { Lock } from 'phosphor-svelte';
@@ -194,8 +194,10 @@
   let todayTasbihCount = 0;
 
   let showMoodSelector = false;
-  let currentMood = null;
+  let currentMorningMood = null;
+  let currentEveningMood = null;
   let weekMoods = {};
+  let currentMoodPeriod = 'morning';
 
   let selectedHistoryMood = null;
 
@@ -488,24 +490,30 @@
 
   async function handleMoodSelect(event) {
     const selectedMood = event.detail;
-    // console.log('Selected mood:', selectedMood);
     try {
-      await saveMood(selectedMood, selectedMood.guidance);
+      await saveMood(selectedMood, selectedMood.guidance, currentMoodPeriod);
+      
       // Use the local mood template to ensure we have the icon
       const matchingMood = moods.find(m => m.value === selectedMood.value);
       if (matchingMood) {
-        currentMood = {
+        const moodData = {
           value: selectedMood.value,
           name: matchingMood.name,
           icon: matchingMood.icon,
           description: matchingMood.description,
           guidance: selectedMood.guidance
         };
+
+        if (currentMoodPeriod === 'morning') {
+          currentMorningMood = moodData;
+        } else {
+          currentEveningMood = moodData;
+        }
       }
       showMoodSelector = false;
       await loadWeekMoods();
     } catch (error) {
-      // console.error('Error saving mood:', error);
+      console.error('Error saving mood:', error);
     }
   }
 
@@ -513,38 +521,58 @@
     try {
       await getMoodHistory(7);
       const moodsFromDb = get(moodHistoryStore);
-      // console.log('Loaded moods from database:', moodsFromDb);
       weekMoods = moodsFromDb.reduce((acc, mood) => {
-        acc[mood.date] = mood;
+        if (!acc[mood.date]) {
+          acc[mood.date] = {};
+        }
+        acc[mood.date][mood.period] = mood;
         return acc;
       }, {});
 
-      // Check if we have a mood for today
+      // Check if we have moods for today
       const today = new Date().toLocaleDateString();
-      const todayMood = weekMoods[today];
-      // console.log('Today\'s mood from database:', todayMood);
+      const todayMoods = weekMoods[today] || {};
       
-      if (todayMood) {
-        // Find the matching mood from our local moods array to get the icon
-        const matchingMood = moods.find(m => m.value === todayMood.mood);
-        // console.log('Local mood template:', matchingMood);
+      // Get prayer times to determine which mood selector to show
+      const prayerTimes = get(prayerTimesStore);
+      const { showMorningMood, showEveningMood } = shouldShowMoodSelector(prayerTimes);
+
+      if (todayMoods.morning) {
+        const matchingMood = moods.find(m => m.value === todayMoods.morning.mood);
         if (matchingMood) {
-          currentMood = {
-            value: todayMood.mood,
+          currentMorningMood = {
+            value: todayMoods.morning.mood,
             name: matchingMood.name,
             icon: matchingMood.icon,
             description: matchingMood.description
           };
-          // console.log('Set current mood to:', currentMood);
-          showMoodSelector = false;
         }
-      } else {
-        // If no mood for today, show the selector
+      }
+
+      if (todayMoods.evening) {
+        const matchingMood = moods.find(m => m.value === todayMoods.evening.mood);
+        if (matchingMood) {
+          currentEveningMood = {
+            value: todayMoods.evening.mood,
+            name: matchingMood.name,
+            icon: matchingMood.icon,
+            description: matchingMood.description
+          };
+        }
+      }
+
+      // Show mood selector if we're in the right time window and haven't recorded mood yet
+      if (showMorningMood && !currentMorningMood) {
         showMoodSelector = true;
-        currentMood = null;
+        currentMoodPeriod = 'morning';
+      } else if (showEveningMood && !currentEveningMood) {
+        showMoodSelector = true;
+        currentMoodPeriod = 'evening';
+      } else {
+        showMoodSelector = false;
       }
     } catch (error) {
-      // console.error('Error loading moods:', error);
+      console.error('Error loading moods:', error);
     }
   }
 
@@ -725,9 +753,18 @@
             <div class="greeting-content">
               <div class="greeting-text">
                 <h1>{greeting}, {userName}!</h1>
-                {#if currentMood}
-                  <div class="mood-icon small">
-                    {@html currentMood.icon}
+                {#if currentMorningMood || currentEveningMood}
+                  <div class="mood-icons">
+                    {#if currentMorningMood}
+                      <div class="mood-icon small" title="Morning mood">
+                        {@html currentMorningMood.icon}
+                      </div>
+                    {/if}
+                    {#if currentEveningMood}
+                      <div class="mood-icon small" title="Evening mood">
+                        {@html currentEveningMood.icon}
+                      </div>
+                    {/if}
                   </div>
                 {/if}
               </div>
@@ -762,16 +799,32 @@
                   <div class="completion-mark">✓</div>
                 {/if}
                 {#if weekMoods[fullDate]}
-                  {@const matchingMood = moods.find(m => m.value === weekMoods[fullDate].mood)}
-                  {#if matchingMood}
-                    <button 
-                      class="mood-icon-button" 
-                      on:click={() => handleMoodHistoryClick(weekMoods[fullDate])}
-                      title={matchingMood.name}
-                    >
-                      {@html matchingMood.icon}
-                    </button>
-                  {/if}
+                  <div class="mood-buttons">
+                    {#if weekMoods[fullDate].morning}
+                      {@const morningMood = moods.find(m => m.value === weekMoods[fullDate].morning.mood)}
+                      {#if morningMood}
+                        <button 
+                          class="mood-icon-button morning" 
+                          on:click={() => handleMoodHistoryClick(weekMoods[fullDate].morning)}
+                          title={`Morning: ${morningMood.name}`}
+                        >
+                          {@html morningMood.icon}
+                        </button>
+                      {/if}
+                    {/if}
+                    {#if weekMoods[fullDate].evening}
+                      {@const eveningMood = moods.find(m => m.value === weekMoods[fullDate].evening.mood)}
+                      {#if eveningMood}
+                        <button 
+                          class="mood-icon-button evening" 
+                          on:click={() => handleMoodHistoryClick(weekMoods[fullDate].evening)}
+                          title={`Evening: ${eveningMood.name}`}
+                        >
+                          {@html eveningMood.icon}
+                        </button>
+                      {/if}
+                    {/if}
+                  </div>
                 {/if}
               </div>
             {/each}
@@ -1776,6 +1829,64 @@
   /* Remove the old calendar-strip transition styles */
   .quote-card.scrolled + .calendar-strip {
     display: none;
+  }
+
+  .mood-icons {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+  }
+
+  .mood-icon.small {
+    width: 1.25rem;
+    height: 1.25rem;
+    color: white;
+  }
+
+  .mood-icon-button.morning {
+    color: #216974;
+  }
+
+  .mood-icon-button.evening {
+    color: #E09453;
+  }
+
+  .day-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  .mood-buttons {
+    display: flex;
+    gap: 0.25rem;
+    align-items: center;
+  }
+
+  .mood-icon-button {
+    width: 1.25rem;
+    height: 1.25rem;
+    padding: 0;
+    background: none;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s;
+  }
+
+  .mood-icon-button:hover {
+    transform: scale(1.1);
+  }
+
+  .mood-icon-button.morning {
+    color: #216974;
+  }
+
+  .mood-icon-button.evening {
+    color: #E09453;
   }
 </style>
 
