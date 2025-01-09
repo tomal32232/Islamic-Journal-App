@@ -1,5 +1,6 @@
 <script>
   import { onMount } from 'svelte';
+  import { fade } from 'svelte/transition';
   import Profile from './Profile.svelte';
   import { iconMap } from '../utils/icons';
   import { prayerTimesStore, loadingStore, errorStore, fetchPrayerTimes, locationStore } from '../services/prayerTimes';
@@ -723,7 +724,7 @@
           <div class="greeting-section">
             <div class="greeting-content">
               <div class="greeting-text">
-                <h1>Good Morning, {userName}!</h1>
+                <h1>{greeting}, {userName}!</h1>
                 {#if currentMood}
                   <div class="mood-icon small">
                     {@html currentMood.icon}
@@ -745,32 +746,36 @@
           </div>
         </div>
 
-        {#if showMoodSelector}
-          <MoodSelector on:select={handleMoodSelect} />
-        {/if}
-
-        <div class="calendar-strip">
-          {#each weekDays as { day, date, fullDate, isToday }}
-            <div class="day-item {isToday ? 'active' : ''}">
-              <span class="day">{day}</span>
-              <span class="date-num">{date}</span>
-              {#if $journalStore.dailyProgress.find(d => d.date === fullDate && d.morning && d.evening)}
-                <div class="completion-mark">✓</div>
-              {/if}
-              {#if weekMoods[fullDate]}
-                {@const matchingMood = moods.find(m => m.value === weekMoods[fullDate].mood)}
-                {#if matchingMood}
-                  <button 
-                    class="mood-icon-button" 
-                    on:click={() => handleMoodHistoryClick(weekMoods[fullDate])}
-                    title={matchingMood.name}
-                  >
-                    {@html matchingMood.icon}
-                  </button>
-                {/if}
-              {/if}
+        <div class="animated-section" class:scrolled={isScrolled}>
+          {#if showMoodSelector}
+            <div class="mood-selector-wrapper" transition:fade={{ duration: 300 }}>
+              <MoodSelector on:select={handleMoodSelect} />
             </div>
-          {/each}
+          {/if}
+
+          <div class="calendar-strip">
+            {#each weekDays as { day, date, fullDate, isToday }}
+              <div class="day-item {isToday ? 'active' : ''}">
+                <span class="day">{day}</span>
+                <span class="date-num">{date}</span>
+                {#if $journalStore.dailyProgress.find(d => d.date === fullDate && d.morning && d.evening)}
+                  <div class="completion-mark">✓</div>
+                {/if}
+                {#if weekMoods[fullDate]}
+                  {@const matchingMood = moods.find(m => m.value === weekMoods[fullDate].mood)}
+                  {#if matchingMood}
+                    <button 
+                      class="mood-icon-button" 
+                      on:click={() => handleMoodHistoryClick(weekMoods[fullDate])}
+                      title={matchingMood.name}
+                    >
+                      {@html matchingMood.icon}
+                    </button>
+                  {/if}
+                {/if}
+              </div>
+            {/each}
+          </div>
         </div>
 
         <MoodHistoryModal 
@@ -985,9 +990,7 @@
   }
 
   .quote-card.scrolled + .calendar-strip {
-    opacity: 0;
-    transform: translateY(-100%);
-    pointer-events: none;
+    display: none;
   }
 
   .quote-section {
@@ -1746,6 +1749,33 @@
     margin: 4px 0 0;
     color: #666;
     font-size: 16px;
+  }
+
+  .animated-section {
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    transform-origin: top center;
+  }
+
+  .animated-section.scrolled {
+    opacity: 0;
+    transform: translateY(-100%);
+    pointer-events: none;
+  }
+
+  .mood-selector-wrapper {
+    margin: 10px 0;
+  }
+
+  .calendar-strip {
+    display: flex;
+    justify-content: space-between;
+    margin: 0;
+    padding: 0.25rem 0;
+  }
+
+  /* Remove the old calendar-strip transition styles */
+  .quote-card.scrolled + .calendar-strip {
+    display: none;
   }
 </style>
 
