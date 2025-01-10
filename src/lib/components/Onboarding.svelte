@@ -103,28 +103,34 @@
 </script>
 
 <div class="onboarding-container">
-    <div class="slider" style="transform: translateX(-{currentSlideValue * 100}%)">
-        {#each slides as slide, index}
-            <div class="slide" class:active={index === currentSlideValue} in:fade>
-                <h2>{slide.title}</h2>
-                <div class="image-container">
-                    {@html slide.image}
+    <div class="slider-container">
+        <div class="slider" style="transform: translateX(-{currentSlideValue * 100}vw)">
+            {#each slides as slide, index}
+                <div class="slide" class:active={index === currentSlideValue}>
+                    <div class="slide-content">
+                        <div class="content-wrapper">
+                            <h2>{slide.title}</h2>
+                            <div class="image-container">
+                                {@html slide.image}
+                            </div>
+                            <p>{slide.description}</p>
+                            
+                            {#if index === 1 && !$locationPermissionGranted}
+                                <button class="permission-button" on:click={requestLocationPermission}>
+                                    Enable Location
+                                </button>
+                            {/if}
+                            
+                            {#if index === 2 && !$notificationPermissionGranted}
+                                <button class="permission-button" on:click={requestNotificationPermission}>
+                                    Enable Notifications
+                                </button>
+                            {/if}
+                        </div>
+                    </div>
                 </div>
-                <p>{slide.description}</p>
-                
-                {#if index === 1 && !$locationPermissionGranted}
-                    <button class="permission-button" on:click={requestLocationPermission}>
-                        Enable Location
-                    </button>
-                {/if}
-                
-                {#if index === 2 && !$notificationPermissionGranted}
-                    <button class="permission-button" on:click={requestNotificationPermission}>
-                        Enable Notifications
-                    </button>
-                {/if}
-            </div>
-        {/each}
+            {/each}
+        </div>
     </div>
 
     <div class="navigation">
@@ -143,33 +149,62 @@
 
 <style>
     .onboarding-container {
-        width: 100%;
+        width: 100vw;
         height: 100vh;
+        height: 100dvh;
         overflow: hidden;
-        position: relative;
+        position: fixed;
+        top: 0;
+        left: 0;
         background-color: #f8f9fa;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .slider-container {
+        position: relative;
+        flex: 1;
+        overflow: hidden;
     }
 
     .slider {
         display: flex;
         transition: transform 0.3s ease-in-out;
         height: 100%;
+        width: 400vw; /* 100vw * number of slides */
     }
 
     .slide {
-        min-width: 100%;
+        width: 100vw;
+        height: 100%;
+        flex-shrink: 0;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .slide-content {
+        min-height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        padding: 1rem;
+        box-sizing: border-box;
+    }
+
+    .content-wrapper {
+        max-width: 500px;
+        margin: 0 auto;
+        width: 100%;
         display: flex;
         flex-direction: column;
         align-items: center;
-        justify-content: center;
-        padding: 2rem;
-        text-align: center;
+        padding: 1rem;
     }
 
     .image-container {
-        width: 250px;
-        height: 250px;
-        margin: 2rem 0;
+        width: min(180px, 50vw);
+        height: min(180px, 50vw);
+        margin: 1.5rem 0;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -181,27 +216,31 @@
     }
 
     h2 {
-        font-size: 1.8rem;
+        font-size: clamp(1.3rem, 4vw, 1.6rem);
         color: #2c3e50;
-        margin-bottom: 1rem;
+        margin-bottom: 0.5rem;
+        padding: 0 1rem;
+        text-align: center;
+        width: 100%;
     }
 
     p {
-        font-size: 1.1rem;
+        font-size: clamp(0.9rem, 3.5vw, 1rem);
         color: #666;
-        max-width: 80%;
-        margin: 0 auto;
+        max-width: 90%;
+        margin: 0 auto 1rem;
+        line-height: 1.5;
+        text-align: center;
     }
 
     .navigation {
-        position: absolute;
-        bottom: 2rem;
-        left: 0;
-        right: 0;
+        position: relative;
+        padding: 1.5rem;
         display: flex;
         flex-direction: column;
         align-items: center;
         gap: 1rem;
+        background: linear-gradient(to top, rgba(248, 249, 250, 1), rgba(248, 249, 250, 0.8));
     }
 
     .dots {
@@ -210,38 +249,77 @@
     }
 
     .dot {
-        width: 8px;
-        height: 8px;
+        width: 6px;
+        height: 6px;
         border-radius: 50%;
         background-color: #ccc;
         transition: background-color 0.3s ease;
     }
 
     .dot.active {
-        background-color: #4CAF50;
+        background-color: #216974;
     }
 
     .next-button, .permission-button {
         padding: 0.8rem 2rem;
         border: none;
         border-radius: 25px;
-        background-color: #4CAF50;
+        background-color: #216974;
         color: white;
-        font-size: 1rem;
+        font-size: 0.9rem;
         cursor: pointer;
-        transition: background-color 0.3s ease;
+        transition: all 0.3s ease;
+        min-width: 120px;
+        -webkit-tap-highlight-color: transparent;
     }
 
     .next-button:hover, .permission-button:hover {
-        background-color: #45a049;
+        background-color: #1a5761;
+    }
+
+    .next-button:active, .permission-button:active {
+        transform: scale(0.98);
     }
 
     .permission-button {
         margin-top: 1rem;
-        background-color: #2196F3;
+        background-color: #E09453;
     }
 
     .permission-button:hover {
-        background-color: #1976D2;
+        background-color: #c87f43;
+    }
+
+    @media (max-height: 600px) {
+        .image-container {
+            width: min(140px, 40vw);
+            height: min(140px, 40vw);
+            margin: 1rem 0;
+        }
+
+        h2 {
+            margin-bottom: 0.3rem;
+            font-size: clamp(1.1rem, 3.5vw, 1.4rem);
+        }
+
+        p {
+            margin-bottom: 0.5rem;
+            font-size: clamp(0.8rem, 3vw, 0.9rem);
+        }
+
+        .navigation {
+            padding: 1rem;
+        }
+
+        .next-button, .permission-button {
+            padding: 0.6rem 1.5rem;
+            font-size: 0.8rem;
+        }
+    }
+
+    @media (min-width: 768px) {
+        .content-wrapper {
+            padding: 2rem;
+        }
     }
 </style> 

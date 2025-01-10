@@ -19,7 +19,7 @@
 
   let user = null;
   let activeTab = 'home';
-  let showOnboarding = false;
+  let showOnboarding = true;
 
   onMount(() => {
     // Check onboarding status
@@ -62,41 +62,39 @@
   }
 </script>
 
-{#if user}
-  {#if showOnboarding}
-    <Onboarding />
-  {:else}
-    <div class="top-bar"></div>
-    <div class="app-container">
-      {#if activeTab !== 'notifications'}
-        <NotificationIcon on:click={() => navigateTo('notifications')} />
+{#if showOnboarding}
+  <Onboarding />
+{:else if user}
+  <div class="top-bar"></div>
+  <div class="app-container">
+    {#if activeTab !== 'notifications'}
+      <NotificationIcon on:click={() => navigateTo('notifications')} />
+    {/if}
+    
+    <main>
+      {#if activeTab === 'home'}
+        <Home on:navigate={e => navigateTo(e.detail)} />
+      {:else if activeTab === 'notifications'}
+        <Notifications onBack={() => navigateTo('home')} />
+      {:else if activeTab === 'badges'}
+        <Badges onBack={() => navigateTo('profile')} />
+      {:else if activeTab === 'favorites'}
+        <Favorites onBack={() => navigateTo('profile')} />
+      {:else if activeTab === 'profile'}
+        <Profile {navigateTo} />
+      {:else if activeTab === 'tracker'}
+        <Tracker />
+      {:else if activeTab === 'journal'}
+        <Journal />
+      {:else if activeTab === 'prayer'}
+        <Prayer />
+      {:else}
+        <Home />
       {/if}
-      
-      <main>
-        {#if activeTab === 'home'}
-          <Home on:navigate={e => navigateTo(e.detail)} />
-        {:else if activeTab === 'notifications'}
-          <Notifications onBack={() => navigateTo('home')} />
-        {:else if activeTab === 'badges'}
-          <Badges onBack={() => navigateTo('profile')} />
-        {:else if activeTab === 'favorites'}
-          <Favorites onBack={() => navigateTo('profile')} />
-        {:else if activeTab === 'profile'}
-          <Profile {navigateTo} />
-        {:else if activeTab === 'tracker'}
-          <Tracker />
-        {:else if activeTab === 'journal'}
-          <Journal />
-        {:else if activeTab === 'prayer'}
-          <Prayer />
-        {:else}
-          <Home />
-        {/if}
-      </main>
-      <BottomNav {activeTab} on:tabChange={handleTabChange} />
-    </div>
-    <div class="bottom-bar"></div>
-  {/if}
+    </main>
+    <BottomNav {activeTab} on:tabChange={handleTabChange} />
+  </div>
+  <div class="bottom-bar"></div>
 {:else}
   <main>
     <SignIn />
