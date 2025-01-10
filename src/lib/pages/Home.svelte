@@ -809,16 +809,16 @@
               <blockquote>"{$quoteStore.text}"</blockquote>
               <cite>{$quoteStore.source}</cite>
             </div>
-            <div class="button-container">
-              <button class="test-notification" on:click={testNotification}>
-                Test Notification
-              </button>
-              {#if isAdmin}
+            {#if isAdmin}
+              <div class="button-container">
+                <button class="test-notification" on:click={testNotification}>
+                  Test Notification
+                </button>
                 <button class="sync-button" on:click={handleSync}>
                   Sync Mood Guidance
                 </button>
-              {/if}
-            </div>
+              </div>
+            {/if}
           </div>
         </div>
 
