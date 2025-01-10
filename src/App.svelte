@@ -14,11 +14,17 @@
   import { ensurePrayerData } from './lib/stores/prayerHistoryStore';
   import Favorites from './lib/pages/Favorites.svelte';
   import { setupNotifications } from './lib/services/notificationService';
+  import Onboarding from './lib/components/Onboarding.svelte';
+  import { onboardingComplete, checkOnboardingStatus } from './lib/stores/onboardingStore';
 
   let user = null;
   let activeTab = 'home';
+  let showOnboarding = false;
 
   onMount(() => {
+    // Check onboarding status
+    checkOnboardingStatus();
+    
     // Listen for auth state changes
     const unsubscribe = auth.onAuthStateChanged(async (authUser) => {
       user = authUser; // Set the user variable
@@ -28,14 +34,22 @@
       }
     });
 
-    return () => unsubscribe();
+    // Subscribe to onboarding status
+    const unsubscribeOnboarding = onboardingComplete.subscribe(complete => {
+      showOnboarding = !complete;
+    });
+
+    return () => {
+      unsubscribe();
+      unsubscribeOnboarding();
+    };
   });
 
   onMount(async () => {
     try {
-        await setupNotifications();
+      await setupNotifications();
     } catch (error) {
-        console.error('Failed to setup notifications:', error);
+      console.error('Failed to setup notifications:', error);
     }
   });
 
@@ -49,36 +63,40 @@
 </script>
 
 {#if user}
-  <div class="top-bar"></div>
-  <div class="app-container">
-    {#if activeTab !== 'notifications'}
-      <NotificationIcon on:click={() => navigateTo('notifications')} />
-    {/if}
-    
-    <main>
-      {#if activeTab === 'home'}
-        <Home on:navigate={e => navigateTo(e.detail)} />
-      {:else if activeTab === 'notifications'}
-        <Notifications onBack={() => navigateTo('home')} />
-      {:else if activeTab === 'badges'}
-        <Badges onBack={() => navigateTo('profile')} />
-      {:else if activeTab === 'favorites'}
-        <Favorites onBack={() => navigateTo('profile')} />
-      {:else if activeTab === 'profile'}
-        <Profile {navigateTo} />
-      {:else if activeTab === 'tracker'}
-        <Tracker />
-      {:else if activeTab === 'journal'}
-        <Journal />
-      {:else if activeTab === 'prayer'}
-        <Prayer />
-      {:else}
-        <Home />
+  {#if showOnboarding}
+    <Onboarding />
+  {:else}
+    <div class="top-bar"></div>
+    <div class="app-container">
+      {#if activeTab !== 'notifications'}
+        <NotificationIcon on:click={() => navigateTo('notifications')} />
       {/if}
-    </main>
-    <BottomNav {activeTab} on:tabChange={handleTabChange} />
-  </div>
-  <div class="bottom-bar"></div>
+      
+      <main>
+        {#if activeTab === 'home'}
+          <Home on:navigate={e => navigateTo(e.detail)} />
+        {:else if activeTab === 'notifications'}
+          <Notifications onBack={() => navigateTo('home')} />
+        {:else if activeTab === 'badges'}
+          <Badges onBack={() => navigateTo('profile')} />
+        {:else if activeTab === 'favorites'}
+          <Favorites onBack={() => navigateTo('profile')} />
+        {:else if activeTab === 'profile'}
+          <Profile {navigateTo} />
+        {:else if activeTab === 'tracker'}
+          <Tracker />
+        {:else if activeTab === 'journal'}
+          <Journal />
+        {:else if activeTab === 'prayer'}
+          <Prayer />
+        {:else}
+          <Home />
+        {/if}
+      </main>
+      <BottomNav {activeTab} on:tabChange={handleTabChange} />
+    </div>
+    <div class="bottom-bar"></div>
+  {/if}
 {:else}
   <main>
     <SignIn />
