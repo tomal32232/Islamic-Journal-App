@@ -381,100 +381,46 @@
     };
 
     function analyzeMoodPatterns() {
-      if (!$moodHistoryStore || !$prayerHistoryStore.history) return [];
+      if (!$moodHistoryStore) return [];
 
       const patterns = [];
-      const moodsByDate = {};
-      const prayersByDate = {};
+      const morningMoods = {};
+      const eveningMoods = {};
 
-      // Group moods by date
+      // Count moods by period
       $moodHistoryStore.forEach(mood => {
-        const date = new Date(mood.timestamp).toLocaleDateString('en-CA');
-        if (!moodsByDate[date]) moodsByDate[date] = [];
-        moodsByDate[date].push(mood);
-      });
-
-      // Group prayers by date
-      $prayerHistoryStore.history.forEach(prayer => {
-        const date = prayer.date;
-        if (!prayersByDate[date]) prayersByDate[date] = [];
-        prayersByDate[date].push(prayer);
-      });
-
-      // Analyze prayer-mood correlations
-      Object.keys(moodsByDate).forEach(date => {
-        const dayMoods = moodsByDate[date];
-        const dayPrayers = prayersByDate[date] || [];
-
-        dayMoods.forEach(mood => {
-          const moodTime = new Date(mood.timestamp);
-          const hour = moodTime.getHours();
-
-          // Time of day categorization
-          if (hour >= 4 && hour < 12) {
-            moodPatterns.timeOfDay.morning[mood.mood] = (moodPatterns.timeOfDay.morning[mood.mood] || 0) + 1;
-          } else if (hour >= 12 && hour < 17) {
-            moodPatterns.timeOfDay.afternoon[mood.mood] = (moodPatterns.timeOfDay.afternoon[mood.mood] || 0) + 1;
-          } else {
-            moodPatterns.timeOfDay.evening[mood.mood] = (moodPatterns.timeOfDay.evening[mood.mood] || 0) + 1;
-          }
-
-          // Find nearest prayer before this mood
-          const nearestPrayer = dayPrayers.find(prayer => {
-            const prayerTime = new Date(date + ' ' + prayer.time);
-            return prayerTime <= moodTime;
-          });
-
-          if (nearestPrayer) {
-            if (!moodPatterns.prayerMoods[nearestPrayer.prayerName][mood.mood]) {
-              moodPatterns.prayerMoods[nearestPrayer.prayerName][mood.mood] = 0;
-            }
-            moodPatterns.prayerMoods[nearestPrayer.prayerName][mood.mood]++;
-          }
-        });
-      });
-
-      // Generate insights
-      const insights = [];
-
-      // Find best mood after each prayer
-      Object.entries(moodPatterns.prayerMoods).forEach(([prayer, moods]) => {
-        const bestMood = Object.entries(moods).sort((a, b) => b[1] - a[1])[0];
-        if (bestMood) {
-          insights.push({
-            type: 'prayer-mood',
-            icon: patternIcons[prayer],
-            title: `${prayer} Reflection`,
-            description: `Most ${capitalizeFirstLetter(bestMood[0])} after ${prayer} prayer`
-          });
+        if (mood.period === 'morning') {
+          morningMoods[mood.mood] = (morningMoods[mood.mood] || 0) + 1;
+        } else if (mood.period === 'evening') {
+          eveningMoods[mood.mood] = (eveningMoods[mood.mood] || 0) + 1;
         }
       });
 
-      // Find time of day patterns
-      const morningMood = Object.entries(moodPatterns.timeOfDay.morning)
+      // Find most common mood for morning period (after Fajr)
+      const bestMorningMood = Object.entries(morningMoods)
         .sort((a, b) => b[1] - a[1])[0];
-      const eveningMood = Object.entries(moodPatterns.timeOfDay.evening)
-        .sort((a, b) => b[1] - a[1])[0];
-
-      if (morningMood) {
-        insights.push({
-          type: 'time-mood',
-          icon: patternIcons.Morning,
-          title: 'Morning Mindset',
-          description: `Most ${capitalizeFirstLetter(morningMood[0])} in the mornings`
+      if (bestMorningMood) {
+        patterns.push({
+          type: 'prayer-mood',
+          icon: patternIcons.Fajr,
+          title: 'Fajr Reflection',
+          description: `Most ${capitalizeFirstLetter(bestMorningMood[0])} after Fajr prayer`
         });
       }
 
-      if (eveningMood) {
-        insights.push({
-          type: 'time-mood',
-          icon: patternIcons.Evening,
-          title: 'Evening Energy',
-          description: `Feeling ${capitalizeFirstLetter(eveningMood[0])} in the evenings`
+      // Find most common mood for evening period (after Isha)
+      const bestEveningMood = Object.entries(eveningMoods)
+        .sort((a, b) => b[1] - a[1])[0];
+      if (bestEveningMood) {
+        patterns.push({
+          type: 'prayer-mood',
+          icon: patternIcons.Isha,
+          title: 'Isha Reflection',
+          description: `Most ${capitalizeFirstLetter(bestEveningMood[0])} after Isha prayer`
         });
       }
 
-      return insights.slice(0, 3); // Return top 3 insights
+      return patterns;
     }
 
     // Add pattern analysis
@@ -702,7 +648,7 @@
   <div class="analysis-card">
     <div class="card-header">
       <Brain weight="fill" size={24} />
-      <h2>Mood & Prayer Patterns</h2>
+      <h2>Daily Mood Patterns</h2>
     </div>
     <div class="patterns-list">
       {#each calculateInsights() as pattern}
@@ -719,7 +665,7 @@
       {#if calculateInsights().length === 0}
         <div class="pattern-item">
           <div class="pattern-content">
-            <p class="no-patterns">Track more prayers and moods to see patterns</p>
+            <p class="no-patterns">Track your moods after Fajr and Isha prayers to see patterns</p>
           </div>
         </div>
       {/if}
