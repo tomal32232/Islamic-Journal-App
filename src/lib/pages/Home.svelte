@@ -1,10 +1,11 @@
-<script>
+<script lang="ts">
   import { onMount } from 'svelte';
   import { fade } from 'svelte/transition';
   import Profile from './Profile.svelte';
   import { iconMap } from '../utils/icons';
   import { prayerTimesStore, loadingStore, errorStore, fetchPrayerTimes, locationStore } from '../services/prayerTimes';
   import { auth } from '../firebase';
+  import { getAuth } from 'firebase/auth';
   import Tasbih from './Tasbih.svelte';
   import WeeklyStreak from '../components/WeeklyStreak.svelte';
   import Prayer from './Prayer.svelte';
@@ -36,6 +37,7 @@
   import { notificationPermissionStore, checkNotificationPermission } from '../services/notificationService';
   import NotificationPermissionDialog from '../components/NotificationPermissionDialog.svelte';
   import { checkAdminStatus } from '../services/adminService';
+  import { fetchMoodGuidance } from '../services/moodGuidanceService';
   const dispatch = createEventDispatcher();
   
   let currentPage = 'home';
@@ -48,6 +50,26 @@
   else greeting = 'Good Evening';
 
   let showPermissionDialog = false;
+
+  let isAdmin = false;
+
+  async function checkAndSetAdminStatus() {
+    const firebaseAuth = getAuth();
+    const user = firebaseAuth.currentUser;
+    if (user) {
+      const idTokenResult = await user.getIdTokenResult();
+      isAdmin = idTokenResult.claims.admin === true;
+    }
+  }
+
+  async function handleSync() {
+    try {
+      await fetchMoodGuidance();
+      console.log('Mood guidance sync completed');
+    } catch (error) {
+      console.error('Error syncing mood guidance:', error);
+    }
+  }
 
   // Request notification permissions on mount
   onMount(async () => {
@@ -75,6 +97,7 @@
       userName = capitalizeFirstLetter(user?.displayName?.split(' ')[0]) || 'Guest';
       if (user) {
         // Check admin status
+        checkAndSetAdminStatus();
         checkAdminStatus();
         // console.log('User authenticated:', user.uid);
         Promise.all([
@@ -782,6 +805,16 @@
             <div class="quote-section">
               <blockquote>"{$quoteStore.text}"</blockquote>
               <cite>{$quoteStore.source}</cite>
+            </div>
+            <div class="button-container">
+              <button class="test-notification" on:click={testNotification}>
+                Test Notification
+              </button>
+              {#if isAdmin}
+                <button class="sync-button" on:click={handleSync}>
+                  Sync Mood Guidance
+                </button>
+              {/if}
             </div>
           </div>
         </div>
@@ -1890,6 +1923,29 @@
 
   .mood-icon-button.evening {
     color: #E09453;
+  }
+
+  .sync-button, .test-notification {
+    background: #216974;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    width: 100%;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+  }
+
+  .sync-button:hover, .test-notification:hover {
+    background: #184f57;
+  }
+
+  .button-container {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
   }
 </style>
 
