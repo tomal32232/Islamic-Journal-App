@@ -25,6 +25,7 @@
     "@capacitor/local-notifications": "^6.1.1",
     "@codetrix-studio/capacitor-google-auth": "^3.4.0-rc.4",
     "firebase": "^11.0.2",
+    "firebase-admin": "^13.0.2",
     "phosphor-svelte": "^2.0.1"
   }
 }

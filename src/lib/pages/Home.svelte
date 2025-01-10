@@ -35,6 +35,7 @@
   import { quranStore, fetchCompleteQuran } from '../services/quranService';
   import { notificationPermissionStore, checkNotificationPermission } from '../services/notificationService';
   import NotificationPermissionDialog from '../components/NotificationPermissionDialog.svelte';
+  import { checkAdminStatus } from '../services/adminService';
   const dispatch = createEventDispatcher();
   
   let currentPage = 'home';
@@ -73,6 +74,8 @@
     const cleanup = auth.onAuthStateChanged((user) => {
       userName = capitalizeFirstLetter(user?.displayName?.split(' ')[0]) || 'Guest';
       if (user) {
+        // Check admin status
+        checkAdminStatus();
         // console.log('User authenticated:', user.uid);
         Promise.all([
           fetchPrayerTimes(),
@@ -519,11 +522,8 @@
 
   async function loadWeekMoods() {
     try {
-      console.log('Starting loadWeekMoods...');
       await getMoodHistory(7);
       const moodsFromDb = get(moodHistoryStore);
-      console.log('Moods from database:', moodsFromDb);
-      
       weekMoods = moodsFromDb.reduce((acc, mood) => {
         if (!acc[mood.date]) {
           acc[mood.date] = {};
@@ -531,23 +531,17 @@
         acc[mood.date][mood.period] = mood;
         return acc;
       }, {});
-      console.log('Processed weekMoods:', weekMoods);
 
       // Check if we have moods for today
       const today = new Date().toLocaleDateString();
       const todayMoods = weekMoods[today] || {};
-      console.log('Today\'s moods:', todayMoods);
       
       // Get prayer times to determine which mood selector to show
       const prayerTimes = get(prayerTimesStore);
-      const selectorStatus = shouldShowMoodSelector(prayerTimes);
-      const showMorningMood = selectorStatus === false ? false : selectorStatus.showMorningMood;
-      const showEveningMood = selectorStatus === false ? false : selectorStatus.showEveningMood;
-      console.log('Mood selector status - Morning:', showMorningMood, 'Evening:', showEveningMood);
+      const { showMorningMood, showEveningMood } = shouldShowMoodSelector(prayerTimes);
 
       if (todayMoods.morning) {
         const matchingMood = moods.find(m => m.value === todayMoods.morning.mood);
-        console.log('Morning mood match:', matchingMood);
         if (matchingMood) {
           currentMorningMood = {
             value: todayMoods.morning.mood,
@@ -560,7 +554,6 @@
 
       if (todayMoods.evening) {
         const matchingMood = moods.find(m => m.value === todayMoods.evening.mood);
-        console.log('Evening mood match:', matchingMood);
         if (matchingMood) {
           currentEveningMood = {
             value: todayMoods.evening.mood,
@@ -581,7 +574,6 @@
       } else {
         showMoodSelector = false;
       }
-      console.log('Final mood state - Morning:', currentMorningMood, 'Evening:', currentEveningMood);
     } catch (error) {
       console.error('Error loading moods:', error);
     }
