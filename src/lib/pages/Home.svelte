@@ -64,10 +64,13 @@
 
   async function handleSync() {
     try {
-      await fetchMoodGuidance();
-      console.log('Mood guidance sync completed');
+      await Promise.all([
+        fetchMoodGuidance(),
+        getRandomQuote()
+      ]);
+      console.log('Mood guidance and quotes sync completed');
     } catch (error) {
-      console.error('Error syncing mood guidance:', error);
+      console.error('Error syncing data:', error);
     }
   }
 
