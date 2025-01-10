@@ -62,6 +62,50 @@ async function syncWithFirestore(sheetQuotes) {
   }
 }
 
+// Function to force sync quotes with Firestore
+export async function syncQuotes() {
+  try {
+    const SHEET_ID = import.meta.env.VITE_GOOGLE_SHEET_ID;
+    const API_KEY = import.meta.env.VITE_GOOGLE_SHEETS_API_KEY;
+    
+    // Use Sheet1 as the default sheet name
+    const sheetName = 'Sheet1';
+    const range = `${sheetName}!A2:B`;
+    
+    console.log('Fetching quotes from sheet for sync:', SHEET_ID);
+    const response = await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${range}?key=${API_KEY}`
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('Google Sheets API Error:', errorData);
+      throw new Error(`Google Sheets API error: ${errorData.error?.message || 'Unknown error'}`);
+    }
+
+    const data = await response.json();
+    console.log('Received data from Google Sheets:', data);
+
+    if (data.values && data.values.length > 0) {
+      // Convert rows to quote objects
+      const sheetQuotes = data.values.map(([text, source]) => ({
+        text: text?.trim() || '',
+        source: source?.trim() || ''
+      })).filter(quote => quote.text && quote.source); // Filter out empty quotes
+
+      console.log('Parsed quotes for sync:', sheetQuotes);
+
+      // Sync with Firestore
+      await syncWithFirestore(sheetQuotes);
+      return true;
+    }
+    return false;
+  } catch (error) {
+    console.error('Error syncing quotes:', error);
+    throw error;
+  }
+}
+
 export async function getRandomQuote() {
   // Check if we have a valid cached quote
   const savedQuote = localStorage.getItem('dailyQuote');

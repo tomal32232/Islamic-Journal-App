@@ -24,7 +24,7 @@
   import Journal from './Journal.svelte';
   import { getTodayReadingTime, formatReadingTime } from '../services/readingTimeService';
   import { weeklyStatsStore, getWeeklyStats } from '../stores/tasbihStore';
-  import { quoteStore, getRandomQuote } from '../services/quoteService';
+  import { quoteStore, getRandomQuote, syncQuotes } from '../services/quoteService';
   import MoodSelector from '../components/MoodSelector.svelte';
   import { moodHistoryStore, saveMood, getMoodHistory, getMoodForDate, shouldShowMoodSelector } from '../stores/moodStore';
   import { get } from 'svelte/store';
@@ -66,7 +66,7 @@
     try {
       await Promise.all([
         fetchMoodGuidance(),
-        getRandomQuote()
+        syncQuotes()
       ]);
       console.log('Mood guidance and quotes sync completed');
     } catch (error) {
