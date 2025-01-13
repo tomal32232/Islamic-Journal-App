@@ -331,6 +331,9 @@
       background: transparent;
       box-shadow: none;
       border: none;
+      display: flex;
+      justify-content: center;
+      align-items: center;
     }
   
     .app-logo {
@@ -340,6 +343,8 @@
       transform-origin: center;
       animation: pulse 2s infinite;
       filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.08));
+      position: relative;
+      overflow: hidden;
     }
   
     .logo-shine {
@@ -351,11 +356,13 @@
       background: linear-gradient(
         90deg,
         transparent,
-        rgba(247, 235, 230, 0.3),
+        rgba(255, 255, 255, 0.5),
         transparent
       );
       animation: shine 3s infinite;
       transform: skewX(-20deg);
+      pointer-events: none;
+      mix-blend-mode: overlay;
     }
   
     .icon-container {
@@ -534,9 +541,21 @@
     }
   
     @keyframes shine {
-      0% { left: -100%; }
-      20% { left: 100%; }
-      100% { left: 100%; }
+      0% {
+        left: -100%;
+        opacity: 0;
+      }
+      20% {
+        opacity: 1;
+      }
+      40% {
+        left: 100%;
+        opacity: 0;
+      }
+      100% {
+        left: 100%;
+        opacity: 0;
+      }
     }
   
     @keyframes bounce {
