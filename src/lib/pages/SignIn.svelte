@@ -3,6 +3,7 @@
   import { GoogleAuthProvider, signInWithPopup, signInWithCredential } from 'firebase/auth';
   import { Capacitor } from '@capacitor/core';
   import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
+  import { fly } from 'svelte/transition';
 
   let errorMessage = '';
   let isLoading = false;
@@ -73,79 +74,182 @@
   }
 </script>
 
-<main class="signin-container">
-  <div class="content">
-    <h1>Welcome to Islamic Journal</h1>
-    <p>Please sign in to continue</p>
-    <button 
-      on:click={handleGoogleSignIn} 
-      class="google-button"
-      disabled={isLoading}
-    >
-      {#if isLoading}
-        Signing in...
-      {:else}
-        Sign in with Google
+<div class="login-container">
+  <div class="login-content">
+    <div class="login-top">
+      <img src="/Logo.png" alt="Deen Reflections Logo" class="login-logo" />
+      <h1>Deen Reflections</h1>
+      <p class="login-description">Sign in to continue your spiritual journey</p>
+    </div>
+    
+    <div class="login-bottom">
+      <button 
+        class="google-login-button" 
+        on:click={handleGoogleSignIn}
+        disabled={isLoading}
+      >
+        <img src="https://www.google.com/favicon.ico" alt="Google" class="google-icon" />
+        {isLoading ? 'Signing in...' : 'Continue with Google'}
+      </button>
+      
+      {#if errorMessage}
+        <p class="error-message">{errorMessage}</p>
       {/if}
-    </button>
-    {#if errorMessage}
-      <p class="error-message">{errorMessage}</p>
-    {/if}
+      
+      <p class="privacy-note">
+        By continuing, you agree to our Terms of Service and Privacy Policy
+      </p>
+    </div>
   </div>
-</main>
+</div>
 
 <style>
-  .signin-container {
-    width: 100%;
+  .login-container {
+    width: 100vw;
     height: 100vh;
     display: flex;
-    justify-content: center;
     align-items: center;
-    background-color: var(--background-color, #f5f5f5);
+    justify-content: center;
+    padding: 0;
+    position: fixed;
+    top: 0;
+    left: 0;
+    overflow: hidden;
+    background-color: white;
   }
 
-  .content {
-    text-align: center;
-    padding: 2rem;
-    border-radius: 8px;
-    background-color: white;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  .login-content {
+    width: 100%;
+    height: 100%;
+    max-width: 320px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2rem 0;
+  }
+
+  .login-top {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+  }
+
+  .login-bottom {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+
+  .login-logo {
+    width: auto;
+    height: 80px;
+    margin-bottom: 1rem;
   }
 
   h1 {
-    font-size: 1.5rem;
-    margin-bottom: 1rem;
-    color: #333;
+    color: #216974;
+    font-size: 1.75rem;
+    margin: 0;
+    font-weight: 600;
   }
 
-  p {
-    margin-bottom: 2rem;
+  .login-description {
     color: #666;
+    font-size: 1rem;
+    margin: 0;
   }
 
-  .google-button {
-    background-color: #4285f4;
-    color: white;
-    padding: 0.8em 1.5em;
+  .google-login-button {
+    width: 100%;
+    max-width: 280px;
+    padding: 0.75rem 1.5rem;
     border: none;
-    border-radius: 4px;
+    border-radius: 25px;
+    background-color: #216974;
+    color: white;
+    font-size: 1rem;
     font-weight: 500;
     cursor: pointer;
-    transition: background-color 0.2s;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    box-shadow: 0 2px 4px rgba(33, 105, 116, 0.15);
   }
 
-  .google-button:disabled {
-    background-color: #ccc;
+  .google-login-button:hover:not(:disabled) {
+    background-color: #1a545d;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 6px rgba(33, 105, 116, 0.2);
+  }
+
+  .google-login-button:disabled {
+    opacity: 0.7;
     cursor: not-allowed;
   }
 
-  .google-button:not(:disabled):hover {
-    background-color: #357ae8;
+  .google-icon {
+    width: 18px;
+    height: 18px;
+  }
+
+  .privacy-note {
+    color: #666;
+    font-size: 0.85rem;
+    max-width: 280px;
+    line-height: 1.5;
+    margin: 0;
+    text-align: center;
   }
 
   .error-message {
     color: #dc3545;
-    margin-top: 1rem;
     font-size: 0.875rem;
+    text-align: center;
+    max-width: 300px;
+  }
+
+  @media (min-width: 768px) {
+    .login-logo {
+      height: 100px;
+    }
+
+    h1 {
+      font-size: 2rem;
+    }
+
+    .login-description {
+      font-size: 1.1rem;
+    }
+
+    .login-content {
+      max-width: 400px;
+      padding: 2rem;
+    }
+
+    .google-login-button {
+      max-width: 300px;
+    }
+
+    .privacy-note {
+      max-width: 300px;
+    }
+
+    .google-login-button {
+      padding: 1rem 2rem;
+      font-size: 1.1rem;
+    }
+
+    .privacy-note {
+      font-size: 0.9rem;
+    }
   }
 </style>
