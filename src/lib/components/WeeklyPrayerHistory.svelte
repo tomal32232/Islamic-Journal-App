@@ -4,7 +4,8 @@
     prayerHistoryStore, 
     getPrayerHistory, 
     getPrayerDateTime,
-    shouldMarkPrayerExcused 
+    shouldMarkPrayerExcused,
+    savePrayerStatus 
   } from '../stores/prayerHistoryStore';
   import { prayerTimesStore, fetchPrayerTimes } from '../stores/prayerTimes';
   import { iconMap } from '../utils/icons';
@@ -17,6 +18,46 @@
     missed: 0,
     excused: 0
   };
+
+  let tapTimeout;
+  let lastTappedCell = null;
+
+  // Handle tap on prayer cell
+  async function handleTap(prayer, day) {
+    console.log('Tapped prayer:', prayer);
+    console.log('Tapped day:', day);
+    
+    if (!day.date || day.status === 'none' || day.status === 'excused') return;
+    
+    const now = new Date();
+    const todayStr = now.toLocaleDateString('en-CA');
+    
+    // Only allow tracking for today and past prayers
+    if (day.date > todayStr) return;
+
+    const prayerData = {
+      prayerName: prayer.name,
+      date: day.date,
+      status: lastTappedCell === `${day.date}-${prayer.name}` ? 'late' : 'ontime'
+    };
+    console.log('Saving prayer data:', prayerData);
+
+    if (lastTappedCell === `${day.date}-${prayer.name}`) {
+      // Double tap detected - mark as late
+      clearTimeout(tapTimeout);
+      lastTappedCell = null;
+      await savePrayerStatus(prayerData);
+    } else {
+      // First tap - set timeout for potential double tap
+      lastTappedCell = `${day.date}-${prayer.name}`;
+      clearTimeout(tapTimeout);
+      tapTimeout = setTimeout(async () => {
+        // Single tap - mark as on time
+        await savePrayerStatus(prayerData);
+        lastTappedCell = null;
+      }, 300); // 300ms window for double tap
+    }
+  }
 
   // Add cache for grid data
   let gridCache = {
@@ -220,6 +261,9 @@
 </script>
 
 <div class="prayer-history">
+  <div class="instructions">
+    <p>Tap once to mark prayer as on time, double tap to mark as late</p>
+  </div>
   <div class="history-grid">
     <div class="header-row">
       <div class="prayer-label"></div>
@@ -239,7 +283,10 @@
         </div>
         {#each row.days as day}
           {@const isPending = $prayerHistoryStore.pendingByDate[day.date]?.prayers.some(p => p.prayerName === row.name)}
-          <div class="status-cell">
+          <div 
+            class="status-cell"
+            on:click={() => handleTap({ name: row.name }, day)}
+          >
             <div class="status-dot {day.status} {day.status === 'pending' && isPending ? 'has-notification' : ''}"></div>
           </div>
         {/each}
@@ -248,82 +295,72 @@
   </div>
 
   <div class="weekly-stats">
-    <div class="stat-item">
-      <span class="stat-number">{weeklyStats.ontime}</span>
-      <span class="stat-label">On Time</span>
+    <div class="stat">
+      <span class="label">On Time</span>
+      <span class="value ontime">{weeklyStats.ontime}</span>
     </div>
-    <div class="stat-item">
-      <span class="stat-number">{weeklyStats.late}</span>
-      <span class="stat-label">Late</span>
+    <div class="stat">
+      <span class="label">Late</span>
+      <span class="value late">{weeklyStats.late}</span>
     </div>
-    <div class="stat-item">
-      <span class="stat-number">{weeklyStats.missed}</span>
-      <span class="stat-label">Missed</span>
+    <div class="stat">
+      <span class="label">Missed</span>
+      <span class="value missed">{weeklyStats.missed}</span>
     </div>
-    <div class="stat-item">
-      <span class="stat-number">{weeklyStats.excused}</span>
-      <span class="stat-label">Excused</span>
-    </div>
-  </div>
-
-  <div class="legend">
-    <div class="legend-item">
-      <div class="status-dot ontime"></div>
-      <span>On time</span>
-    </div>
-    <div class="legend-item">
-      <div class="status-dot late"></div>
-      <span>Late</span>
-    </div>
-    <div class="legend-item">
-      <div class="status-dot missed"></div>
-      <span>Missed</span>
-    </div>
-    <div class="legend-item">
-      <div class="status-dot excused"></div>
-      <span>Excused</span>
+    <div class="stat">
+      <span class="label">Excused</span>
+      <span class="value excused">{weeklyStats.excused}</span>
     </div>
   </div>
 </div>
 
 <style>
   .prayer-history {
-    background: white;
-    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
     padding: 1rem;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    margin-bottom: 1rem;
-  }
-
-  h3 {
-    font-size: 1rem;
-    color: #216974;
-    margin-bottom: 1rem;
+    background: white;
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   }
 
   .history-grid {
-    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
   }
 
   .header-row {
     display: grid;
-    grid-template-columns: 80px repeat(7, 1fr);
-    gap: 0.25rem;
-    margin-bottom: 0.75rem;
-    padding-bottom: 0.25rem;
-    border-bottom: 1px solid #eee;
+    grid-template-columns: 100px repeat(7, 1fr);
+    gap: 0.5rem;
+  }
+
+  .prayer-row {
+    display: grid;
+    grid-template-columns: 100px repeat(7, 1fr);
+    gap: 0.5rem;
+    align-items: center;
+  }
+
+  .prayer-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 500;
   }
 
   .day-column {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.125rem;
+    gap: 0.25rem;
   }
 
   .day-column.today {
     color: #216974;
-    font-weight: 500;
+    font-weight: 600;
   }
 
   .day-name {
@@ -335,164 +372,144 @@
     font-size: 0.875rem;
   }
 
-  .prayer-row {
-    display: grid;
-    grid-template-columns: 80px repeat(7, 1fr);
-    gap: 0.25rem;
-    align-items: center;
-    padding: 0.5rem 0;
-    border-bottom: 1px solid #f5f5f5;
-  }
-
-  .prayer-label {
-    display: flex;
-    align-items: center;
-    gap: 0.375rem;
-    color: #216974;
-    font-weight: 500;
-    font-size: 0.875rem;
-  }
-
   .status-cell {
     display: flex;
     justify-content: center;
     align-items: center;
+    height: 2rem;
+    cursor: pointer;
+    transition: transform 0.1s ease;
+  }
+
+  .status-cell:active {
+    transform: scale(0.95);
   }
 
   .status-dot {
-    width: 14px;
-    height: 14px;
+    width: 1rem;
+    height: 1rem;
     border-radius: 50%;
-    border: 1.5px solid #eee;
-    position: relative;
-  }
-
-  .status-dot.pending.has-notification {
-    background: white;
-    border: 2px solid #216974;
+    background: #e0e0e0;
   }
 
   .status-dot.ontime {
-    background: #216974;
-    border-color: #216974;
+    background: #22c55e;
   }
 
   .status-dot.late {
-    background: #E09453;
-    border-color: #E09453;
+    background: #f59e0b;
   }
 
   .status-dot.missed {
-    background: #EF4444;
-    border-color: #EF4444;
-  }
-
-  .status-dot.upcoming {
-    background: white;
-    border: 1.5px solid #216974;
-  }
-
-  .status-dot.pending {
-    background: white;
-    border: 2px solid #216974;
-  }
-
-  .status-dot.none {
-    background: transparent;
-    border-color: #eee;
+    background: #ef4444;
   }
 
   .status-dot.excused {
-    background: #9CA3AF;
-    border-color: #9CA3AF;
+    background: #94a3b8;
   }
 
-  .legend {
-    display: flex;
-    justify-content: center;
-    gap: 1rem;
-    margin-top: 0.75rem;
-    padding-top: 0.75rem;
-    border-top: 1px solid #eee;
+  .status-dot.pending {
+    background: #e0e0e0;
+    border: 2px solid #216974;
   }
 
-  .legend-item {
-    display: flex;
-    align-items: center;
-    gap: 0.375rem;
-    font-size: 0.75rem;
-    color: #666;
-  }
-
-  .legend-item .status-dot {
-    width: 8px;
-    height: 8px;
+  .status-dot.has-notification {
+    animation: pulse 2s infinite;
   }
 
   .weekly-stats {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.5rem 1rem;
-    margin: 0.5rem 0;
-    font-size: 0.8rem;
-    border-radius: 8px;
-    background: #f5f5f5;
+    justify-content: space-around;
+    padding: 1rem;
+    background: #f8fafc;
+    border-radius: 0.5rem;
   }
 
-  .stat-item {
+  .stat {
     display: flex;
+    flex-direction: column;
     align-items: center;
     gap: 0.25rem;
   }
 
-  .stat-number {
-    font-weight: 600;
-    color: #216974;
-  }
-
-  .stat-label {
+  .label {
+    font-size: 0.875rem;
     color: #666;
   }
 
-  @media (max-width: 480px) {
+  .value {
+    font-size: 1.25rem;
+    font-weight: 600;
+  }
+
+  .value.ontime {
+    color: #22c55e;
+  }
+
+  .value.late {
+    color: #f59e0b;
+  }
+
+  .value.missed {
+    color: #ef4444;
+  }
+
+  .value.excused {
+    color: #94a3b8;
+  }
+
+  .instructions {
+    text-align: center;
+    margin-bottom: 1rem;
+    color: #666;
+    font-size: 0.9rem;
+  }
+
+  @keyframes pulse {
+    0% {
+      transform: scale(1);
+      opacity: 1;
+    }
+    50% {
+      transform: scale(1.1);
+      opacity: 0.8;
+    }
+    100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+
+  @media (max-width: 640px) {
     .prayer-history {
-      padding: 1rem;
-      margin-bottom: 1rem;
-    }
-
-    .header-row, .prayer-row {
-      grid-template-columns: 70px repeat(7, 1fr);
-      gap: 0.2rem;
-    }
-
-    .prayer-label {
-      font-size: 0.75rem;
-      gap: 0.25rem;
-    }
-
-    .status-dot {
-      width: 12px;
-      height: 12px;
-      border-width: 1.5px;
-    }
-
-    .legend {
-      gap: 0.75rem;
-    }
-
-    .weekly-stats {
-      grid-template-columns: repeat(2, 1fr);
-      gap: 0.75rem;
       padding: 0.5rem;
     }
 
-    .stat-number {
-      font-size: 1.25rem;
+    .header-row,
+    .prayer-row {
+      grid-template-columns: 80px repeat(7, 1fr);
+      gap: 0.25rem;
     }
 
-    .stat-label {
+    .prayer-label {
+      font-size: 0.875rem;
+    }
+
+    .day-name {
       font-size: 0.75rem;
+    }
+
+    .day-number {
+      font-size: 0.75rem;
+    }
+
+    .status-cell {
+      height: 1.75rem;
+    }
+
+    .status-dot {
+      width: 0.875rem;
+      height: 0.875rem;
     }
   }
 </style>

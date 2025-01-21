@@ -439,13 +439,15 @@ export async function savePrayerStatus(prayerData) {
   const user = auth.currentUser;
   if (!user) return;
 
-  if (!prayerData?.name) {
+  if (!prayerData?.name && !prayerData?.prayerName) {
     console.error('Prayer name is undefined:', prayerData);
     return;
   }
 
+  const prayerName = prayerData.prayerName || prayerData.name;
+
   try {
-    const prayerId = `${prayerData.date}-${prayerData.name.toLowerCase()}`;
+    const prayerId = `${prayerData.date}-${prayerName.toLowerCase()}`;
     
     // Query to find the existing prayer document
     const prayerQuery = query(
@@ -471,7 +473,7 @@ export async function savePrayerStatus(prayerData) {
     await setDoc(prayerRef, {
       userId: user.uid,
       prayerId,
-      prayerName: prayerData.name,
+      prayerName: prayerName,
       time: prayerData.time || '',
       status: prayerData.status,
       date: prayerData.date,
@@ -486,16 +488,20 @@ export async function savePrayerStatus(prayerData) {
     
     // Update history
     const historyIndex = store.history.findIndex(
-      p => p.date === prayerData.date && p.prayerName === prayerData.name
+      p => p.date === prayerData.date && p.prayerName === prayerName
     );
     
     if (historyIndex >= 0) {
       store.history[historyIndex] = {
         ...store.history[historyIndex],
-        ...prayerData
+        ...prayerData,
+        prayerName: prayerName
       };
     } else {
-      store.history.push(prayerData);
+      store.history.push({
+        ...prayerData,
+        prayerName: prayerName
+      });
     }
 
     // Remove from pendingByDate if status is final
@@ -503,7 +509,7 @@ export async function savePrayerStatus(prayerData) {
       if (store.pendingByDate[prayerData.date]) {
         store.pendingByDate[prayerData.date].prayers = 
           store.pendingByDate[prayerData.date].prayers.filter(
-            p => p.prayerName !== prayerData.name
+            p => p.prayerName !== prayerName
           );
         
         // Remove the date if no prayers left
