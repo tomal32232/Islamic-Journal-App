@@ -1,8 +1,9 @@
 <script>
   import { auth } from '../firebase';
-  import { GoogleAuthProvider, signInWithPopup, signInWithCredential } from 'firebase/auth';
+  import { GoogleAuthProvider, signInWithPopup, signInWithCredential, OAuthProvider } from 'firebase/auth';
   import { Capacitor } from '@capacitor/core';
   import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
+  import { SignInWithApple } from '@capacitor-community/apple-sign-in';
   import { fly } from 'svelte/transition';
 
   let errorMessage = '';
@@ -50,6 +51,44 @@
     }
   }
 
+  async function handleAppleSignIn() {
+    try {
+      isLoading = true;
+      errorMessage = '';
+
+      if (Capacitor.isNativePlatform()) {
+        // Native platform (iOS)
+        const result = await SignInWithApple.authorize({
+          clientId: 'your.bundle.id',
+          redirectURI: 'your-redirect-uri',
+          scopes: ['email', 'name'],
+        });
+
+        // Create OAuthCredential for Firebase
+        const provider = new OAuthProvider('apple.com');
+        const credential = provider.credential({
+          idToken: result.response.identityToken,
+          rawNonce: result.response.nonce,
+        });
+
+        // Sign in with Firebase
+        await signInWithCredential(auth, credential);
+      } else {
+        // Web platform
+        const provider = new OAuthProvider('apple.com');
+        provider.addScope('email');
+        provider.addScope('name');
+        
+        await signInWithPopup(auth, provider);
+      }
+    } catch (error) {
+      console.error("Apple Sign In error:", error);
+      errorMessage = error.message || 'An error occurred during Apple sign in';
+    } finally {
+      isLoading = false;
+    }
+  }
+
   // Initialize Google Auth when the component mounts
   if (Capacitor.isNativePlatform()) {
     const platform = Capacitor.getPlatform();
@@ -91,6 +130,19 @@
         <img src="https://www.google.com/favicon.ico" alt="Google" class="google-icon" />
         {isLoading ? 'Signing in...' : 'Continue with Google'}
       </button>
+
+      {#if Capacitor.getPlatform() === 'ios' || !Capacitor.isNativePlatform()}
+        <button 
+          class="apple-login-button" 
+          on:click={handleAppleSignIn}
+          disabled={isLoading}
+        >
+          <svg class="apple-icon" viewBox="0 0 24 24">
+            <path fill="currentColor" d="M17.05 20.28c-.98.95-2.05.88-3.08.38-1.08-.52-2.07-.53-3.2 0-1.44.71-2.2.51-3.06-.38C3.7 16.52 3.44 11.23 6.85 9.24c1.21-.71 2.09-.78 2.91-.28 1.02.62 2.04.6 3.12 0 1.21-.69 2.09-.57 2.91.28.65.66 1.13 1.57 1.36 2.7-3.47 1.33-2.98 5.73.95 6.71-.5.77-1.08 1.28-1.05 1.63zm-1.8-15.53c0 1.33-1.18 2.42-2.51 2.42-1.39-.03-2.66-1.23-2.6-2.63 0-1.31 1.2-2.43 2.54-2.42 1.38.01 2.62 1.21 2.57 2.63z"/>
+          </svg>
+          {isLoading ? 'Signing in...' : 'Continue with Apple'}
+        </button>
+      {/if}
       
       {#if errorMessage}
         <p class="error-message">{errorMessage}</p>
@@ -201,6 +253,42 @@
     height: 18px;
   }
 
+  .apple-login-button {
+    width: 100%;
+    max-width: 280px;
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 25px;
+    background-color: #000;
+    color: white;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+    margin-top: 0.5rem;
+  }
+
+  .apple-login-button:hover:not(:disabled) {
+    background-color: #333;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+  }
+
+  .apple-login-button:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+  }
+
+  .apple-icon {
+    width: 18px;
+    height: 18px;
+  }
+
   .privacy-note {
     color: #666;
     font-size: 0.85rem;
@@ -239,17 +327,14 @@
       max-width: 300px;
     }
 
-    .privacy-note {
+    .apple-login-button {
       max-width: 300px;
-    }
-
-    .google-login-button {
       padding: 1rem 2rem;
       font-size: 1.1rem;
     }
 
     .privacy-note {
-      font-size: 0.9rem;
+      max-width: 300px;
     }
   }
 </style>

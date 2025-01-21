@@ -143,14 +143,17 @@
   });
 
   function navigateTo(page) {
+    currentPage = page;
     dispatch('navigate', page);
   }
 
   function handleTabChange(event) {
     const previousPage = currentPage;
     currentPage = event.detail;
-    if (currentPage === 'home' && previousPage === 'tasbih') {
-      // Explicitly refresh weekly stats when coming from tasbih page
+    if (currentPage === 'home') {
+      // Always update stats when returning to home
+      updateStats();
+      // Refresh weekly stats
       weeklyStatsStore.set({ dailyCounts: [], streak: 0 }); // Reset store first
       getWeeklyStats().then((stats) => {
         if (stats?.dailyCounts) {
@@ -158,14 +161,9 @@
           todayTasbihCount = todayCount ? todayCount.count : 0;
         }
       });
-    } else if (currentPage === 'home') {
-      console.log('Returning to home page, checking if update needed...');
-      // Only update if we don't have prayer data
-      if (!upcomingPrayer && (!$prayerTimesStore || $prayerTimesStore.length === 0)) {
-        console.log('No prayer data found, updating stats...');
-        updateStats();
-      } else {
-        console.log('Using cached prayer data');
+      // Update prayer status if needed
+      if (!upcomingPrayer || (!$prayerTimesStore || $prayerTimesStore.length === 0)) {
+        updatePrayerStatus();
       }
     }
   }
@@ -879,7 +877,7 @@
         <div class="reading-stats">
           <h3 class="section-title">Today's Activities</h3>
           <div class="activities-row">
-            <div class="activity-card">
+            <div class="activity-card" on:click={() => navigateTo('prayer')}>
               <div class="activity-icon prayer">
                 {#if isExcusedPeriodActive}
                   <Lock size={18} weight="fill" color="#9CA3AF" />
@@ -893,7 +891,7 @@
               </div>
             </div>
 
-            <div class="activity-card">
+            <div class="activity-card" on:click={() => navigateTo('quran')}>
               <div class="activity-icon quran">
                 <svelte:component this={iconMap.Book} size={18} weight="fill" color="#216974" />
               </div>
@@ -903,7 +901,7 @@
               </div>
             </div>
 
-            <div class="activity-card">
+            <div class="activity-card" on:click={() => navigateTo('tasbih')}>
               <div class="activity-icon tasbih">
                 <svelte:component this={iconMap.Timer} size={18} weight="fill" color="#216974" />
               </div>
@@ -913,7 +911,7 @@
               </div>
             </div>
 
-            <div class="activity-card">
+            <div class="activity-card" on:click={() => navigateTo('journal')}>
               <div class="activity-icon journal">
                 <svelte:component this={iconMap.Note} size={18} weight="fill" color="#216974" />
               </div>
@@ -1459,6 +1457,18 @@
     align-items: center;
     gap: 0.25rem;
     flex: 1;
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .activity-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  }
+
+  .activity-card:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   }
 
   .activity-icon {
@@ -1466,7 +1476,6 @@
     height: 28px;
     border-radius: 4px;
     display: flex;
-
     align-items: center;
     justify-content: center;
     background: rgba(33, 105, 116, 0.1);
