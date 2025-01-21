@@ -24,11 +24,11 @@
       </button>
       
       <button 
-        class="nav-item {activeTab === 'tracker' ? 'active' : ''}" 
-        on:click={() => setActiveTab('tracker')}
+        class="nav-item {activeTab === 'journal' ? 'active' : ''}" 
+        on:click={() => setActiveTab('journal')}
       >
-        <ChartLine weight={activeTab === 'tracker' ? 'fill' : 'regular'} size={20} />
-        <span>Tracker</span>
+        <Book weight={activeTab === 'journal' ? 'fill' : 'regular'} size={20} />
+        <span>Journal</span>
       </button>
     </div>
 
@@ -41,11 +41,11 @@
 
     <div class="nav-group">
       <button 
-        class="nav-item {activeTab === 'journal' ? 'active' : ''}" 
-        on:click={() => setActiveTab('journal')}
+        class="nav-item {activeTab === 'tracker' ? 'active' : ''}" 
+        on:click={() => setActiveTab('tracker')}
       >
-        <Book weight={activeTab === 'journal' ? 'fill' : 'regular'} size={20} />
-        <span>Journal</span>
+        <ChartLine weight={activeTab === 'tracker' ? 'fill' : 'regular'} size={20} />
+        <span>Tracker</span>
       </button>
       
       <button 
