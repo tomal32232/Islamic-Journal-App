@@ -2,7 +2,7 @@
     import { fade, fly } from 'svelte/transition';
     import { onMount } from 'svelte';
     import lottie from 'lottie-web';
-    import { onboardingComplete } from '../stores/onboardingStore';
+    import { onboardingComplete, completeOnboarding } from '../stores/onboardingStore';
     import { Geolocation } from '@capacitor/geolocation';
     import { LocalNotifications } from '@capacitor/local-notifications';
     import { Capacitor } from '@capacitor/core';
@@ -113,7 +113,7 @@
       if (currentSlide < totalSlides - 1) {
         currentSlide++;
       } else {
-        onboardingComplete.set(true);
+        completeOnboarding();
       }
     }
   
