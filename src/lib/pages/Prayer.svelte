@@ -30,10 +30,12 @@
     { arabic: 'سُبْحَانَ ٱللَّٰهِ', latin: 'SubhanAllah', meaning: 'Glory be to Allah' },
     { arabic: 'ٱلْحَمْدُ لِلَّٰهِ', latin: 'Alhamdulillah', meaning: 'Praise be to Allah' },
     { arabic: 'ٱللَّٰهُ أَكْبَرُ', latin: 'Allahu Akbar', meaning: 'Allah is Greater' },
-    { arabic: 'لَا إِلَٰهَ إِلَّا ٱللَّٰهُ', latin: 'La ilaha illAllah', meaning: 'There is no deity except Allah' }
+    { arabic: 'لَا إِلَٰهَ إِلَّا ٱللَّٰهُ', latin: 'La ilaha illAllah', meaning: 'There is no deity except Allah' },
+    { arabic: 'أَسْتَغْفِرُ ٱللَّٰهَ', latin: 'Astagfirullah', meaning: 'I seek forgiveness from Allah' }
   ];
 
-  let selectedDhikr = dhikrOptions[0];
+  let selectedDhikrs = [];
+  let manualCountStr = '';
   let count = 0;
   let sets = 0;
   let totalCount = 0;
@@ -168,12 +170,14 @@
 
   async function saveSession() {
     if (totalCount > 0) {
-      await saveTasbihSession({
-        dhikr: selectedDhikr,
-        count,
-        sets,
-        totalCount
-      });
+      for (const dhikr of selectedDhikrs) {
+        await saveTasbihSession({
+          dhikr,
+          count,
+          sets,
+          totalCount: Math.floor(totalCount / selectedDhikrs.length) // Distribute count evenly
+        });
+      }
       const stats = await getWeeklyStats();
       weeklyStreak = stats?.streak || 0;
     }
@@ -314,6 +318,25 @@
     // For today's prayers that have passed and haven't been marked, show mark button
     return isPrayerPassed(prayer.time);
   }
+
+  function handleManualCount() {
+    const numCount = parseInt(manualCountStr) || 0;
+    if (numCount > 0) {
+      totalCount += numCount;
+      count = numCount % selectedTarget;
+      sets += Math.floor(numCount / selectedTarget);
+      manualCountStr = '';
+    }
+  }
+
+  function toggleDhikr(dhikr) {
+    const index = selectedDhikrs.findIndex(d => d.latin === dhikr.latin);
+    if (index === -1) {
+      selectedDhikrs = [...selectedDhikrs, dhikr];
+    } else {
+      selectedDhikrs = selectedDhikrs.filter(d => d.latin !== dhikr.latin);
+    }
+  }
 </script>
 
 <div class="prayer-container">
@@ -400,17 +423,30 @@
             <span class="streak-count">{weeklyStreak} days</span>
           </div>
           
-          <h2>Select Dhikr</h2>
+          <h2>Select Dhikr (Multiple Selection)</h2>
           <div class="dhikr-options">
             {#each dhikrOptions as dhikr}
               <button 
-                class="dhikr-button {selectedDhikr === dhikr ? 'active' : ''}"
-                on:click={() => selectedDhikr = dhikr}
+                class="dhikr-button {selectedDhikrs.some(d => d.latin === dhikr.latin) ? 'active' : ''}"
+                on:click={() => toggleDhikr(dhikr)}
               >
                 <span class="arabic">{dhikr.arabic}</span>
                 <span class="latin">{dhikr.latin}</span>
               </button>
             {/each}
+          </div>
+
+          <div class="manual-count-section">
+            <h3>Add External Dhikr Count</h3>
+            <div class="manual-count-input">
+              <input
+                type="number"
+                bind:value={manualCountStr}
+                placeholder="Enter count"
+                min="1"
+              />
+              <button class="add-count-button" on:click={handleManualCount}>Add</button>
+            </div>
           </div>
 
           <div class="target-selector">
@@ -466,9 +502,13 @@
         
         <div class="counter-content">
           <div class="dhikr-display">
-            <span class="arabic-large">{selectedDhikr.arabic}</span>
-            <span class="latin-large">{selectedDhikr.latin}</span>
-            <span class="meaning">{selectedDhikr.meaning}</span>
+            {#each selectedDhikrs as dhikr}
+              <div class="dhikr-item">
+                <span class="arabic-large">{dhikr.arabic}</span>
+                <span class="latin-large">{dhikr.latin}</span>
+                <span class="meaning">{dhikr.meaning}</span>
+              </div>
+            {/each}
           </div>
 
           <div class="progress">
@@ -1151,6 +1191,49 @@
     to {
       transform: rotate(360deg);
     }
+  }
+
+  .manual-count-section {
+    margin-bottom: 2rem;
+    padding: 1rem;
+    background: rgba(33, 105, 116, 0.1);
+    border-radius: 8px;
+  }
+
+  .manual-count-input {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+  }
+
+  .manual-count-input input {
+    flex: 1;
+    padding: 0.5rem;
+    border: 1px solid #E0E0E0;
+    border-radius: 4px;
+    font-size: 1rem;
+  }
+
+  .add-count-button {
+    background: #216974;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1rem;
+  }
+
+  .dhikr-item {
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .dhikr-item:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
   }
 </style>
 
