@@ -48,6 +48,10 @@
   // Add loading state
   let isLoading = false;
 
+  let showManualDhikrPopup = false;
+  let manualDhikrSelection = null;
+  let manualDhikrCount = 33;
+
   function getNextPrayer(prayers) {
     const now = new Date();
     const today = now.toLocaleDateString('en-CA');
@@ -319,33 +323,38 @@
     return isPrayerPassed(prayer.time);
   }
 
-  async function handleManualCount() {
-    const numCount = parseInt(manualCountStr) || 0;
-    if (numCount > 0 && selectedDhikrs.length > 0) {
-      // Calculate the count per dhikr
-      const countPerDhikr = Math.floor(numCount / selectedDhikrs.length);
-      
-      // Save each dhikr session without resetting the total
-      for (const dhikr of selectedDhikrs) {
+  function openManualDhikrPopup() {
+    manualDhikrSelection = null;
+    manualDhikrCount = 33;
+    showManualDhikrPopup = true;
+  }
+
+  async function submitManualDhikr() {
+    if (manualDhikrSelection && manualDhikrCount > 0) {
+      try {
+        console.log('Saving manual dhikr:', manualDhikrSelection.latin, manualDhikrCount);
         await saveTasbihSession({
-          dhikr,
-          count: countPerDhikr % selectedTarget,
-          sets: Math.floor(countPerDhikr / selectedTarget),
-          totalCount: countPerDhikr,
-          isManualEntry: true // Add flag to indicate manual entry
+          dhikr: manualDhikrSelection,
+          count: manualDhikrCount % selectedTarget,
+          sets: Math.floor(manualDhikrCount / selectedTarget),
+          totalCount: manualDhikrCount,
+          isManualEntry: true
         });
+        
+        // Update local state
+        totalCount += manualDhikrCount;
+        count = manualDhikrCount % selectedTarget;
+        sets += Math.floor(manualDhikrCount / selectedTarget);
+        
+        // Update streak after saving
+        const stats = await getWeeklyStats();
+        weeklyStreak = stats?.streak || 0;
+        
+        showManualDhikrPopup = false;
+        console.log('Manual dhikr successfully saved');
+      } catch (error) {
+        console.error('Error saving manual dhikr:', error);
       }
-      
-      // Update local state
-      totalCount += numCount;
-      count = numCount % selectedTarget;
-      sets += Math.floor(numCount / selectedTarget);
-      
-      // Update streak after saving
-      const stats = await getWeeklyStats();
-      weeklyStreak = stats?.streak || 0;
-      
-      manualCountStr = '';
     }
   }
 
@@ -456,18 +465,9 @@
             {/each}
           </div>
 
-          <div class="manual-count-section">
-            <h3>Add External Dhikr Count</h3>
-            <div class="manual-count-input">
-              <input
-                type="number"
-                bind:value={manualCountStr}
-                placeholder="Enter count"
-                min="1"
-              />
-              <button class="add-count-button" on:click={handleManualCount}>Add</button>
-            </div>
-          </div>
+          <button class="add-manual-button" on:click={openManualDhikrPopup}>
+            Add Manual Dhikr
+          </button>
 
           <div class="target-selector">
             <h3>Select Target</h3>
@@ -592,6 +592,66 @@
             <Clock weight="bold" />
             Prayed Late
           {/if}
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+{#if showManualDhikrPopup}
+  <div 
+    class="popup-overlay" 
+    on:click={() => showManualDhikrPopup = false} 
+    transition:fade
+  >
+    <div 
+      class="popup-content"
+      on:click|stopPropagation
+      transition:slide={{ duration: 300, axis: 'y' }}
+    >
+      <h3>Add Manual Dhikr</h3>
+      
+      <div class="popup-section">
+        <h4>Select Dhikr</h4>
+        <div class="dhikr-slider">
+          {#each dhikrOptions as dhikr}
+            <button 
+              class="dhikr-option {manualDhikrSelection === dhikr ? 'active' : ''}"
+              on:click={() => manualDhikrSelection = dhikr}
+            >
+              <span class="arabic">{dhikr.arabic}</span>
+              <span class="latin">{dhikr.latin}</span>
+            </button>
+          {/each}
+        </div>
+      </div>
+
+      <div class="popup-section">
+        <h4>Enter Count</h4>
+        <div class="count-input">
+          <input 
+            type="number" 
+            bind:value={manualDhikrCount}
+            min="1" 
+            max="1000"
+            placeholder="Enter count"
+          />
+        </div>
+      </div>
+
+      <div class="popup-actions">
+        <button 
+          class="cancel-button" 
+          on:click={() => showManualDhikrPopup = false}
+        >
+          Cancel
+        </button>
+        <button 
+          class="submit-button" 
+          on:click={submitManualDhikr}
+          disabled={!manualDhikrSelection || manualDhikrCount <= 0}
+        >
+          Add Dhikr
         </button>
       </div>
     </div>
@@ -1213,47 +1273,127 @@
     }
   }
 
-  .manual-count-section {
-    margin-bottom: 2rem;
-    padding: 1rem;
-    background: rgba(33, 105, 116, 0.1);
-    border-radius: 8px;
-  }
-
-  .manual-count-input {
-    display: flex;
-    gap: 0.5rem;
-    margin-top: 0.5rem;
-  }
-
-  .manual-count-input input {
-    flex: 1;
-    padding: 0.5rem;
-    border: 1px solid #E0E0E0;
-    border-radius: 4px;
-    font-size: 1rem;
-  }
-
-  .add-count-button {
+  .add-manual-button {
     background: #216974;
     color: white;
+    width: 100%;
+    padding: 1rem;
     border: none;
-    padding: 0.5rem 1rem;
-    border-radius: 4px;
+    border-radius: 8px;
+    font-size: 1.125rem;
+    margin: 1rem 0;
     cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .popup-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    z-index: 1000;
+  }
+
+  .popup-content {
+    background: white;
+    border-radius: 12px;
+    padding: 1.25rem;
+    width: 100%;
+    max-width: 320px;
+  }
+
+  .popup-content h3 {
+    color: #216974;
+    font-size: 1.125rem;
+    margin-bottom: 1rem;
+    text-align: center;
+  }
+
+  .popup-section {
+    margin-bottom: 1rem;
+  }
+
+  .popup-section h4 {
+    color: #216974;
+    font-size: 0.875rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .dhikr-slider {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .dhikr-option {
+    background: white;
+    border: 1px solid #E0E0E0;
+    padding: 0.75rem;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .dhikr-option.active {
+    background: #216974;
+    border-color: #216974;
+    color: white;
+  }
+
+  .count-input {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .count-input input[type="number"] {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #E0E0E0;
+    border-radius: 8px;
+    text-align: center;
     font-size: 1rem;
   }
 
-  .dhikr-item {
-    margin-bottom: 1rem;
-    padding-bottom: 1rem;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  .popup-actions {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 1rem;
   }
 
-  .dhikr-item:last-child {
-    border-bottom: none;
-    margin-bottom: 0;
-    padding-bottom: 0;
+  .cancel-button, .submit-button {
+    flex: 1;
+    padding: 0.75rem;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .cancel-button {
+    background: #f1f1f1;
+    color: #666;
+  }
+
+  .submit-button {
+    background: #216974;
+    color: white;
+  }
+
+  .submit-button:disabled {
+    background: #cccccc;
+    cursor: not-allowed;
   }
 </style>
 
