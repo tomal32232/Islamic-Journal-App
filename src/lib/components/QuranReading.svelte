@@ -517,7 +517,7 @@
 
 <style>
   .quran-container {
-    padding: 1rem;
+    padding: 0.5rem;
     padding-bottom: 6rem;
     max-width: 800px;
     margin: 0 auto;
@@ -525,10 +525,10 @@
 
   .header-section {
     background: #fff;
-    padding: 1rem;
+    padding: 0.75rem;
     border-radius: 12px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    margin-bottom: 1rem;
+    margin-bottom: 0.75rem;
   }
 
   .controls-section {
@@ -539,7 +539,7 @@
 
   .sticky-header {
     position: sticky;
-    top: 48px;
+    top: 0;
     z-index: 10;
     background: white;
     padding: 0.75rem 1rem;
@@ -666,11 +666,12 @@
 
   @media (max-width: 640px) {
     .quran-container {
-      padding: 0.5rem;
+      padding: 0.25rem;
     }
 
     .header-section {
-      padding: 0.75rem;
+      padding: 0.5rem;
+      margin-bottom: 0.5rem;
     }
 
     .surah-select,
@@ -687,7 +688,7 @@
 
     .sticky-header {
       padding: 0.5rem 0.75rem;
-      top: 44px; /* Adjusted for smaller tabs on mobile */
+      top: 0;
     }
 
     h3 {
@@ -715,8 +716,8 @@
     height: calc(100vh - 280px);
     overflow-y: auto;
     padding: 1rem;
-    padding-top: calc(50vh - 140px);
-    padding-bottom: calc(50vh - 140px);
+    padding-top: calc(15vh - 35px);
+    padding-bottom: calc(15vh - 35px);
     scroll-behavior: smooth;
   }
 
