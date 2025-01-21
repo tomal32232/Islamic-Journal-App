@@ -20,7 +20,7 @@
         on:click={() => setActiveTab('prayer')}
       >
         <Mosque weight={activeTab === 'prayer' ? 'fill' : 'regular'} size={20} />
-        <span>Prayer</span>
+        <span>Worship</span>
       </button>
       
       <button 
