@@ -38,6 +38,7 @@
   import NotificationPermissionDialog from '../components/NotificationPermissionDialog.svelte';
   import { checkAdminStatus } from '../services/adminService';
   import { fetchMoodGuidance } from '../services/moodGuidanceService';
+  import QuranReading from '../components/QuranReading.svelte';
   const dispatch = createEventDispatcher();
   
   let currentPage = 'home';
@@ -993,6 +994,8 @@
       <Tasbih />
     {:else if currentPage === 'journal'}
       <Journal />
+    {:else if currentPage === 'quran'}
+      <QuranReading />
     {:else if currentPage === 'profile'}
       <Profile {navigateTo} />
     {/if}
