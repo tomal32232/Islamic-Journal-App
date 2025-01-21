@@ -41,8 +41,11 @@ export async function saveTasbihSession(sessionData) {
   const user = auth.currentUser;
   if (!user) return;
 
-  // Check if we need to reset daily count
-  const wasReset = await checkAndResetDailyCount(user.uid);
+  // Only check for reset if it's not a manual entry
+  if (!sessionData.isManualEntry) {
+    // Check if we need to reset daily count
+    const wasReset = await checkAndResetDailyCount(user.uid);
+  }
 
   // Save the individual session
   const sessionRef = doc(collection(db, 'tasbih_sessions'));
@@ -52,6 +55,7 @@ export async function saveTasbihSession(sessionData) {
     count: sessionData.count,
     sets: sessionData.sets,
     totalCount: sessionData.totalCount,
+    isManualEntry: sessionData.isManualEntry || false,
     timestamp: Timestamp.now()
   });
 

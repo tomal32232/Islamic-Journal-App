@@ -319,12 +319,32 @@
     return isPrayerPassed(prayer.time);
   }
 
-  function handleManualCount() {
+  async function handleManualCount() {
     const numCount = parseInt(manualCountStr) || 0;
-    if (numCount > 0) {
+    if (numCount > 0 && selectedDhikrs.length > 0) {
+      // Calculate the count per dhikr
+      const countPerDhikr = Math.floor(numCount / selectedDhikrs.length);
+      
+      // Save each dhikr session without resetting the total
+      for (const dhikr of selectedDhikrs) {
+        await saveTasbihSession({
+          dhikr,
+          count: countPerDhikr % selectedTarget,
+          sets: Math.floor(countPerDhikr / selectedTarget),
+          totalCount: countPerDhikr,
+          isManualEntry: true // Add flag to indicate manual entry
+        });
+      }
+      
+      // Update local state
       totalCount += numCount;
       count = numCount % selectedTarget;
       sets += Math.floor(numCount / selectedTarget);
+      
+      // Update streak after saving
+      const stats = await getWeeklyStats();
+      weeklyStreak = stats?.streak || 0;
+      
       manualCountStr = '';
     }
   }
