@@ -20,6 +20,7 @@
   let user = null;
   let activeTab = 'home';
   let showOnboarding = true;
+  let isLoading = true;
 
   onMount(() => {
     // Check onboarding status
@@ -32,6 +33,7 @@
         // Ensure prayer data is initialized when user logs in
         await ensurePrayerData();
       }
+      isLoading = false;
     });
 
     // Subscribe to onboarding status
@@ -62,7 +64,11 @@
   }
 </script>
 
-{#if showOnboarding}
+{#if isLoading}
+  <div class="loading-container">
+    <img src="/Logo.png" alt="Deen Reflections Logo" class="loading-logo" />
+  </div>
+{:else if showOnboarding}
   <Onboarding />
 {:else if user}
   <div class="top-bar"></div>
@@ -102,6 +108,27 @@
 {/if}
 
 <style>
+  .loading-container {
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: #fff;
+  }
+
+  .loading-logo {
+    width: auto;
+    height: 120px;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.03); opacity: 0.95; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+
   .top-bar {
     position: fixed;
     top: 0;
