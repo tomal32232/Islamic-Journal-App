@@ -48,7 +48,7 @@
     {
       title: 'Your Progress',
       description: 'Track your daily prayers and achievements',
-      path: '/progress',
+      path: 'progress',
       stats: [
         {
           value: () => prayerStats.onTime,
@@ -67,7 +67,7 @@
     {
       title: 'Achievements',
       description: 'View your earned badges and milestones',
-      path: '/achievements',
+      path: 'achievements',
       stats: [
         {
           value: () => earnedBadges.length,
@@ -78,12 +78,12 @@
     {
       title: 'Settings',
       description: 'Customize your app preferences',
-      path: '/settings'
+      path: 'settings'
     },
     {
       title: 'Notifications',
       description: 'Manage your prayer and reminder alerts',
-      path: '/notifications'
+      path: 'notifications'
     }
   ];
 
@@ -92,9 +92,7 @@
     scrollY = container.scrollTop;
   }
 
-  function navigateTo(path) {
-    currentPage.set(path.substring(1)); // Remove the leading slash
-  }
+  export let navigateTo;
 
   onMount(async () => {
     const container = document.querySelector('.profile-container');

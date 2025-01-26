@@ -2,7 +2,6 @@
   import { prayerHistoryStore } from '../stores/prayerHistoryStore';
   import { weeklyStatsStore } from '../stores/tasbihStore';
   import { ArrowLeft, Mosque, Book, HandsPraying } from 'phosphor-svelte';
-  import { currentPage } from '../stores/pageStore';
   import { onMount } from 'svelte';
   import { getTodayReadingTime } from '../services/readingTimeService';
 
@@ -10,6 +9,8 @@
   let todayReadingTime = 0;
   let todayDhikrCount = 0;
   let selectedTab = 'prayers';
+
+  export let onBack;
 
   // Calculate prayer statistics when prayerHistoryStore changes
   $: if ($prayerHistoryStore?.history) {
@@ -37,15 +38,11 @@
   onMount(async () => {
     todayReadingTime = await getTodayReadingTime();
   });
-
-  function goBack() {
-    currentPage.set('profile');
-  }
 </script>
 
 <div class="progress-page">
   <header>
-    <button class="back-button" on:click={goBack}>
+    <button class="back-button" on:click={onBack}>
       <ArrowLeft weight="bold" />
     </button>
     <h1>Your Progress</h1>

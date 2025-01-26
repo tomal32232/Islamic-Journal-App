@@ -10,6 +10,8 @@
   import Tracker from './lib/pages/Tracker.svelte';
   import Journal from './lib/pages/Journal.svelte';
   import Prayer from './lib/pages/Prayer.svelte';
+  import Progress from './lib/pages/Progress.svelte';
+  import Achievements from './lib/pages/Achievements.svelte';
   import BottomNav from './lib/components/BottomNav.svelte';
   import { ensurePrayerData } from './lib/stores/prayerHistoryStore';
   import Favorites from './lib/pages/Favorites.svelte';
@@ -94,6 +96,10 @@
         <Journal />
       {:else if activeTab === 'prayer'}
         <Prayer />
+      {:else if activeTab === 'progress'}
+        <Progress onBack={() => navigateTo('profile')} />
+      {:else if activeTab === 'achievements'}
+        <Achievements onBack={() => navigateTo('profile')} />
       {:else}
         <Home />
       {/if}

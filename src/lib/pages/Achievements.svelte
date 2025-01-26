@@ -1,12 +1,13 @@
 <script>
   import { badgeStore } from '../stores/badgeStore';
   import { ArrowLeft, Trophy, Mosque, Book, HandsPraying, Sun, BookBookmark, Sparkle, Pencil, CalendarPlus } from 'phosphor-svelte';
-  import { currentPage } from '../stores/pageStore';
   import { onMount } from 'svelte';
 
   let earnedBadges = [];
   let allBadges = badgeStore.getAllBadges();
   let selectedCategory = 'all';
+
+  export let onBack;
 
   // Update earned badges when store changes
   $: if ($badgeStore) {
@@ -80,7 +81,7 @@
   }
 
   function goBack() {
-    currentPage.set('profile');
+    onBack();
   }
 
   const categories = [
