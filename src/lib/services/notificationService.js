@@ -53,6 +53,69 @@ export async function requestNotificationPermission() {
     }
 }
 
+// Minutes to wait after prayer time before sending mark prayer notification
+const MARK_PRAYER_DELAY = 30;
+
+async function scheduleMarkPrayerNotifications() {
+    try {
+        console.log('Starting to schedule mark prayer notifications...');
+        // Schedule notifications for each prayer time
+        for (const prayer of prayerTimes) {
+            console.log(`Scheduling mark notification for ${prayer.name} prayer...`);
+            const [time, period] = prayer.time.split(' ');
+            const [hours, minutes] = time.split(':');
+            let prayerHours = parseInt(hours);
+            
+            // Convert to 24-hour format
+            if (period === 'PM' && prayerHours !== 12) {
+                prayerHours += 12;
+            } else if (period === 'AM' && prayerHours === 12) {
+                prayerHours = 0;
+            }
+
+            // Create notification schedule time in local timezone
+            const now = new Date();
+            const scheduleTime = new Date(
+                now.getFullYear(),
+                now.getMonth(),
+                now.getDate(),
+                prayerHours,
+                parseInt(minutes) + MARK_PRAYER_DELAY // 30 minutes after prayer time
+            );
+
+            // If the prayer time has passed for today, schedule for tomorrow
+            if (scheduleTime < now) {
+                scheduleTime.setDate(scheduleTime.getDate() + 1);
+                console.log(`${prayer.name} prayer time has passed, scheduling for tomorrow`);
+            }
+
+            // Ensure we're working with local time
+            scheduleTime.setMinutes(scheduleTime.getMinutes() - scheduleTime.getTimezoneOffset());
+            
+            console.log(`${prayer.name} mark notification scheduled for: ${scheduleTime.toLocaleString()}`);
+
+            await LocalNotifications.schedule({
+                notifications: [
+                    {
+                        title: 'Mark Your Prayer',
+                        body: `Don't forget to mark your ${prayer.name} prayer in the app`,
+                        id: Math.floor(Math.random() * 100000) + 5000, // Using 5000+ to avoid ID conflicts
+                        schedule: { at: scheduleTime },
+                        smallIcon: 'ic_launcher_foreground',
+                        actionTypeId: '',
+                        extra: null
+                    }
+                ]
+            });
+            console.log(`Successfully scheduled mark notification for ${prayer.name} prayer`);
+        }
+        console.log('Completed scheduling all mark prayer notifications');
+    } catch (error) {
+        console.error('Error scheduling mark prayer notifications:', error);
+    }
+}
+
+// Update setupNotifications to include mark prayer notifications
 export async function setupNotifications() {
     try {
         const permissionStatus = await checkNotificationPermission();
@@ -67,6 +130,7 @@ export async function setupNotifications() {
             if (isActive) {
                 if (settings.prayerNotifications) {
                     await scheduleAllPrayerNotifications();
+                    await scheduleMarkPrayerNotifications();
                 }
                 if (settings.moodNotifications) {
                     await scheduleMoodNotifications(true);
@@ -77,6 +141,7 @@ export async function setupNotifications() {
         // Do initial scheduling
         if (settings.prayerNotifications) {
             await scheduleAllPrayerNotifications();
+            await scheduleMarkPrayerNotifications();
         }
         if (settings.moodNotifications) {
             await scheduleMoodNotifications(true);
@@ -113,7 +178,7 @@ async function scheduleAllPrayerNotifications() {
                 prayerHours = 0;
             }
 
-            // Create notification schedule time
+            // Create notification schedule time in local timezone
             const now = new Date();
             const scheduleTime = new Date(
                 now.getFullYear(),
@@ -128,6 +193,9 @@ async function scheduleAllPrayerNotifications() {
                 scheduleTime.setDate(scheduleTime.getDate() + 1);
             }
 
+            // Ensure we're working with local time
+            scheduleTime.setMinutes(scheduleTime.getMinutes() - scheduleTime.getTimezoneOffset());
+
             await scheduleNotification(prayer.name, scheduleTime);
         }
     } catch (error) {
@@ -137,13 +205,25 @@ async function scheduleAllPrayerNotifications() {
 
 async function scheduleNotification(prayerName, scheduleTime) {
     try {
+        // Convert the local time to UTC for the notification
+        const utcScheduleTime = new Date(
+            Date.UTC(
+                scheduleTime.getFullYear(),
+                scheduleTime.getMonth(),
+                scheduleTime.getDate(),
+                scheduleTime.getHours(),
+                scheduleTime.getMinutes(),
+                0
+            )
+        );
+
         await LocalNotifications.schedule({
             notifications: [
                 {
                     title: 'Prayer Time',
-                    body: `It's time for ${prayerName} prayer`,
+                    body: `It's almost time for ${prayerName} prayer`,
                     id: Math.floor(Math.random() * 100000),
-                    schedule: { at: scheduleTime },
+                    schedule: { at: utcScheduleTime },
                     smallIcon: 'ic_launcher_foreground',
                     actionTypeId: '',
                     extra: null
@@ -168,7 +248,7 @@ async function testNotification() {
             notifications: [
                 {
                     title: 'Prayer Time',
-                    body: `It's time for ${nextPrayer.name} prayer`,
+                    body: `It's almost time for ${nextPrayer.name} prayer`,
                     id: Math.floor(Math.random() * 100000),
                     schedule: { at: scheduleTime },
                     smallIcon: 'ic_launcher_foreground',
@@ -180,4 +260,4 @@ async function testNotification() {
     } catch (error) {
         console.error('Error scheduling test notification:', error);
     }
-} 
+}
