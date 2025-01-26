@@ -346,7 +346,7 @@
     >
       <div class="card-content">
         <Sun weight={todayStreak.morning ? 'fill' : 'regular'} size={24} />
-        <h3>Morning reflection</h3>
+        <h3>Morning<br>reflection</h3>
         <span class="status">{todayStreak.morning ? 'Completed' : ''}</span>
       </div>
     </div>
@@ -357,7 +357,7 @@
     >
       <div class="card-content">
         <Moon weight={todayStreak.evening ? 'fill' : 'regular'} size={24} />
-        <h3>Evening reflection</h3>
+        <h3>Evening<br>reflection</h3>
         <span class="status">{todayStreak.evening ? 'Completed' : ''}</span>
       </div>
     </div>
@@ -620,6 +620,8 @@
     font-size: 1.125rem;
     font-weight: 500;
     color: #216974;
+    text-align: center;
+    line-height: 1.2;
   }
 
   .status {
