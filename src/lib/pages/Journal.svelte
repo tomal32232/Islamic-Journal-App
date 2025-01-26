@@ -392,9 +392,9 @@
         <div class="modal-header">
           <h3>
             {#if selectedReflection === 'morning-view' || selectedReflection === 'evening-view'}
-              {getReflectionData(selectedReflection).title}
+              {getReflectionData(selectedReflection).title.split(' ').join('\n')}
             {:else}
-              {selectedReflection === 'morning' ? 'Morning' : 'Evening'} Reflection
+              {(selectedReflection === 'morning' ? 'Morning' : 'Evening') + '\nReflection'}
             {/if}
           </h3>
           <button class="close-btn" on:click={() => selectedReflection = null}>
@@ -738,6 +738,8 @@
     font-size: 1.75rem;
     font-weight: 500;
     color: #216974;
+    white-space: pre-line;
+    line-height: 1.2;
   }
 
   .close-btn {
