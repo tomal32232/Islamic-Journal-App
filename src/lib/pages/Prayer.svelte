@@ -408,13 +408,15 @@
               <div class="icon-wrapper">
                 <svelte:component 
                   this={iconMap[prayer.icon]} 
-                  size={24} 
+                  size={20} 
                   weight={prayer.weight}
                   color={prayer.name === nextPrayer?.name ? '#E09453' : '#216974'}
                 />
               </div>
-              <span class="prayer-name">{prayer.name}</span>
-              <span class="prayer-time">{prayer.time}</span>
+              <div class="prayer-info">
+                <span class="prayer-name">{prayer.name}</span>
+                <span class="prayer-time">{prayer.time}</span>
+              </div>
               {#if getPrayerStatus(prayer.name) === 'ontime' || getPrayerStatus(prayer.name) === 'late'}
                 <button 
                   class="status-label {getPrayerStatus(prayer.name)}"
@@ -734,78 +736,110 @@
   }
 
   .prayer-times-section {
-    padding: 0 10px;
-    margin-top: 10px;
+    padding: 0 16px;
+    margin-top: 16px;
     padding-bottom: 6rem;
   }
 
   h2 {
-    font-size: 1.125rem;
-    color: #333;
-    margin-bottom: 0.75rem;
-    font-weight: 500;
+    font-size: 1.25rem;
+    color: #1a1a1a;
+    margin-bottom: 1rem;
+    font-weight: 600;
   }
 
   .prayer-times-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
     margin-bottom: 1.5rem;
-    padding: 1rem;
     background: white;
     border-radius: 12px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    padding: 0.75rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
   }
 
   .prayer-time-card {
-    background: #f8fafc;
-    padding: 1.25rem 1rem;
-    border-radius: 12px;
     display: flex;
-    flex-direction: column;
     align-items: center;
-    gap: 0.75rem;
-    text-align: center;
-    transition: all 0.2s ease;
-    border: 1px solid #eee;
-    min-width: 120px;
+    padding: 0.75rem;
+    border-radius: 8px;
+    background: #fafafa;
+    gap: 1rem;
+    position: relative;
   }
 
   .prayer-time-card.current {
-    background: rgba(224, 148, 83, 0.1);
-    border: 2px solid #E09453;
-    transform: scale(1.02);
+    background: rgba(224, 148, 83, 0.08);
+    border: 1px solid #E09453;
   }
 
   .icon-wrapper {
-    background: rgba(33, 105, 116, 0.1);
-    padding: 0.75rem;
-    border-radius: 10px;
+    background: white;
+    padding: 0.5rem;
+    border-radius: 8px;
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-bottom: 0.25rem;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  }
+
+  .prayer-info {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
   }
 
   .prayer-name {
-    font-size: 1rem;
-    color: #216974;
-    font-weight: 600;
-    margin-bottom: 0.25rem;
+    font-size: 0.9375rem;
+    color: #1a1a1a;
+    font-weight: 500;
   }
 
   .prayer-time {
-    font-size: 1.125rem;
+    font-size: 0.9375rem;
     font-weight: 500;
     color: #4a5568;
   }
 
-  .prayer-time-card.current .prayer-name {
+  .prayer-time-card.current .prayer-name,
+  .prayer-time-card.current .prayer-time {
     color: #E09453;
   }
 
-  .prayer-time-card.current .prayer-time {
-    color: #E09453;
+  .status-label,
+  .mark-prayer-btn {
+    padding: 0.375rem 0.75rem;
+    border-radius: 6px;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .status-label.ontime {
+    background: #E5F6E5;
+    color: #166534;
+  }
+
+  .status-label.late {
+    background: #FEF3C7;
+    color: #92400E;
+  }
+
+  .mark-prayer-btn {
+    background: #216974;
+    color: white;
+  }
+
+  .mark-prayer-btn:hover {
+    opacity: 0.9;
   }
 
   .loading, .error {
@@ -1126,22 +1160,6 @@
     padding-bottom: 6rem;
   }
 
-  .mark-prayer-btn {
-    margin-top: 8px;
-    padding: 6px 12px;
-    border: none;
-    border-radius: 6px;
-    background-color: #E09453;
-    color: white;
-    font-size: 14px;
-    cursor: pointer;
-    transition: background-color 0.2s;
-  }
-
-  .mark-prayer-btn:hover {
-    background-color: #d68642;
-  }
-
   .bottom-sheet-overlay {
     position: fixed;
     top: 0;
@@ -1209,81 +1227,6 @@
   .mark-btn.late {
     background-color: #FFA726;
     color: white;
-  }
-
-  .prayer-time-card {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 16px;
-    background-color: #f5f5f5;
-    border-radius: 12px;
-    transition: transform 0.2s;
-  }
-
-  .prayer-time-card.current {
-    background-color: #FFF3E0;
-    transform: scale(1.05);
-  }
-
-  .status-label {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    margin-top: 8px;
-    padding: 6px 12px;
-    border: none;
-    border-radius: 6px;
-    font-size: 14px;
-    cursor: pointer;
-    transition: opacity 0.2s;
-  }
-
-  .status-label:hover {
-    opacity: 0.9;
-  }
-
-  .status-label.ontime {
-    background-color: #4CAF50;
-    color: white;
-  }
-
-  .status-label.late {
-    background-color: #FFA726;
-    color: white;
-  }
-
-  .mark-btn:disabled {
-    opacity: 0.7;
-    cursor: not-allowed;
-  }
-
-  .loading-spinner {
-    width: 20px;
-    height: 20px;
-    border: 2px solid rgba(255, 255, 255, 0.3);
-    border-radius: 50%;
-    border-top-color: white;
-    animation: spin 0.8s linear infinite;
-  }
-
-  @keyframes spin {
-    to {
-      transform: rotate(360deg);
-    }
-  }
-
-  .add-manual-button {
-    background: #216974;
-    color: white;
-    width: 100%;
-    padding: 1rem;
-    border: none;
-    border-radius: 8px;
-    font-size: 1.125rem;
-    margin: 1rem 0;
-    cursor: pointer;
-    transition: all 0.2s ease;
   }
 
   .popup-overlay {
