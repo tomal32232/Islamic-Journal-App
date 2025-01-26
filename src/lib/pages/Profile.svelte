@@ -76,13 +76,8 @@
       ]
     },
     {
-      title: 'Settings',
-      description: 'Customize your app preferences',
-      path: 'settings'
-    },
-    {
       title: 'Notifications',
-      description: 'Manage your prayer and reminder alerts',
+      description: 'Manage prayer and journal reminder settings',
       path: 'notifications'
     }
   ];
