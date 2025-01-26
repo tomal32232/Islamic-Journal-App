@@ -143,8 +143,14 @@
   .setting-item {
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-start;
     gap: 1rem;
+  }
+
+  .setting-info {
+    flex: 1;
+    min-width: 0;
+    padding-right: 1rem;
   }
 
   .setting-info h3 {
@@ -161,6 +167,7 @@
   }
 
   .toggle-button {
+    flex-shrink: 0;
     width: 52px;
     height: 28px;
     background: #e9ecef;
