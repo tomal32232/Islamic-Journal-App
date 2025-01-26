@@ -1,7 +1,8 @@
 import { LocalNotifications } from '@capacitor/local-notifications';
-import { fetchPrayerTimes, prayerTimesStore } from './prayerTimes';
+import { fetchPrayerTimes, prayerTimesStore, getNextPrayer } from './prayerTimes';
 import { App } from '@capacitor/app';
 import { writable } from 'svelte/store';
+import { scheduleMoodNotifications } from './moodNotificationService';
 
 let prayerTimes = [];
 prayerTimesStore.subscribe(value => {
@@ -10,6 +11,19 @@ prayerTimesStore.subscribe(value => {
 
 // Store to track notification permission status
 export const notificationPermissionStore = writable('prompt');
+
+// Load notification settings
+function getNotificationSettings() {
+    const savedSettings = localStorage.getItem('notificationSettings');
+    if (savedSettings) {
+        return JSON.parse(savedSettings);
+    }
+    return {
+        prayerNotifications: true,
+        journalNotifications: true,
+        moodNotifications: true
+    };
+}
 
 export async function checkNotificationPermission() {
     try {
@@ -46,15 +60,27 @@ export async function setupNotifications() {
             return;
         }
 
+        const settings = getNotificationSettings();
+
         // Set up app lifecycle listeners
         App.addListener('appStateChange', async ({ isActive }) => {
             if (isActive) {
-                await scheduleAllPrayerNotifications();
+                if (settings.prayerNotifications) {
+                    await scheduleAllPrayerNotifications();
+                }
+                if (settings.moodNotifications) {
+                    await scheduleMoodNotifications(true);
+                }
             }
         });
 
         // Do initial scheduling
-        await scheduleAllPrayerNotifications();
+        if (settings.prayerNotifications) {
+            await scheduleAllPrayerNotifications();
+        }
+        if (settings.moodNotifications) {
+            await scheduleMoodNotifications(true);
+        }
 
         console.log('Notification system setup complete');
     } catch (error) {

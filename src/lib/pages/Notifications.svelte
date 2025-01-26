@@ -3,12 +3,14 @@
   import { onMount } from 'svelte';
   import { writable } from 'svelte/store';
   import { scheduleJournalNotifications } from '../services/journalNotificationService';
+  import { scheduleMoodNotifications } from '../services/moodNotificationService';
 
   export let onBack;
   
   const notificationSettings = writable({
     prayerNotifications: true,
-    journalNotifications: true
+    journalNotifications: true,
+    moodNotifications: true
   });
 
   // Load settings from localStorage on mount
@@ -27,6 +29,7 @@
   // Update journal notifications when the setting changes
   $: if ($notificationSettings) {
     scheduleJournalNotifications($notificationSettings.journalNotifications);
+    scheduleMoodNotifications($notificationSettings.moodNotifications);
   }
 
   function toggleSetting(setting) {
@@ -74,6 +77,23 @@
           class="toggle-button" 
           class:active={$notificationSettings.journalNotifications}
           on:click={() => toggleSetting('journalNotifications')}
+        >
+          <div class="toggle-slider"></div>
+        </button>
+      </div>
+    </div>
+
+    <div class="settings-group">
+      <h2>Mood Tracking</h2>
+      <div class="setting-item">
+        <div class="setting-info">
+          <h3>Mood Check Reminders</h3>
+          <p>Get reminded to track your mood after Fajr and Isha prayers</p>
+        </div>
+        <button 
+          class="toggle-button" 
+          class:active={$notificationSettings.moodNotifications}
+          on:click={() => toggleSetting('moodNotifications')}
         >
           <div class="toggle-slider"></div>
         </button>

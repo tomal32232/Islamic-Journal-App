@@ -1,6 +1,7 @@
 import { writable } from 'svelte/store';
 import { Capacitor } from '@capacitor/core';
 import { Geolocation } from '@capacitor/geolocation';
+import { get } from 'svelte/store';
 
 export const prayerTimesStore = writable([]);
 export const loadingStore = writable(true);
@@ -223,4 +224,34 @@ function isPrayerPast(time24) {
   const prayerDate = new Date();
   prayerDate.setHours(parseInt(hours), parseInt(minutes), 0);
   return now > prayerDate;
+}
+
+export function getNextPrayer() {
+  const prayers = get(prayerTimesStore);
+  if (!prayers || prayers.length === 0) return null;
+
+  const now = new Date();
+  for (const prayer of prayers) {
+    if (!prayer.time) continue;
+    const [time, period] = prayer.time.split(' ');
+    const [hours, minutes] = time.split(':');
+    let prayerHours = parseInt(hours);
+    
+    // Convert to 24-hour format
+    if (period === 'PM' && prayerHours !== 12) {
+      prayerHours += 12;
+    } else if (period === 'AM' && prayerHours === 12) {
+      prayerHours = 0;
+    }
+
+    const prayerTime = new Date();
+    prayerTime.setHours(prayerHours, parseInt(minutes), 0);
+
+    if (prayerTime > now) {
+      return prayer;
+    }
+  }
+
+  // If no upcoming prayer found today, return the first prayer for tomorrow
+  return prayers[0];
 }
