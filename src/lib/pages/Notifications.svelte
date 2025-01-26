@@ -2,6 +2,7 @@
   import { ArrowLeft, Bell } from 'phosphor-svelte';
   import { onMount } from 'svelte';
   import { writable } from 'svelte/store';
+  import { scheduleJournalNotifications } from '../services/journalNotificationService';
 
   export let onBack;
   
@@ -21,6 +22,11 @@
   // Save settings when they change
   $: if ($notificationSettings) {
     localStorage.setItem('notificationSettings', JSON.stringify($notificationSettings));
+  }
+
+  // Update journal notifications when the setting changes
+  $: if ($notificationSettings) {
+    scheduleJournalNotifications($notificationSettings.journalNotifications);
   }
 
   function toggleSetting(setting) {
