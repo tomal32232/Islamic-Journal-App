@@ -17,7 +17,7 @@
   let earnedBadges = [];
   let isEditingName = false;
   let displayName = localStorage.getItem('user_display_name') || user?.displayName || 'User';
-  let profilePicture = localStorage.getItem('user_profile_picture') || user?.photoURL;
+  let profilePicture = '';
   let fileInput: HTMLInputElement;
 
   // Calculate prayer statistics when prayerHistoryStore changes
@@ -113,6 +113,9 @@
   export let navigateTo: (path: string) => void;
 
   onMount(() => {
+    // Get the stored profile picture or user's photoURL
+    profilePicture = localStorage.getItem('user_profile_picture') || user?.photoURL || '';
+
     const container = document.querySelector('.profile-container');
     if (container) {
       container.addEventListener('scroll', handleScroll);
@@ -157,7 +160,7 @@
         <img src={profilePicture} alt="Profile" />
       {:else}
         <div class="avatar-placeholder">
-          {displayName[0] || '?'}
+          {user?.email?.[0]?.toUpperCase() || '?'}
         </div>
       {/if}
     </div>
