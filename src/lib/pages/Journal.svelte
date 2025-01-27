@@ -67,7 +67,6 @@
 
   // Subscribe to the store
   $: todayStreak = $journalStore.streak;
-  $: userName = auth.currentUser?.displayName?.split(' ')[0] || 'friend';
   $: greeting = getGreeting();
   $: weekDays.forEach(({ fullDate, isToday }) => {
     const hasCompletion = $journalStore.dailyProgress.find(d => d.date === fullDate && d.morning && d.evening);
@@ -335,7 +334,7 @@
 
     <div class="date-header">
       <span class="current-date">{new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</span>
-      <h1>{greeting}, {userName}!</h1>
+      <h1>{greeting}</h1>
     </div>
   </div>
 
