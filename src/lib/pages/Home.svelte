@@ -39,6 +39,7 @@
   import { checkAdminStatus } from '../services/adminService';
   import { fetchMoodGuidance } from '../services/moodGuidanceService';
   import QuranReading from '../components/QuranReading.svelte';
+  import LocationPermissionDialog from '../components/LocationPermissionDialog.svelte';
   const dispatch = createEventDispatcher();
   
   let currentPage = 'home';
@@ -47,6 +48,7 @@
   let greeting = 'Asalaamu Alaikum';
 
   let showPermissionDialog = false;
+  let showLocationDialog = false;
 
   let isAdmin = false;
 
@@ -83,6 +85,11 @@
       const permStatus = await checkNotificationPermission();
       if (permStatus === 'prompt') {
         showPermissionDialog = true;
+      }
+
+      // Check location permission
+      if ($locationStore === 'Location unavailable') {
+        showLocationDialog = true;
       }
     } catch (error) {
       console.error('Error in onMount:', error);
@@ -765,6 +772,14 @@
   function handlePermissionResult(event) {
     showPermissionDialog = false;
   }
+
+  function handleLocationResult(event) {
+    showLocationDialog = false;
+    if (event.detail === 'granted') {
+      // Retry fetching prayer times
+      fetchPrayerTimes();
+    }
+  }
 </script>
 
 <div class="home-container">
@@ -1000,6 +1015,10 @@
 
 {#if showPermissionDialog}
   <NotificationPermissionDialog on:permissionResult={handlePermissionResult} />
+{/if}
+
+{#if showLocationDialog}
+  <LocationPermissionDialog on:permissionResult={handleLocationResult} />
 {/if}
 
 <style>
