@@ -631,12 +631,12 @@
         <div class="mood-display">
           {#if mostCommonMood}
             {@const matchingMood = moods.find(m => m.value === mostCommonMood)}
+            <div class="big-number">{capitalizeFirstLetter(mostCommonMood)}</div>
             {#if matchingMood}
               <div class="mood-icon small">
                 {@html matchingMood.icon}
               </div>
             {/if}
-            <div class="big-number">{capitalizeFirstLetter(mostCommonMood)}</div>
           {/if}
         </div>
         <div class="sub-text">Best mood: {capitalizeFirstLetter(bestMood)}</div>
@@ -653,13 +653,13 @@
     <div class="patterns-list">
       {#each calculateInsights() as pattern}
         <div class="pattern-item">
-          <span class="pattern-icon">
-            {@html pattern.icon}
-          </span>
           <div class="pattern-content">
             <h3>{pattern.title}</h3>
             <p>{pattern.description}</p>
           </div>
+          <span class="pattern-icon">
+            {@html pattern.icon}
+          </span>
         </div>
       {/each}
       {#if calculateInsights().length === 0}
@@ -798,6 +798,7 @@
   .pattern-item {
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 1rem;
     padding: 0.75rem;
     background: #f8fafc;
@@ -811,11 +812,12 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    flex-shrink: 0;
   }
 
-  .pattern-icon :global(svg) {
-    width: 100%;
-    height: 100%;
+  .pattern-content {
+    flex: 1;
+    min-width: 0;
   }
 
   .pattern-content h3 {
@@ -858,15 +860,17 @@
 
   .mood-display {
     display: flex;
-    align-items: left;
+    align-items: center;
     gap: 0.5rem;
-    justify-content: left;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
   }
 
   .mood-icon.small {
     width: 1.5rem;
     height: 1.5rem;
     color: #216974;
+    flex-shrink: 0;
   }
 
   .mood-icon.small :global(svg) {

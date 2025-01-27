@@ -1,9 +1,9 @@
-<script>
+<script lang="ts">
   import { auth } from '../firebase';
   import { prayerHistoryStore } from '../stores/prayerHistoryStore';
   import { weeklyStatsStore } from '../stores/tasbihStore';
   import { badgeStore } from '../stores/badgeStore';
-  import { SignOut, CaretRight } from 'phosphor-svelte';
+  import { SignOut, CaretRight, PencilSimple, Camera } from 'phosphor-svelte';
   import { currentPage } from '../stores/pageStore';
   import { onMount } from 'svelte';
   import { fade } from 'svelte/transition';
@@ -15,6 +15,10 @@
   let todayDhikrCount = 0;
   let scrollY = 0;
   let earnedBadges = [];
+  let isEditingName = false;
+  let displayName = localStorage.getItem('user_display_name') || user?.displayName || 'User';
+  let profilePicture = localStorage.getItem('user_profile_picture') || user?.photoURL;
+  let fileInput: HTMLInputElement;
 
   // Calculate prayer statistics when prayerHistoryStore changes
   $: if ($prayerHistoryStore?.history) {
@@ -87,9 +91,28 @@
     scrollY = container.scrollTop;
   }
 
-  export let navigateTo;
+  function handleNameEdit() {
+    if (isEditingName) {
+      localStorage.setItem('user_display_name', displayName);
+    }
+    isEditingName = !isEditingName;
+  }
 
-  onMount(async () => {
+  function handleFileSelect(event: Event) {
+    const file = (event.target as HTMLInputElement).files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        profilePicture = (e.target?.result as string) || '';
+        localStorage.setItem('user_profile_picture', profilePicture);
+      };
+      reader.readAsDataURL(file);
+    }
+  }
+
+  export let navigateTo: (path: string) => void;
+
+  onMount(() => {
     const container = document.querySelector('.profile-container');
     if (container) {
       container.addEventListener('scroll', handleScroll);
@@ -101,7 +124,9 @@
     }
 
     // Initialize async operations
-    todayReadingTime = await getTodayReadingTime();
+    getTodayReadingTime().then(time => {
+      todayReadingTime = time;
+    });
 
     return () => {
       container?.removeEventListener('scroll', handleScroll);
@@ -121,15 +146,41 @@
 <div class="profile-container" class:scrolled={scrollY > 10} on:scroll={handleScroll}>
   <div class="profile-header" transition:fade>
     <div class="avatar">
-      {#if user?.photoURL}
-        <img src={user.photoURL} alt="Profile" />
+      <input
+        type="file"
+        accept="image/*"
+        bind:this={fileInput}
+        on:change={handleFileSelect}
+        style="display: none"
+      />
+      {#if profilePicture}
+        <img src={profilePicture} alt="Profile" />
       {:else}
         <div class="avatar-placeholder">
-          {user?.displayName?.[0] || user?.email?.[0] || '?'}
+          {displayName[0] || '?'}
         </div>
       {/if}
+      <button class="edit-avatar" on:click={() => fileInput.click()}>
+        <Camera weight="bold" />
+      </button>
     </div>
-    <h1>{user?.displayName || 'User'}</h1>
+    
+    <div class="name-container">
+      {#if isEditingName}
+        <input
+          type="text"
+          bind:value={displayName}
+          class="name-input"
+          on:blur={handleNameEdit}
+          on:keydown={(e) => e.key === 'Enter' && handleNameEdit()}
+        />
+      {:else}
+        <h1>{displayName}</h1>
+        <button class="edit-name" on:click={handleNameEdit}>
+          <PencilSimple weight="bold" />
+        </button>
+      {/if}
+    </div>
     <p class="location">{user?.email || ''}</p>
   </div>
 
@@ -191,6 +242,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    position: relative;
   }
 
   .avatar img {
@@ -299,5 +351,66 @@
 
   .sign-out :global(svg) {
     color: #ef4444;
+  }
+
+  .edit-avatar {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    background: #216974;
+    border: none;
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    cursor: pointer;
+    transition: background-color 0.2s;
+  }
+
+  .edit-avatar:hover {
+    background: #184f57;
+  }
+
+  .name-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+  }
+
+  .edit-name {
+    background: none;
+    border: none;
+    padding: 4px;
+    color: #6c757d;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s;
+  }
+
+  .edit-name:hover {
+    color: #216974;
+  }
+
+  .name-input {
+    font-size: 1.5rem;
+    font-weight: 600;
+    text-align: center;
+    border: none;
+    border-bottom: 2px solid #216974;
+    background: transparent;
+    color: #212529;
+    padding: 0.25rem;
+    width: auto;
+    min-width: 150px;
+  }
+
+  .name-input:focus {
+    outline: none;
   }
 </style> 
