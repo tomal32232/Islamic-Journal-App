@@ -1,6 +1,6 @@
 {
   "appId": "com.islamicjournal.app",
-  "appName": "Islamic Journal",
+  "appName": "Deen Reflections",
   "webDir": "dist",
   "plugins": {
     "GoogleAuth": {
