@@ -4,6 +4,7 @@
   import { writable } from 'svelte/store';
   import { scheduleJournalNotifications } from '../services/journalNotificationService';
   import { scheduleMoodNotifications } from '../services/moodNotificationService';
+  import { testPrayerNotification, testMarkPrayerNotification, testMoodNotification, testJournalNotification } from '../services/notificationService';
 
   export let onBack;
   
@@ -64,6 +65,14 @@
           <div class="toggle-slider"></div>
         </button>
       </div>
+      <div class="test-buttons">
+        <button class="test-button" on:click={testPrayerNotification}>
+          Test Prayer Time Notification
+        </button>
+        <button class="test-button" on:click={testMarkPrayerNotification}>
+          Test Mark Prayer Notification
+        </button>
+      </div>
     </div>
 
     <div class="settings-group">
@@ -81,6 +90,11 @@
           <div class="toggle-slider"></div>
         </button>
       </div>
+      <div class="test-buttons">
+        <button class="test-button" on:click={testJournalNotification}>
+          Test Journal Notification
+        </button>
+      </div>
     </div>
 
     <div class="settings-group">
@@ -96,6 +110,11 @@
           on:click={() => toggleSetting('moodNotifications')}
         >
           <div class="toggle-slider"></div>
+        </button>
+      </div>
+      <div class="test-buttons">
+        <button class="test-button" on:click={testMoodNotification}>
+          Test Mood Notification
         </button>
       </div>
     </div>
@@ -220,5 +239,27 @@
 
   .toggle-button.active .toggle-slider {
     transform: translateX(24px);
+  }
+
+  .test-buttons {
+    margin-top: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .test-button {
+    background: #216974;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: background-color 0.2s;
+  }
+
+  .test-button:hover {
+    background: #184f57;
   }
 </style> 

@@ -281,3 +281,88 @@ async function testNotification() {
         console.error('Error scheduling test notification:', error);
     }
 }
+
+// Test notification functions
+export async function testPrayerNotification() {
+    try {
+        await LocalNotifications.schedule({
+            notifications: [
+                {
+                    title: 'Prayer Time',
+                    body: `It's almost time for Fajr prayer`,
+                    id: 1001,
+                    schedule: { at: new Date(Date.now() + 5000) }, // 5 seconds from now
+                    smallIcon: 'ic_launcher_foreground',
+                    actionTypeId: '',
+                    extra: null
+                }
+            ]
+        });
+        console.log('Test prayer notification scheduled');
+    } catch (error) {
+        console.error('Error scheduling test prayer notification:', error);
+    }
+}
+
+export async function testMarkPrayerNotification() {
+    try {
+        await LocalNotifications.schedule({
+            notifications: [
+                {
+                    title: 'Mark Your Prayer',
+                    body: `Don't forget to mark your Fajr prayer in the app`,
+                    id: 1002,
+                    schedule: { at: new Date(Date.now() + 5000) }, // 5 seconds from now
+                    smallIcon: 'ic_launcher_foreground',
+                    actionTypeId: '',
+                    extra: null
+                }
+            ]
+        });
+        console.log('Test mark prayer notification scheduled');
+    } catch (error) {
+        console.error('Error scheduling test mark prayer notification:', error);
+    }
+}
+
+export async function testMoodNotification() {
+    try {
+        await LocalNotifications.schedule({
+            notifications: [
+                {
+                    title: 'Mood Check',
+                    body: `Time to track your mood after Fajr prayer`,
+                    id: 1003,
+                    schedule: { at: new Date(Date.now() + 5000) }, // 5 seconds from now
+                    smallIcon: 'ic_launcher_foreground',
+                    actionTypeId: '',
+                    extra: null
+                }
+            ]
+        });
+        console.log('Test mood notification scheduled');
+    } catch (error) {
+        console.error('Error scheduling test mood notification:', error);
+    }
+}
+
+export async function testJournalNotification() {
+    try {
+        await LocalNotifications.schedule({
+            notifications: [
+                {
+                    title: 'Journal Reminder',
+                    body: `Time for your morning reflection`,
+                    id: 1004,
+                    schedule: { at: new Date(Date.now() + 5000) }, // 5 seconds from now
+                    smallIcon: 'ic_launcher_foreground',
+                    actionTypeId: '',
+                    extra: null
+                }
+            ]
+        });
+        console.log('Test journal notification scheduled');
+    } catch (error) {
+        console.error('Error scheduling test journal notification:', error);
+    }
+}
