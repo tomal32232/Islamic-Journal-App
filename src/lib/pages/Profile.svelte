@@ -160,11 +160,11 @@
           {displayName[0] || '?'}
         </div>
       {/if}
-      <button class="edit-avatar" on:click={() => fileInput.click()}>
-        <Camera weight="bold" />
-      </button>
     </div>
-    
+    <button class="upload-button" on:click={() => fileInput.click()}>
+      Change photo
+    </button>
+
     <div class="name-container">
       {#if isEditingName}
         <input
@@ -235,14 +235,13 @@
   .avatar {
     width: 100px;
     height: 100px;
-    margin: 0 auto 1rem;
+    margin: 0 auto 0.5rem;
     border-radius: 50%;
     overflow: hidden;
     background: #e9ecef;
     display: flex;
     align-items: center;
     justify-content: center;
-    position: relative;
   }
 
   .avatar img {
@@ -412,5 +411,20 @@
 
   .name-input:focus {
     outline: none;
+  }
+
+  .upload-button {
+    background: none;
+    border: none;
+    color: #216974;
+    font-size: 0.875rem;
+    padding: 4px 8px;
+    cursor: pointer;
+    margin-bottom: 1rem;
+    transition: color 0.2s;
+  }
+
+  .upload-button:hover {
+    color: #184f57;
   }
 </style> 
