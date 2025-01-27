@@ -395,53 +395,57 @@
 
   {#if activeTab === 'prayer'}
     <div class="prayer-times-section">
-      <h2>Prayer Times</h2>
-      
-      {#if $loadingStore}
-        <div class="loading">Loading prayer times...</div>
-      {:else if $errorStore}
-        <div class="error">{$errorStore}</div>
-      {:else}
-        <div class="prayer-times-grid">
-          {#each $prayerTimesStore as prayer}
-            <div class="prayer-time-card {prayer.name === nextPrayer?.name ? 'current' : ''}">
-              <div class="icon-wrapper">
-                <svelte:component 
-                  this={iconMap[prayer.icon]} 
-                  size={20} 
-                  weight={prayer.weight}
-                  color={prayer.name === nextPrayer?.name ? '#E09453' : '#216974'}
-                />
-              </div>
-              <div class="prayer-info">
-                <span class="prayer-name">{prayer.name}</span>
-                <span class="prayer-time">{prayer.time}</span>
-              </div>
-              {#if getPrayerStatus(prayer.name) === 'ontime' || getPrayerStatus(prayer.name) === 'late'}
-                <button 
-                  class="status-label {getPrayerStatus(prayer.name)}"
-                  on:click={() => openMarkPrayerSheet(prayer)}
-                >
-                  {#if getPrayerStatus(prayer.name) === 'ontime'}
-                    <Check weight="bold" size={14} />
-                    On Time
-                  {:else}
-                    <Clock weight="bold" size={14} />
-                    Late
-                  {/if}
-                </button>
-              {:else if shouldShowMarkButton(prayer)}
-                <button 
-                  class="mark-prayer-btn"
-                  on:click={() => openMarkPrayerSheet(prayer)}
-                >
-                  Mark Prayer
-                </button>
-              {/if}
-            </div>
-          {/each}
+      <div class="prayer-times-card">
+        <div class="header">
+          <h2>Prayer Times</h2>
         </div>
-      {/if}
+      
+        {#if $loadingStore}
+          <div class="loading">Loading prayer times...</div>
+        {:else if $errorStore}
+          <div class="error">{$errorStore}</div>
+        {:else}
+          <div class="prayer-times-grid">
+            {#each $prayerTimesStore as prayer}
+              <div class="prayer-time-card {prayer.name === nextPrayer?.name ? 'current' : ''}">
+                <div class="icon-wrapper">
+                  <svelte:component 
+                    this={iconMap[prayer.icon]} 
+                    size={20} 
+                    weight={prayer.weight}
+                    color={prayer.name === nextPrayer?.name ? '#E09453' : '#216974'}
+                  />
+                </div>
+                <div class="prayer-info">
+                  <span class="prayer-name">{prayer.name}</span>
+                  <span class="prayer-time">{prayer.time}</span>
+                </div>
+                {#if getPrayerStatus(prayer.name) === 'ontime' || getPrayerStatus(prayer.name) === 'late'}
+                  <button 
+                    class="status-label {getPrayerStatus(prayer.name)}"
+                    on:click={() => openMarkPrayerSheet(prayer)}
+                  >
+                    {#if getPrayerStatus(prayer.name) === 'ontime'}
+                      <Check weight="bold" size={14} />
+                      On Time
+                    {:else}
+                      <Clock weight="bold" size={14} />
+                      Late
+                    {/if}
+                  </button>
+                {:else if shouldShowMarkButton(prayer)}
+                  <button 
+                    class="mark-prayer-btn"
+                    on:click={() => openMarkPrayerSheet(prayer)}
+                  >
+                    Mark Prayer
+                  </button>
+                {/if}
+              </div>
+            {/each}
+          </div>
+        {/if}
+      </div>
 
       <PrayerHistorySection />
     </div>
@@ -741,11 +745,26 @@
     padding-bottom: 6rem;
   }
 
-  h2 {
-    font-size: 1.25rem;
-    color: #1a1a1a;
+  .prayer-times-card {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     margin-bottom: 1rem;
-    font-weight: 600;
+  }
+
+  h2 {
+    font-size: 1.125rem;
+    color: #216974;
+    font-weight: 500;
+    margin: 0;
   }
 
   .prayer-times-grid {
