@@ -3,6 +3,7 @@ import { fetchPrayerTimes, prayerTimesStore, getNextPrayer } from './prayerTimes
 import { App } from '@capacitor/app';
 import { writable } from 'svelte/store';
 import { scheduleMoodNotifications } from './moodNotificationService';
+import { scheduleEndOfDayReminders } from './prayerReminderService';
 
 let prayerTimes = [];
 prayerTimesStore.subscribe(value => {
@@ -115,7 +116,7 @@ async function scheduleMarkPrayerNotifications() {
     }
 }
 
-// Update setupNotifications to include mark prayer notifications
+// Update setupNotifications to include end-of-day reminders
 export async function setupNotifications() {
     try {
         const permissionStatus = await checkNotificationPermission();
@@ -131,6 +132,7 @@ export async function setupNotifications() {
                 if (settings.prayerNotifications) {
                     await scheduleAllPrayerNotifications();
                     await scheduleMarkPrayerNotifications();
+                    await scheduleEndOfDayReminders();
                 }
                 if (settings.moodNotifications) {
                     await scheduleMoodNotifications(true);
@@ -142,6 +144,7 @@ export async function setupNotifications() {
         if (settings.prayerNotifications) {
             await scheduleAllPrayerNotifications();
             await scheduleMarkPrayerNotifications();
+            await scheduleEndOfDayReminders();
         }
         if (settings.moodNotifications) {
             await scheduleMoodNotifications(true);
