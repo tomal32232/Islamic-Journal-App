@@ -67,10 +67,10 @@
       </div>
       <div class="test-buttons">
         <button class="test-button" on:click={testPrayerNotification}>
-          Test Prayer Time Notification
+          See Prayer Time Notification
         </button>
         <button class="test-button" on:click={testMarkPrayerNotification}>
-          Test Mark Prayer Notification
+          See Mark Prayer Notification
         </button>
       </div>
     </div>
@@ -92,7 +92,7 @@
       </div>
       <div class="test-buttons">
         <button class="test-button" on:click={testJournalNotification}>
-          Test Journal Notification
+          See Journal Notification
         </button>
       </div>
     </div>
@@ -114,7 +114,7 @@
       </div>
       <div class="test-buttons">
         <button class="test-button" on:click={testMoodNotification}>
-          Test Mood Notification
+          See Mood Notification
         </button>
       </div>
     </div>
