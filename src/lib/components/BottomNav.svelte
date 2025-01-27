@@ -62,19 +62,13 @@
 <style>
   .bottom-nav {
     position: fixed;
-    bottom: 16px;
-    left: 16px;
-    right: 16px;
+    bottom: 0;
+    left: 0;
+    right: 0;
     z-index: 1000;
-    padding: 0 16px;
-    background: rgba(23, 23, 23, 0.95);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border-radius: 32px;
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
+    background: white;
     height: 64px;
-    max-width: 400px;
-    margin: 0 auto;
+    border-top: 1px solid #eee;
   }
 
   .nav-container {
@@ -83,11 +77,14 @@
     align-items: center;
     height: 100%;
     position: relative;
+    max-width: 420px;
+    margin: 0 auto;
+    padding: 0 24px;
   }
 
   .nav-group {
     display: flex;
-    gap: 32px;
+    gap: 48px;
   }
 
   .nav-item {
@@ -95,45 +92,44 @@
     flex-direction: column;
     align-items: center;
     gap: 4px;
-    padding: 8px 0;
+    padding: 0;
     background: transparent;
     border: none;
-    color: #666;
-    transition: all 0.3s ease;
-    font-size: 11px;
+    color: #999;
+    transition: color 0.2s ease;
+    font-size: 12px;
+    cursor: pointer;
   }
 
   .home-button {
-    width: 50px;
-    height: 50px;
+    width: 48px;
+    height: 48px;
     position: absolute;
     left: 50%;
     top: 50%;
-    transform: translate(-50%, -60%);
-    background: transparent;
-    border: 2px solid #E09453;
+    transform: translate(-50%, -50%);
+    background: linear-gradient(135deg, #E09453, #E09453);
+    border: none;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
     padding: 0;
-    color: #666;
-    transition: all 0.3s ease;
+    color: white;
   }
 
   .nav-item.active {
     color: #E09453;
   }
 
-  .home-button.active {
-    background: #216974;
-    color: white;
-    border: none;
-  }
-
-  @media (prefers-color-scheme: light) {
+  @media (prefers-color-scheme: dark) {
     .bottom-nav {
-      background: rgba(255, 255, 255, 0.95);
+      background: #171717;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .nav-item {
+      color: #666;
     }
   }
 </style> 
