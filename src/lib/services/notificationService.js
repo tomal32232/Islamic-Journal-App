@@ -13,6 +13,9 @@ prayerTimesStore.subscribe(value => {
 // Store to track notification permission status
 export const notificationPermissionStore = writable('prompt');
 
+// Store for navigation events
+export const navigationStore = writable(null);
+
 // Load notification settings
 function getNotificationSettings() {
     const savedSettings = localStorage.getItem('notificationSettings');
@@ -116,7 +119,18 @@ async function scheduleMarkPrayerNotifications() {
     }
 }
 
-// Update setupNotifications to include end-of-day reminders
+// Add notification click handler
+async function setupNotificationClickHandler() {
+    LocalNotifications.addListener('localNotificationActionPerformed', (notification) => {
+        // Check if it's an unmarked prayer reminder
+        if (notification.notification.extra?.type === 'unmarked_prayer_reminder') {
+            // Trigger navigation to prayer page
+            navigationStore.set('prayer');
+        }
+    });
+}
+
+// Update setupNotifications to include end-of-day reminders and click handler
 export async function setupNotifications() {
     try {
         const permissionStatus = await checkNotificationPermission();
@@ -125,6 +139,9 @@ export async function setupNotifications() {
         }
 
         const settings = getNotificationSettings();
+
+        // Set up notification click handler
+        await setupNotificationClickHandler();
 
         // Set up app lifecycle listeners
         App.addListener('appStateChange', async ({ isActive }) => {

@@ -15,7 +15,7 @@
   import BottomNav from './lib/components/BottomNav.svelte';
   import { ensurePrayerData } from './lib/stores/prayerHistoryStore';
   import Favorites from './lib/pages/Favorites.svelte';
-  import { setupNotifications } from './lib/services/notificationService';
+  import { setupNotifications, navigationStore } from './lib/services/notificationService';
   import Onboarding from './lib/components/Onboarding.svelte';
   import { onboardingComplete, checkOnboardingStatus } from './lib/stores/onboardingStore';
 
@@ -54,6 +54,14 @@
       await setupNotifications();
     } catch (error) {
       console.error('Failed to setup notifications:', error);
+    }
+  });
+
+  // Handle notification navigation
+  navigationStore.subscribe((targetPage) => {
+    if (targetPage) {
+      activeTab = targetPage;
+      navigationStore.set(null); // Reset after handling
     }
   });
 

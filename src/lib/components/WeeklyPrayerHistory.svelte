@@ -393,7 +393,7 @@
   }
 
   .status-dot.ontime {
-    background: #22c55e;
+    background: #216974;
   }
 
   .status-dot.late {
@@ -443,7 +443,7 @@
   }
 
   .value.ontime {
-    color: #22c55e;
+    color: #216974;
   }
 
   .value.late {
