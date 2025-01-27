@@ -1,5 +1,5 @@
 <script>
-  import { House, Mosque, ChartLine, Book, User } from 'phosphor-svelte';
+  import { Mosque, ChartLine, Book, User } from 'phosphor-svelte';
   
   export let activeTab = 'home';
   
@@ -36,7 +36,7 @@
       class="nav-item home-button {activeTab === 'home' ? 'active' : ''}" 
       on:click={() => setActiveTab('home')}
     >
-      <House weight={activeTab === 'home' ? 'fill' : 'regular'} size={24} />
+      <img src="/Logo.png" alt="Home" width="24" height="24" />
     </button>
 
     <div class="nav-group">
@@ -108,8 +108,8 @@
     left: 50%;
     top: 50%;
     transform: translate(-50%, -50%);
-    background: linear-gradient(135deg, #E09453, #E09453);
-    border: none;
+    background: transparent;
+    border: 2px solid #216974;
     border-radius: 50%;
     display: flex;
     align-items: center;
