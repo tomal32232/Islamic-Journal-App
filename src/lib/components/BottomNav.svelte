@@ -116,6 +116,12 @@
     justify-content: center;
     padding: 0;
     color: white;
+    transition: background-color 0.2s ease;
+  }
+
+  .home-button.active {
+    background: #E09453;
+    border-color: #E09453;
   }
 
   .nav-item.active {
