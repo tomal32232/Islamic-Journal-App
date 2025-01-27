@@ -18,6 +18,8 @@
   import { setupNotifications, navigationStore } from './lib/services/notificationService';
   import Onboarding from './lib/components/Onboarding.svelte';
   import { onboardingComplete, checkOnboardingStatus } from './lib/stores/onboardingStore';
+  import QuranReading from './lib/components/QuranReading.svelte';
+  import Tasbih from './lib/pages/Tasbih.svelte';
 
   let user = null;
   let activeTab = 'home';
@@ -104,6 +106,10 @@
         <Journal />
       {:else if activeTab === 'prayer'}
         <Prayer />
+      {:else if activeTab === 'quran'}
+        <QuranReading />
+      {:else if activeTab === 'tasbih'}
+        <Tasbih />
       {:else if activeTab === 'progress'}
         <Progress onBack={() => navigateTo('profile')} />
       {:else if activeTab === 'achievements'}
