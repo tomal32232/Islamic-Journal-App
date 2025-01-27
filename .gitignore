@@ -37,3 +37,6 @@ ios/App/App/GoogleService-Info.plist
 # Android configuration
 android/app/google-services.json
 android/google-services.json
+
+# Google Cloud Service Account
+serviceAccountKey.json
