@@ -5,14 +5,31 @@
   import { badgeStore } from '../stores/badgeStore';
   import { SignOut, CaretRight, PencilSimple, Camera } from 'phosphor-svelte';
   import { currentPage } from '../stores/pageStore';
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { fade } from 'svelte/transition';
   import { getTodayReadingTime } from '../services/readingTimeService';
+  import { getFirestore, collection, query, where, getDocs } from 'firebase/firestore';
+
+  interface StatItem {
+    value: () => number;
+    yesterdayValue?: () => number;
+    label: string;
+  }
+
+  interface MenuItem {
+    title: string;
+    description: string;
+    path: string;
+    stats?: StatItem[];
+  }
 
   const user = auth.currentUser;
   let prayerStats = { onTime: 0, late: 0, missed: 0, total: 0 };
   let todayReadingTime = 0;
   let todayDhikrCount = 0;
+  let yesterdayPrayerStats = { onTime: 0, late: 0, missed: 0, total: 0 };
+  let yesterdayReadingTime = 0;
+  let yesterdayDhikrCount = 0;
   let scrollY = 0;
   let earnedBadges = [];
   let isEditingName = false;
@@ -24,10 +41,17 @@
   $: if ($prayerHistoryStore?.history) {
     const allPrayers = $prayerHistoryStore.history;
     const today = new Date().toLocaleDateString('en-CA');
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toLocaleDateString('en-CA');
     
-    const onTime = allPrayers.filter(p => p.status === 'ontime').length || 0;
-    const late = allPrayers.filter(p => p.status === 'late').length || 0;
-    const missed = allPrayers.filter(p => p.status === 'missed').length || 0;
+    const onTime = allPrayers.filter(p => p.date === today && p.status === 'ontime').length || 0;
+    const late = allPrayers.filter(p => p.date === today && p.status === 'late').length || 0;
+    const missed = allPrayers.filter(p => p.date === today && p.status === 'missed').length || 0;
+    
+    const yesterdayOnTime = allPrayers.filter(p => p.date === yesterdayStr && p.status === 'ontime').length || 0;
+    const yesterdayLate = allPrayers.filter(p => p.date === yesterdayStr && p.status === 'late').length || 0;
+    const yesterdayMissed = allPrayers.filter(p => p.date === yesterdayStr && p.status === 'missed').length || 0;
     
     prayerStats = {
       onTime,
@@ -35,12 +59,26 @@
       missed,
       total: onTime + late + missed
     };
+
+    yesterdayPrayerStats = {
+      onTime: yesterdayOnTime,
+      late: yesterdayLate,
+      missed: yesterdayMissed,
+      total: yesterdayOnTime + yesterdayLate + yesterdayMissed
+    };
   }
 
   // Update today's dhikr count
   $: if ($weeklyStatsStore?.dailyCounts?.length > 0) {
     const today = $weeklyStatsStore.dailyCounts.find(d => d.isToday);
+    const yesterday = $weeklyStatsStore.dailyCounts.find(d => {
+      const date = new Date();
+      date.setDate(date.getDate() - 1);
+      const yesterdayStr = date.getDate().toString();
+      return d.date.toString() === yesterdayStr;
+    });
     todayDhikrCount = today?.count || 0;
+    yesterdayDhikrCount = yesterday?.count || 0;
   }
 
   // Update earned badges when store changes
@@ -48,7 +86,7 @@
     earnedBadges = badgeStore.getEarnedBadges($badgeStore.earnedBadges);
   }
 
-  const menuItems = [
+  const menuItems: MenuItem[] = [
     {
       title: 'Your Progress',
       description: 'Track your daily prayers and achievements',
@@ -56,14 +94,17 @@
       stats: [
         {
           value: () => prayerStats.onTime,
+          yesterdayValue: () => yesterdayPrayerStats.onTime,
           label: 'Prayers on time'
         },
         {
           value: () => Math.floor(todayReadingTime / 60),
+          yesterdayValue: () => Math.floor(yesterdayReadingTime / 60),
           label: 'Minutes read'
         },
         {
           value: () => todayDhikrCount,
+          yesterdayValue: () => yesterdayDhikrCount,
           label: 'Dhikr today'
         }
       ]
@@ -112,13 +153,17 @@
 
   export let navigateTo: (path: string) => void;
 
-  onMount(() => {
+  // Get yesterday's reading time on mount
+  let cleanup: (() => void) | undefined;
+
+  onMount(async () => {
     // Get the stored profile picture or user's photoURL
     profilePicture = localStorage.getItem('user_profile_picture') || user?.photoURL || '';
 
     const container = document.querySelector('.profile-container');
     if (container) {
       container.addEventListener('scroll', handleScroll);
+      cleanup = () => container.removeEventListener('scroll', handleScroll);
     }
 
     // Initialize badge store
@@ -127,13 +172,44 @@
     }
 
     // Initialize async operations
-    getTodayReadingTime().then(time => {
-      todayReadingTime = time;
-    });
+    todayReadingTime = await getTodayReadingTime();
+    
+    // Get yesterday's reading time
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    yesterday.setHours(0, 0, 0, 0);
+    const yesterdayEnd = new Date(yesterday);
+    yesterdayEnd.setHours(23, 59, 59, 999);
 
-    return () => {
-      container?.removeEventListener('scroll', handleScroll);
-    };
+    try {
+      const db = getFirestore();
+      const readingSessionsRef = collection(db, 'reading_sessions');
+      const q = query(
+        readingSessionsRef,
+        where('userId', '==', user?.uid),
+        where('startTime', '>=', yesterday.toISOString()),
+        where('startTime', '<=', yesterdayEnd.toISOString())
+      );
+      
+      const querySnapshot = await getDocs(q);
+      let totalSeconds = 0;
+
+      querySnapshot.forEach((doc) => {
+        const session = doc.data();
+        if (session.duration) {
+          totalSeconds += session.duration;
+        }
+      });
+
+      yesterdayReadingTime = totalSeconds;
+    } catch (error) {
+      console.error('Error fetching yesterday\'s reading time:', error);
+      yesterdayReadingTime = 0;
+    }
+  });
+
+  onDestroy(() => {
+    if (cleanup) cleanup();
   });
 
   async function handleLogout() {
@@ -197,7 +273,18 @@
             <div class="stats-row">
               {#each item.stats as stat}
                 <div class="stat-item">
-                  <span class="stat-value">{stat.value()}</span>
+                  <div class="stat-header">
+                    <span class="stat-value">{stat.value()}</span>
+                    {#if stat.yesterdayValue}
+                      <span class="stat-change {stat.value() > stat.yesterdayValue() ? 'positive' : stat.value() < stat.yesterdayValue() ? 'negative' : ''}">
+                        {#if stat.value() > stat.yesterdayValue()}
+                          +{stat.value() - stat.yesterdayValue()}
+                        {:else if stat.value() < stat.yesterdayValue()}
+                          {stat.value() - stat.yesterdayValue()}
+                        {/if}
+                      </span>
+                    {/if}
+                  </div>
                   <span class="stat-label">{stat.label}</span>
                 </div>
               {/each}
@@ -326,10 +413,29 @@
     align-items: flex-start;
   }
 
+  .stat-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
   .stat-value {
     font-size: 1.25rem;
     font-weight: 600;
     color: #216974;
+  }
+
+  .stat-change {
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
+
+  .stat-change.positive {
+    color: #22c55e;
+  }
+
+  .stat-change.negative {
+    color: #ef4444;
   }
 
   .stat-label {

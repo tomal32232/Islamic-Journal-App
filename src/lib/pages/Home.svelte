@@ -318,6 +318,10 @@
     }
   }
 
+  // Add a computed value for today's journal count
+  $: todayJournalCount = $journalStore.streak?.morning && $journalStore.streak?.evening ? 2 : 
+                         $journalStore.streak?.morning || $journalStore.streak?.evening ? 1 : 0;
+
   async function updateCountdown() {
     if (!upcomingPrayer) return;
     
@@ -928,7 +932,7 @@
                 <svelte:component this={iconMap.Note} size={18} weight="fill" color="#216974" />
               </div>
               <div class="activity-info">
-                <span class="activity-value">1</span>
+                <span class="activity-value">{todayJournalCount}</span>
                 <span class="activity-label">Journal</span>
               </div>
             </div>

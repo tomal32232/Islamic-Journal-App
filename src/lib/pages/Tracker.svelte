@@ -631,7 +631,10 @@
         <div class="mood-display">
           {#if mostCommonMood}
             {@const matchingMood = moods.find(m => m.value === mostCommonMood)}
-            <div class="big-number">{capitalizeFirstLetter(mostCommonMood)}</div>
+            <div class="mood-content">
+              <div class="big-number">{capitalizeFirstLetter(mostCommonMood)}</div>
+              <div class="sub-text">Best mood: {capitalizeFirstLetter(bestMood)}</div>
+            </div>
             {#if matchingMood}
               <div class="mood-icon small">
                 {@html matchingMood.icon}
@@ -639,7 +642,6 @@
             {/if}
           {/if}
         </div>
-        <div class="sub-text">Best mood: {capitalizeFirstLetter(bestMood)}</div>
       </div>
     </div>
   </div>
@@ -821,7 +823,8 @@
   }
 
   .pattern-content h3 {
-    font-size: 1rem;
+    font-size: 1.5rem;
+    font-weight: 600;
     color: #216974;
     margin: 0 0 0.25rem 0;
   }
@@ -860,10 +863,24 @@
 
   .mood-display {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 0.5rem;
     justify-content: space-between;
+    background: #f8fafc;
+    padding: 0.75rem;
+    border-radius: 8px;
+  }
+
+  .mood-content {
+    flex: 1;
+  }
+
+  .mood-content .big-number {
     margin-bottom: 0.5rem;
+  }
+
+  .mood-content .sub-text {
+    margin: 0;
   }
 
   .mood-icon.small {
