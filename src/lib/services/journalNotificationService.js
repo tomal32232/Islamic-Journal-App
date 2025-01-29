@@ -16,6 +16,29 @@ export async function scheduleJournalNotifications(enabled = true) {
     }
 
     try {
+        // Verify notification channel exists
+        console.log('Checking journal notification channel...');
+        const channels = await LocalNotifications.listChannels();
+        console.log('Available notification channels:', channels.channels);
+        
+        const journalChannel = channels.channels.find(c => c.id === 'journal_notifications');
+        if (!journalChannel) {
+            console.log('Journal notification channel not found, creating it...');
+            await LocalNotifications.createChannel({
+                id: 'journal_notifications',
+                name: 'Journal Reminders',
+                description: 'Reminders for journal entries',
+                importance: 4,
+                visibility: 1,
+                sound: 'notification_sound',
+                vibration: true,
+                lights: true
+            });
+            console.log('Journal notification channel created');
+        } else {
+            console.log('Found existing journal notification channel:', journalChannel);
+        }
+
         // Cancel existing notifications first
         const pendingNotifications = await LocalNotifications.getPending();
         if (pendingNotifications.notifications.length > 0) {
@@ -69,8 +92,9 @@ export async function scheduleJournalNotifications(enabled = true) {
                 body: 'Time for your morning reflection. Start your day mindfully!',
                 id: 1001,
                 schedule: { at: morningTime, every: 'day' },
-                sound: null,
-                attachments: null,
+                smallIcon: 'ic_launcher_foreground',
+                channelId: 'journal_notifications',
+                sound: 'notification_sound',
                 actionTypeId: '',
                 extra: null
             }]
@@ -84,8 +108,9 @@ export async function scheduleJournalNotifications(enabled = true) {
                 body: 'Time for your evening reflection. How was your day?',
                 id: 1002,
                 schedule: { at: eveningTime, every: 'day' },
-                sound: null,
-                attachments: null,
+                smallIcon: 'ic_launcher_foreground',
+                channelId: 'journal_notifications',
+                sound: 'notification_sound',
                 actionTypeId: '',
                 extra: null
             }]

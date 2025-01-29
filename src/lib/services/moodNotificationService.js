@@ -19,6 +19,29 @@ export async function scheduleMoodNotifications(enabled = true) {
     }
 
     try {
+        // Verify notification channel exists
+        console.log('Checking mood notification channel...');
+        const channels = await LocalNotifications.listChannels();
+        console.log('Available notification channels:', channels.channels);
+        
+        const moodChannel = channels.channels.find(c => c.id === 'mood_notifications');
+        if (!moodChannel) {
+            console.log('Mood notification channel not found, creating it...');
+            await LocalNotifications.createChannel({
+                id: 'mood_notifications',
+                name: 'Mood Tracking Reminders',
+                description: 'Reminders for mood tracking',
+                importance: 4,
+                visibility: 1,
+                sound: 'notification_sound',
+                vibration: true,
+                lights: true
+            });
+            console.log('Mood notification channel created');
+        } else {
+            console.log('Found existing mood notification channel:', moodChannel);
+        }
+
         // Cancel existing mood notifications first
         const pendingNotifications = await LocalNotifications.getPending();
         const moodNotifications = pendingNotifications.notifications.filter(n => 
@@ -75,8 +98,9 @@ export async function scheduleMoodNotifications(enabled = true) {
                 body: 'How are you feeling after Fajr prayer? Take a moment to reflect.',
                 id: 2001,
                 schedule: { at: morningTime, every: 'day' },
-                sound: null,
-                attachments: null,
+                smallIcon: 'ic_launcher_foreground',
+                channelId: 'mood_notifications',
+                sound: 'notification_sound',
                 actionTypeId: '',
                 extra: null
             }]
@@ -90,8 +114,9 @@ export async function scheduleMoodNotifications(enabled = true) {
                 body: 'How are you feeling after Isha prayer? Take a moment to reflect.',
                 id: 2002,
                 schedule: { at: eveningTime, every: 'day' },
-                sound: null,
-                attachments: null,
+                smallIcon: 'ic_launcher_foreground',
+                channelId: 'mood_notifications',
+                sound: 'notification_sound',
                 actionTypeId: '',
                 extra: null
             }]

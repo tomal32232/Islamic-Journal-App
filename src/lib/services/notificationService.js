@@ -10,6 +10,82 @@ prayerTimesStore.subscribe(value => {
     prayerTimes = value;
 });
 
+// Initialize notification channels
+export async function initializeNotificationChannels() {
+    try {
+        console.log('Initializing notification channels...');
+        const channels = await LocalNotifications.listChannels();
+        console.log('Existing channels:', channels.channels);
+
+        // Android importance levels: 1 = low, 2 = medium, 3 = high, 4 = max
+        const requiredChannels = [
+            {
+                id: 'prayer_notifications',
+                name: 'Prayer Times',
+                description: 'Notifications for prayer times',
+                importance: 3,
+                sound: 'notification_sound.wav'
+            },
+            {
+                id: 'prayer_mark_notifications',
+                name: 'Prayer Marking',
+                description: 'Reminders to mark your prayers',
+                importance: 3,
+                sound: 'notification_sound.wav'
+            },
+            {
+                id: 'mood_notifications',
+                name: 'Mood Tracking Reminders',
+                description: 'Reminders for mood tracking',
+                importance: 3,
+                sound: 'notification_sound.wav'
+            },
+            {
+                id: 'journal_notifications',
+                name: 'Journal Reminders',
+                description: 'Reminders for journal entries',
+                importance: 3,
+                sound: 'notification_sound.wav'
+            }
+        ];
+
+        // Delete existing channels first to ensure clean state
+        console.log('Deleting existing channels...');
+        for (const existingChannel of channels.channels) {
+            console.log(`Deleting channel: ${existingChannel.id}`);
+            await LocalNotifications.deleteChannel({ id: existingChannel.id });
+        }
+
+        // Create channels one by one with error handling
+        console.log('Creating new channels...');
+        for (const channel of requiredChannels) {
+            try {
+                console.log(`Creating channel: ${channel.id}`);
+                const createChannelResult = await LocalNotifications.createChannel({
+                    id: channel.id,
+                    name: channel.name,
+                    description: channel.description,
+                    importance: channel.importance,
+                    visibility: 1,
+                    vibration: true,
+                    lights: true
+                });
+                console.log(`Channel creation result for ${channel.id}:`, createChannelResult);
+            } catch (error) {
+                console.error(`Error creating channel ${channel.id}:`, error);
+            }
+        }
+
+        // Verify channels were created
+        const newChannels = await LocalNotifications.listChannels();
+        console.log('Newly created channels:', newChannels.channels);
+        
+        console.log('Notification channels initialization complete');
+    } catch (error) {
+        console.error('Error initializing notification channels:', error);
+    }
+}
+
 // Store to track notification permission status
 export const notificationPermissionStore = writable('prompt');
 
@@ -46,7 +122,8 @@ export async function requestNotificationPermission() {
         notificationPermissionStore.set(result.display);
         
         if (result.display === 'granted') {
-            // If permission granted, set up notifications
+            // Initialize channels first, then set up notifications
+            await initializeNotificationChannels();
             await setupNotifications();
         }
         
@@ -106,6 +183,8 @@ async function scheduleMarkPrayerNotifications() {
                         id: Math.floor(Math.random() * 100000) + 5000, // Using 5000+ to avoid ID conflicts
                         schedule: { at: scheduleTime },
                         smallIcon: 'ic_launcher_foreground',
+                        channelId: 'prayer_mark_notifications',
+                        sound: 'notification_sound',
                         actionTypeId: '',
                         extra: null
                     }
@@ -245,6 +324,8 @@ async function scheduleNotification(prayerName, scheduleTime) {
                     id: Math.floor(Math.random() * 100000),
                     schedule: { at: utcScheduleTime },
                     smallIcon: 'ic_launcher_foreground',
+                    channelId: 'prayer_notifications',
+                    sound: 'notification_sound',
                     actionTypeId: '',
                     extra: null
                 }
