@@ -19,7 +19,9 @@ function createJournalStore() {
       evening: false,
       date: null 
     })),
-    totalEntries: 0
+    totalEntries: 0,
+    todayFreeWrite: null,
+    todayDeenReflection: null
   });
 
   // Load cached progress if available
@@ -159,7 +161,9 @@ function createJournalStore() {
         dailyProgress: sortedProgress,
         totalEntries: snapshot.docs.length,
         todayMorningReflection: todayReflections.morning ? store.todayMorningReflection : null,
-        todayEveningReflection: todayReflections.evening ? store.todayEveningReflection : null
+        todayEveningReflection: todayReflections.evening ? store.todayEveningReflection : null,
+        todayFreeWrite: store.todayFreeWrite,
+        todayDeenReflection: store.todayDeenReflection
       };
 
       try {
@@ -273,11 +277,86 @@ function createJournalStore() {
             ...store.streak,
             morning: !!data.morning,
             evening: !!data.evening
-          }
+          },
+          todayFreeWrite: data.freeWrite?.content || null,
+          todayDeenReflection: data.deenReflections || null
+        }));
+      } else {
+        update(store => ({
+          ...store,
+          streak: { morning: false, evening: false },
+          todayMorningReflection: null,
+          todayEveningReflection: null,
+          todayFreeWrite: null,
+          todayDeenReflection: null
         }));
       }
 
       await calculateProgress();
+    },
+
+    async saveFreeWrite(content) {
+      if (!auth.currentUser) return;
+      
+      const today = new Date().toISOString().split('T')[0];
+      const userId = auth.currentUser.uid;
+      const freeWriteRef = doc(db, 'users', userId, 'journal', today);
+
+      try {
+        // Get existing document if it exists
+        const docSnap = await getDoc(freeWriteRef);
+        const existingData = docSnap.exists() ? docSnap.data() : {};
+
+        // Update with new free write content
+        await setDoc(freeWriteRef, {
+          ...existingData,
+          freeWrite: {
+            content,
+            timestamp: new Date().toISOString()
+          }
+        }, { merge: true });
+
+        // Update the store
+        update(state => ({
+          ...state,
+          todayFreeWrite: content
+        }));
+      } catch (error) {
+        console.error('Error saving free write:', error);
+        throw error;
+      }
+    },
+
+    async saveDeenReflection(reflections) {
+      if (!auth.currentUser) return;
+      
+      const today = new Date().toISOString().split('T')[0];
+      const userId = auth.currentUser.uid;
+      const deenRef = doc(db, 'users', userId, 'journal', today);
+
+      try {
+        // Get existing document if it exists
+        const docSnap = await getDoc(deenRef);
+        const existingData = docSnap.exists() ? docSnap.data() : {};
+
+        // Update with new deen reflections
+        await setDoc(deenRef, {
+          ...existingData,
+          deenReflections: {
+            ...reflections,
+            timestamp: new Date().toISOString()
+          }
+        }, { merge: true });
+
+        // Update the store
+        update(state => ({
+          ...state,
+          todayDeenReflection: reflections
+        }));
+      } catch (error) {
+        console.error('Error saving deen reflections:', error);
+        throw error;
+      }
     }
   };
 }

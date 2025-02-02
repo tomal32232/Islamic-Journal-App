@@ -51,7 +51,7 @@
   }
 
   let weekDays = getCurrentWeek();
-  let selectedReflection = null; // 'morning' or 'evening' or null
+  let selectedReflection = null; // 'morning' or 'evening' or 'freeWrite' or 'deenReflections' or null
   let morningReflection = {
     plans: '',
     newThing: '',
@@ -63,6 +63,15 @@
     learnings: '',
     satisfaction: '',
     barriers: ''
+  };
+
+  let freeWriteContent = '';
+
+  let deenReflections = {
+    duas: '',
+    surahs: '',
+    quranQuotes: '',
+    gratitude: ''
   };
 
   // Subscribe to the store
@@ -167,7 +176,40 @@
     }
   ];
 
-  $: currentQuestions = selectedReflection === 'morning' ? morningQuestions : eveningQuestions;
+  const deenReflectionQuestions = [
+    {
+      question: "Duas you want Allah to accept",
+      placeholder: "Write the duas that are close to your heart...",
+      field: "duas",
+      rows: 4
+    },
+    {
+      question: "Surahs you know/want to know",
+      placeholder: "List the surahs you're learning or wish to learn...",
+      field: "surahs",
+      rows: 3
+    },
+    {
+      question: "Resonating Quranic quotes",
+      placeholder: "Note down Quranic verses that touched your heart...",
+      field: "quranQuotes",
+      rows: 4
+    },
+    {
+      question: "Gratitude List to Allah",
+      placeholder: "Express your gratitude to Allah...",
+      field: "gratitude",
+      rows: 4
+    }
+  ];
+
+  $: currentQuestions = selectedReflection === 'morning' 
+    ? morningQuestions 
+    : selectedReflection === 'evening'
+    ? eveningQuestions
+    : selectedReflection === 'deenReflections'
+    ? deenReflectionQuestions
+    : [];
   $: currentQuestion = currentQuestions[currentQuestionIndex];
   $: isLastQuestion = currentQuestionIndex === currentQuestions.length - 1;
   $: isFirstQuestion = currentQuestionIndex === 0;
@@ -177,13 +219,19 @@
     get value() {
       return selectedReflection === 'morning'
         ? morningReflection[currentQuestion.field]
-        : eveningReflection[currentQuestion.field];
+        : selectedReflection === 'evening'
+        ? eveningReflection[currentQuestion.field]
+        : selectedReflection === 'deenReflections'
+        ? deenReflections[currentQuestion.field]
+        : '';
     },
     set value(newValue) {
       if (selectedReflection === 'morning') {
         morningReflection[currentQuestion.field] = newValue;
-      } else {
+      } else if (selectedReflection === 'evening') {
         eveningReflection[currentQuestion.field] = newValue;
+      } else if (selectedReflection === 'deenReflections') {
+        deenReflections[currentQuestion.field] = newValue;
       }
     }
   };
@@ -197,8 +245,18 @@
       // Show completed evening reflection
       selectedReflection = 'evening-view';
       eveningReflection = { ...$journalStore.todayEveningReflection };
+    } else if (type === 'freeWrite' && $journalStore.todayFreeWrite) {
+      // Show completed free write
+      selectedReflection = 'freeWrite-view';
+      freeWriteContent = $journalStore.todayFreeWrite;
+    } else if (type === 'deenReflections' && $journalStore.todayDeenReflection) {
+      // Show completed deen reflection
+      selectedReflection = 'deenReflections-view';
+      deenReflections = { ...$journalStore.todayDeenReflection };
     } else if ((type === 'morning' && !todayStreak.morning) || 
-        (type === 'evening' && !todayStreak.evening)) {
+        (type === 'evening' && !todayStreak.evening) ||
+        (type === 'freeWrite' && !$journalStore.todayFreeWrite) ||
+        (type === 'deenReflections' && !$journalStore.todayDeenReflection)) {
       // Start new reflection
       selectedReflection = selectedReflection === type ? null : type;
       currentQuestionIndex = 0;
@@ -213,11 +271,22 @@
         questions: morningQuestions,
         answers: morningReflection
       };
-    } else {
+    } else if (type === 'evening-view') {
       return {
         title: 'Evening Reflection',
         questions: eveningQuestions,
         answers: eveningReflection
+      };
+    } else if (type === 'freeWrite-view') {
+      return {
+        title: 'Free Write',
+        content: freeWriteContent
+      };
+    } else if (type === 'deenReflections-view') {
+      return {
+        title: 'Deen Reflections',
+        questions: deenReflectionQuestions,
+        answers: deenReflections
       };
     }
   }
@@ -242,8 +311,10 @@
       try {
         if (selectedReflection === 'morning') {
           await saveMorningReflection();
-        } else {
+        } else if (selectedReflection === 'evening') {
           await saveEveningReflection();
+        } else if (selectedReflection === 'deenReflections') {
+          await saveDeenReflection();
         }
         selectedReflection = null;
         currentQuestionIndex = 0;
@@ -292,6 +363,32 @@
     await journalStore.loadTodayReflections(); // Refresh the store data
     weekDays = getCurrentWeek(); // Refresh the week display
     eveningReflection = { highlights: '', learnings: '', satisfaction: '', barriers: '' }; // Reset form
+  }
+
+  async function saveDeenReflection() {
+    isSubmitting = true;
+    try {
+      await journalStore.saveDeenReflection(deenReflections);
+      deenReflections = { duas: '', surahs: '', quranQuotes: '', gratitude: '' }; // Reset form
+      selectedReflection = null;
+    } catch (error) {
+      console.error('Error saving deen reflection:', error);
+    } finally {
+      isSubmitting = false;
+    }
+  }
+
+  async function saveFreeWrite() {
+    isSubmitting = true;
+    try {
+      await journalStore.saveFreeWrite(freeWriteContent);
+      freeWriteContent = ''; // Reset the content
+      selectedReflection = null;
+    } catch (error) {
+      console.error('Error saving free write:', error);
+    } finally {
+      isSubmitting = false;
+    }
   }
 
   let scrollY = 0;
@@ -362,6 +459,30 @@
     </div>
   </div>
 
+  <div class="reflection-cards mt-4">
+    <div 
+      class="reflection-card {$journalStore.todayFreeWrite ? 'completed' : ''} {selectedReflection === 'freeWrite' ? 'active' : ''}"
+      on:click={() => handleReflectionClick('freeWrite')}
+    >
+      <div class="card-content">
+        <Book weight={$journalStore.todayFreeWrite ? 'fill' : 'regular'} size={24} class="text-[#216974]" />
+        <h3>Free<br>Write</h3>
+        <span class="status">{$journalStore.todayFreeWrite ? 'Completed' : ''}</span>
+      </div>
+    </div>
+
+    <div 
+      class="reflection-card {$journalStore.todayDeenReflection ? 'completed' : ''} {selectedReflection === 'deenReflections' ? 'active' : ''}"
+      on:click={() => handleReflectionClick('deenReflections')}
+    >
+      <div class="card-content">
+        <Book weight={$journalStore.todayDeenReflection ? 'fill' : 'regular'} size={24} class="text-[#E09453]" />
+        <h3>Deen<br>Reflections</h3>
+        <span class="status">{$journalStore.todayDeenReflection ? 'Completed' : ''}</span>
+      </div>
+    </div>
+  </div>
+
   <div class="challenge-card">
     <div class="challenge-header">
       <h3>7-DAY JOURNALING CHALLENGE</h3>
@@ -382,6 +503,139 @@
     </div>
   </div>
 
+  {#if !selectedReflection}
+    <div class="p-4 space-y-4">
+      <div class="additional-reflections">
+        <!-- Free Write Section -->
+        <button
+          class="reflection-box free-write"
+          on:click={() => selectedReflection = 'freeWrite'}
+        >
+          <div class="reflection-box-content">
+            <Book weight="fill" class="icon" />
+            <h3>Free Write</h3>
+            <p>Express your thoughts freely</p>
+          </div>
+        </button>
+
+        <!-- Deen Reflections Section -->
+        <button
+          class="reflection-box deen"
+          on:click={() => selectedReflection = 'deenReflections'}
+        >
+          <div class="reflection-box-content">
+            <Book weight="fill" class="icon" />
+            <h3>Deen Reflections</h3>
+            <p>Islamic reflections and remembrance</p>
+          </div>
+        </button>
+      </div>
+    </div>
+  {/if}
+
+  <!-- Free Write Section -->
+  {#if selectedReflection === 'freeWrite'}
+    <div class="p-4" transition:fly="{{ y: 50, duration: 300, easing: quintOut }}">
+      <div class="reflection-panel">
+        <div class="reflection-panel-header">
+          <h2>Free Write</h2>
+          <button
+            class="close-button"
+            on:click={() => selectedReflection = null}
+            type="button"
+          >
+            <X weight="bold" size={24} />
+          </button>
+        </div>
+        <form on:submit|preventDefault={saveFreeWrite} class="reflection-form">
+          <textarea
+            bind:value={freeWriteContent}
+            class="reflection-textarea"
+            rows="8"
+            placeholder="Express your thoughts freely..."
+            required
+          />
+          <div class="reflection-panel-footer">
+            <button
+              type="button"
+              class="cancel-button"
+              on:click={() => selectedReflection = null}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              class="save-button"
+              disabled={isSubmitting}
+            >
+              {#if isSubmitting}
+                <div class="loading-spinner"></div>
+              {:else}
+                Save
+              {/if}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  {/if}
+
+  <!-- Deen Reflections Section -->
+  {#if selectedReflection === 'deenReflections'}
+    <div class="p-4" transition:fly="{{ y: 50, duration: 300, easing: quintOut }}">
+      <div class="reflection-panel deen-panel">
+        <div class="reflection-panel-header">
+          <h2>Deen Reflections</h2>
+          <button
+            class="close-button"
+            on:click={() => selectedReflection = null}
+            type="button"
+          >
+            <X weight="bold" size={24} />
+          </button>
+        </div>
+
+        <form on:submit|preventDefault={saveDeenReflection} class="reflection-form">
+          <div class="deen-questions">
+            {#each deenReflectionQuestions as question}
+              <div class="deen-question">
+                <h3>{question.question}</h3>
+                <textarea
+                  bind:value={deenReflections[question.field]}
+                  class="reflection-textarea deen-textarea"
+                  rows={question.rows}
+                  placeholder={question.placeholder}
+                  required
+                />
+              </div>
+            {/each}
+          </div>
+
+          <div class="reflection-panel-footer">
+            <button
+              type="button"
+              class="cancel-button"
+              on:click={() => selectedReflection = null}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              class="save-button deen-save"
+              disabled={isSubmitting}
+            >
+              {#if isSubmitting}
+                <div class="loading-spinner"></div>
+              {:else}
+                Save
+              {/if}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  {/if}
+
   {#if selectedReflection}
     <div class="modal-overlay" transition:fade={{ duration: 200 }}>
       <div 
@@ -390,10 +644,13 @@
       >
         <div class="modal-header">
           <h3>
-            {#if selectedReflection === 'morning-view' || selectedReflection === 'evening-view'}
+            {#if selectedReflection.endsWith('-view')}
               {getReflectionData(selectedReflection).title.split(' ').join('\n')}
             {:else}
-              {(selectedReflection === 'morning' ? 'Morning' : 'Evening') + '\nReflection'}
+              {(selectedReflection === 'morning' ? 'Morning' : 
+                selectedReflection === 'evening' ? 'Evening' : 
+                selectedReflection === 'freeWrite' ? 'Free Write' : 
+                'Deen Reflections')}
             {/if}
           </h3>
           <button class="close-btn" on:click={() => selectedReflection = null}>
@@ -401,7 +658,7 @@
           </button>
         </div>
 
-        {#if selectedReflection === 'morning-view' || selectedReflection === 'evening-view'}
+        {#if selectedReflection === 'morning-view' || selectedReflection === 'evening-view' || selectedReflection === 'deenReflections-view'}
           <!-- View completed reflection -->
           <div class="modal-body view-mode">
             {#each getReflectionData(selectedReflection).questions as question}
@@ -410,6 +667,73 @@
                 <p class="answer">{getReflectionData(selectedReflection).answers[question.field]}</p>
               </div>
             {/each}
+          </div>
+        {:else if selectedReflection === 'freeWrite-view'}
+          <!-- View completed free write -->
+          <div class="modal-body view-mode">
+            <div class="completed-question">
+              <p class="answer">{getReflectionData(selectedReflection).content}</p>
+            </div>
+          </div>
+        {:else if selectedReflection === 'freeWrite'}
+          <!-- Free Write input mode -->
+          <div class="modal-body">
+            <form on:submit|preventDefault={saveFreeWrite}>
+              <div class="question-content">
+                <textarea 
+                  bind:value={freeWriteContent}
+                  placeholder="Express your thoughts freely..."
+                  rows="8"
+                  autofocus
+                  required
+                ></textarea>
+              </div>
+
+              <div class="modal-footer">
+                <button type="button" class="nav-btn" on:click={() => selectedReflection = null}>
+                  Cancel
+                </button>
+                <button type="submit" class="submit-btn" disabled={isSubmitting}>
+                  {#if isSubmitting}
+                    <div class="loading-spinner"></div>
+                  {:else}
+                    Complete
+                  {/if}
+                </button>
+              </div>
+            </form>
+          </div>
+        {:else if selectedReflection === 'deenReflections'}
+          <!-- Deen Reflections input mode -->
+          <div class="modal-body">
+            <form on:submit|preventDefault={saveDeenReflection}>
+              <div class="question-content">
+                {#each deenReflectionQuestions as question}
+                  <div class="deen-question">
+                    <label>{question.question}</label>
+                    <textarea 
+                      bind:value={deenReflections[question.field]}
+                      placeholder={question.placeholder}
+                      rows={question.rows}
+                      required
+                    ></textarea>
+                  </div>
+                {/each}
+              </div>
+
+              <div class="modal-footer">
+                <button type="button" class="nav-btn" on:click={() => selectedReflection = null}>
+                  Cancel
+                </button>
+                <button type="submit" class="submit-btn" disabled={isSubmitting}>
+                  {#if isSubmitting}
+                    <div class="loading-spinner"></div>
+                  {:else}
+                    Complete
+                  {/if}
+                </button>
+              </div>
+            </form>
           </div>
         {:else}
           <!-- Normal reflection input mode -->
@@ -874,7 +1198,23 @@
   }
 
   .nav-btn {
-    display: none;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 100px;
+    background: #f5f5f5;
+    color: #666;
+    font-weight: 500;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .nav-btn:hover {
+    background: #eeeeee;
+    color: #333;
   }
 
   .view-mode {
@@ -931,5 +1271,321 @@
     to {
       transform: rotate(360deg);
     }
+  }
+
+  .additional-reflections {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-top: 1.5rem;
+    padding: 0 0.5rem;
+  }
+
+  .reflection-box {
+    background: white;
+    border: none;
+    border-radius: 16px;
+    padding: 2rem 1.5rem;
+    width: 100%;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .reflection-box::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: #216974;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+  }
+
+  .reflection-box.deen::before {
+    background: #E09453;
+  }
+
+  .reflection-box:hover::before {
+    opacity: 1;
+  }
+
+  .reflection-box:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+
+  .reflection-box-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .reflection-box .icon {
+    width: 2rem;
+    height: 2rem;
+    color: #216974;
+  }
+
+  .reflection-box.deen .icon {
+    color: #E09453;
+  }
+
+  .reflection-box h3 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #333;
+    margin: 0;
+  }
+
+  .reflection-box p {
+    font-size: 0.875rem;
+    color: #666;
+    margin: 0;
+    text-align: center;
+  }
+
+  .reflection-panel {
+    background: white;
+    border-radius: 20px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+  }
+
+  .reflection-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem;
+    border-bottom: 1px solid #f0f0f0;
+  }
+
+  .reflection-panel-header h2 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #216974;
+    margin: 0;
+  }
+
+  .deen-panel .reflection-panel-header h2 {
+    color: #E09453;
+  }
+
+  .close-button {
+    background: none;
+    border: none;
+    padding: 0.5rem;
+    cursor: pointer;
+    color: #666;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: all 0.2s ease;
+  }
+
+  .close-button:hover {
+    background: #f5f5f5;
+    color: #333;
+  }
+
+  .reflection-textarea {
+    width: 100%;
+    padding: 1.5rem;
+    border: none;
+    background: #f8fafc;
+    color: #333;
+    font-size: 1rem;
+    line-height: 1.6;
+    resize: none;
+    transition: background 0.2s ease;
+  }
+
+  .reflection-textarea:focus {
+    outline: none;
+    background: #f0f9fa;
+  }
+
+  .deen-questions {
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+  }
+
+  .deen-question h3 {
+    font-size: 1.125rem;
+    font-weight: 500;
+    color: #333;
+    margin: 0 0 0.75rem 0;
+  }
+
+  .deen-textarea:focus {
+    background: #fdf6f0;
+  }
+
+  .reflection-panel-footer {
+    padding: 1.5rem;
+    display: flex;
+    justify-content: flex-end;
+    border-top: 1px solid #f0f0f0;
+  }
+
+  .save-button {
+    padding: 0.75rem 2rem;
+    border: none;
+    border-radius: 12px;
+    background: #216974;
+    color: white;
+    font-weight: 500;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .save-button:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+  }
+
+  .save-button.deen-save {
+    background: #E09453;
+  }
+
+  .save-button.deen-save:hover {
+    background: #c77f43;
+  }
+
+  @media (max-width: 640px) {
+    .additional-reflections {
+      grid-template-columns: 1fr;
+      padding: 0;
+    }
+
+    .reflection-box {
+      padding: 1.5rem 1rem;
+    }
+
+    .reflection-panel {
+      border-radius: 16px;
+    }
+
+    .reflection-panel-header {
+      padding: 1rem;
+    }
+
+    .reflection-panel-header h2 {
+      font-size: 1.25rem;
+    }
+
+    .reflection-textarea {
+      padding: 1rem;
+    }
+
+    .deen-questions {
+      padding: 1rem;
+      gap: 1.5rem;
+    }
+
+    .reflection-panel-footer {
+      padding: 1rem;
+    }
+
+    .save-button, .cancel-button {
+      padding: 0.5rem 1.5rem;
+      font-size: 0.875rem;
+    }
+  }
+
+  .reflection-form {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+
+  .reflection-panel-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+    padding: 1.5rem;
+    border-top: 1px solid #f0f0f0;
+    margin-top: auto;
+  }
+
+  .cancel-button {
+    padding: 0.75rem 2rem;
+    border: none;
+    border-radius: 12px;
+    background: #f5f5f5;
+    color: #666;
+    font-weight: 500;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .cancel-button:hover {
+    background: #eeeeee;
+    color: #333;
+  }
+
+  .save-button {
+    padding: 0.75rem 2rem;
+    border: none;
+    border-radius: 12px;
+    background: #216974;
+    color: white;
+    font-weight: 500;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-width: 100px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .save-button:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+  }
+
+  .save-button:not(:disabled):hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+  }
+
+  .save-button.deen-save {
+    background: #E09453;
+  }
+
+  .save-button.deen-save:hover {
+    background: #c77f43;
+  }
+
+  .loading-spinner {
+    width: 20px;
+    height: 20px;
+    border: 2px solid #ffffff;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  .mt-4 {
+    margin-top: 1rem;
+  }
+
+  .deen-question {
+    margin-bottom: 2rem;
+  }
+
+  .deen-question:last-child {
+    margin-bottom: 0;
   }
 </style> 
