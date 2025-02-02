@@ -258,7 +258,7 @@ function createJournalStore() {
       await calculateProgress();
     },
 
-    loadTodayReflections: async () => {
+    async loadTodayReflections() {
       if (!auth.currentUser) return;
 
       const today = new Date();
@@ -284,7 +284,11 @@ function createJournalStore() {
       } else {
         update(store => ({
           ...store,
-          streak: { morning: false, evening: false },
+          streak: { 
+            current: 0,
+            morning: false, 
+            evening: false 
+          },
           todayMorningReflection: null,
           todayEveningReflection: null,
           todayFreeWrite: null,
@@ -298,23 +302,30 @@ function createJournalStore() {
     async saveFreeWrite(content) {
       if (!auth.currentUser) return;
       
-      const today = new Date().toISOString().split('T')[0];
-      const userId = auth.currentUser.uid;
-      const freeWriteRef = doc(db, 'users', userId, 'journal', today);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const docRef = doc(db, 'reflections', `${auth.currentUser.uid}_${today.toISOString().split('T')[0]}`);
+      const existingDoc = await getDoc(docRef);
 
       try {
-        // Get existing document if it exists
-        const docSnap = await getDoc(freeWriteRef);
-        const existingData = docSnap.exists() ? docSnap.data() : {};
-
-        // Update with new free write content
-        await setDoc(freeWriteRef, {
-          ...existingData,
-          freeWrite: {
-            content,
-            timestamp: new Date().toISOString()
-          }
-        }, { merge: true });
+        if (existingDoc.exists()) {
+          await setDoc(docRef, {
+            ...existingDoc.data(),
+            freeWrite: {
+              content,
+              timestamp: new Date()
+            }
+          }, { merge: true });
+        } else {
+          await setDoc(docRef, {
+            userId: auth.currentUser.uid,
+            date: today,
+            freeWrite: {
+              content,
+              timestamp: new Date()
+            }
+          });
+        }
 
         // Update the store
         update(state => ({
@@ -330,23 +341,30 @@ function createJournalStore() {
     async saveDeenReflection(reflections) {
       if (!auth.currentUser) return;
       
-      const today = new Date().toISOString().split('T')[0];
-      const userId = auth.currentUser.uid;
-      const deenRef = doc(db, 'users', userId, 'journal', today);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const docRef = doc(db, 'reflections', `${auth.currentUser.uid}_${today.toISOString().split('T')[0]}`);
+      const existingDoc = await getDoc(docRef);
 
       try {
-        // Get existing document if it exists
-        const docSnap = await getDoc(deenRef);
-        const existingData = docSnap.exists() ? docSnap.data() : {};
-
-        // Update with new deen reflections
-        await setDoc(deenRef, {
-          ...existingData,
-          deenReflections: {
-            ...reflections,
-            timestamp: new Date().toISOString()
-          }
-        }, { merge: true });
+        if (existingDoc.exists()) {
+          await setDoc(docRef, {
+            ...existingDoc.data(),
+            deenReflections: {
+              ...reflections,
+              timestamp: new Date()
+            }
+          }, { merge: true });
+        } else {
+          await setDoc(docRef, {
+            userId: auth.currentUser.uid,
+            date: today,
+            deenReflections: {
+              ...reflections,
+              timestamp: new Date()
+            }
+          });
+        }
 
         // Update the store
         update(state => ({

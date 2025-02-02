@@ -503,139 +503,6 @@
     </div>
   </div>
 
-  {#if !selectedReflection}
-    <div class="p-4 space-y-4">
-      <div class="additional-reflections">
-        <!-- Free Write Section -->
-        <button
-          class="reflection-box free-write"
-          on:click={() => selectedReflection = 'freeWrite'}
-        >
-          <div class="reflection-box-content">
-            <Book weight="fill" class="icon" />
-            <h3>Free Write</h3>
-            <p>Express your thoughts freely</p>
-          </div>
-        </button>
-
-        <!-- Deen Reflections Section -->
-        <button
-          class="reflection-box deen"
-          on:click={() => selectedReflection = 'deenReflections'}
-        >
-          <div class="reflection-box-content">
-            <Book weight="fill" class="icon" />
-            <h3>Deen Reflections</h3>
-            <p>Islamic reflections and remembrance</p>
-          </div>
-        </button>
-      </div>
-    </div>
-  {/if}
-
-  <!-- Free Write Section -->
-  {#if selectedReflection === 'freeWrite'}
-    <div class="p-4" transition:fly="{{ y: 50, duration: 300, easing: quintOut }}">
-      <div class="reflection-panel">
-        <div class="reflection-panel-header">
-          <h2>Free Write</h2>
-          <button
-            class="close-button"
-            on:click={() => selectedReflection = null}
-            type="button"
-          >
-            <X weight="bold" size={24} />
-          </button>
-        </div>
-        <form on:submit|preventDefault={saveFreeWrite} class="reflection-form">
-          <textarea
-            bind:value={freeWriteContent}
-            class="reflection-textarea"
-            rows="8"
-            placeholder="Express your thoughts freely..."
-            required
-          />
-          <div class="reflection-panel-footer">
-            <button
-              type="button"
-              class="cancel-button"
-              on:click={() => selectedReflection = null}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              class="save-button"
-              disabled={isSubmitting}
-            >
-              {#if isSubmitting}
-                <div class="loading-spinner"></div>
-              {:else}
-                Save
-              {/if}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  {/if}
-
-  <!-- Deen Reflections Section -->
-  {#if selectedReflection === 'deenReflections'}
-    <div class="p-4" transition:fly="{{ y: 50, duration: 300, easing: quintOut }}">
-      <div class="reflection-panel deen-panel">
-        <div class="reflection-panel-header">
-          <h2>Deen Reflections</h2>
-          <button
-            class="close-button"
-            on:click={() => selectedReflection = null}
-            type="button"
-          >
-            <X weight="bold" size={24} />
-          </button>
-        </div>
-
-        <form on:submit|preventDefault={saveDeenReflection} class="reflection-form">
-          <div class="deen-questions">
-            {#each deenReflectionQuestions as question}
-              <div class="deen-question">
-                <h3>{question.question}</h3>
-                <textarea
-                  bind:value={deenReflections[question.field]}
-                  class="reflection-textarea deen-textarea"
-                  rows={question.rows}
-                  placeholder={question.placeholder}
-                  required
-                />
-              </div>
-            {/each}
-          </div>
-
-          <div class="reflection-panel-footer">
-            <button
-              type="button"
-              class="cancel-button"
-              on:click={() => selectedReflection = null}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              class="save-button deen-save"
-              disabled={isSubmitting}
-            >
-              {#if isSubmitting}
-                <div class="loading-spinner"></div>
-              {:else}
-                Save
-              {/if}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  {/if}
-
   {#if selectedReflection}
     <div class="modal-overlay" transition:fade={{ duration: 200 }}>
       <div 
@@ -703,43 +570,11 @@
               </div>
             </form>
           </div>
-        {:else if selectedReflection === 'deenReflections'}
-          <!-- Deen Reflections input mode -->
-          <div class="modal-body">
-            <form on:submit|preventDefault={saveDeenReflection}>
-              <div class="question-content">
-                {#each deenReflectionQuestions as question}
-                  <div class="deen-question">
-                    <label>{question.question}</label>
-                    <textarea 
-                      bind:value={deenReflections[question.field]}
-                      placeholder={question.placeholder}
-                      rows={question.rows}
-                      required
-                    ></textarea>
-                  </div>
-                {/each}
-              </div>
-
-              <div class="modal-footer">
-                <button type="button" class="nav-btn" on:click={() => selectedReflection = null}>
-                  Cancel
-                </button>
-                <button type="submit" class="submit-btn" disabled={isSubmitting}>
-                  {#if isSubmitting}
-                    <div class="loading-spinner"></div>
-                  {:else}
-                    Complete
-                  {/if}
-                </button>
-              </div>
-            </form>
-          </div>
         {:else}
-          <!-- Normal reflection input mode -->
+          <!-- Normal reflection input mode (Morning, Evening, and Deen) -->
           <div class="progress-bar">
             {#each currentQuestions as _, i}
-              <div class="progress-dot {i <= currentQuestionIndex ? 'active' : ''}"></div>
+              <div class="progress-dot {i <= currentQuestionIndex ? 'active' : ''} {selectedReflection === 'deenReflections' ? 'deen' : ''}"></div>
             {/each}
           </div>
 
@@ -752,6 +587,7 @@
                   placeholder={currentQuestion.placeholder}
                   rows={currentQuestion.rows}
                   autofocus
+                  required
                 ></textarea>
               </div>
 
@@ -763,11 +599,11 @@
                   </button>
                 {/if}
 
-                <button type="submit" class="submit-btn" disabled={isSubmitting}>
+                <button type="submit" class="submit-btn {selectedReflection === 'deenReflections' ? 'deen-save' : ''}" disabled={isSubmitting}>
                   {#if isSubmitting}
                     <div class="loading-spinner"></div>
                   {:else}
-                    {isLastQuestion ? 'Complete Reflection' : 'Next Question'}
+                    {isLastQuestion ? 'Complete' : 'Next'}
                     {#if !isLastQuestion}
                       <CaretRight size={20} />
                     {/if}
@@ -1110,6 +946,14 @@
 
   .progress-dot.active {
     background: #216974;
+  }
+
+  .progress-dot.deen {
+    background: #e0e0e0;
+  }
+
+  .progress-dot.deen.active {
+    background: #E09453;
   }
 
   .modal-body {
