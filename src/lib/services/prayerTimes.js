@@ -18,15 +18,21 @@ function formatTo12Hour(time24) {
 
 export async function getCurrentLocation() {
   try {
+    console.log('Starting location fetch...');
     if (Capacitor.isNativePlatform()) {
+      console.log('Running on native platform (iOS/Android)');
       // Request permissions first
       const permissionStatus = await Geolocation.checkPermissions();
+      console.log('Current permission status:', permissionStatus);
       
       // Check if we have any required permission
       const hasPermission = permissionStatus.location === 'granted' || permissionStatus.coarseLocation === 'granted';
+      console.log('Has location permission:', hasPermission);
       
       if (!hasPermission) {
+        console.log('Requesting location permission...');
         const requestResult = await Geolocation.requestPermissions();
+        console.log('Permission request result:', requestResult);
         
         // Check if either permission was granted
         const wasGranted = requestResult.location === 'granted' || requestResult.coarseLocation === 'granted';
@@ -35,16 +41,31 @@ export async function getCurrentLocation() {
         }
       }
       
-      // First try with high accuracy and longer timeout
+      // Clear any existing position cache
       try {
+        console.log('Clearing any cached positions...');
+        await Geolocation.clearWatch({ id: 'any' });
+      } catch (e) {
+        console.log('No cached positions to clear');
+      }
+      
+      // First try with high accuracy and shorter timeout
+      try {
+        console.log('Attempting high accuracy GPS location...');
         const position = await Geolocation.getCurrentPosition({
           enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 300000
+          timeout: 30000, // Increased timeout for better GPS fix
+          maximumAge: 0 // Force fresh reading
         });
 
         // Extract coordinates from position object
         if (position && position.coords) {
+          console.log('High accuracy GPS location obtained:', {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            accuracy: position.coords.accuracy,
+            timestamp: new Date(position.timestamp).toISOString()
+          });
           return {
             latitude: position.coords.latitude,
             longitude: position.coords.longitude,
@@ -53,18 +74,25 @@ export async function getCurrentLocation() {
         }
         throw new Error('Invalid position data received');
       } catch (highAccuracyError) {
-        console.log('High accuracy failed, trying low accuracy:', highAccuracyError);
-        // Fall back to low accuracy if high accuracy fails
+        console.log('High accuracy GPS failed:', highAccuracyError);
+        console.log('Trying network-based location as fallback...');
+        // Fall back to network location if GPS fails
         const position = await Geolocation.getCurrentPosition({
           enableHighAccuracy: false,
           timeout: 10000,
-          maximumAge: 300000
+          maximumAge: 0 // Force fresh reading
         });
         
         if (!position || !position.coords) {
           throw new Error('No location data received');
         }
         
+        console.log('Network-based location obtained:', {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy,
+          timestamp: new Date(position.timestamp).toISOString()
+        });
         return {
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
@@ -72,6 +100,7 @@ export async function getCurrentLocation() {
         };
       }
     } else {
+      console.log('Running on web platform');
       // Web platform
       return new Promise((resolve, reject) => {
         if (!navigator.geolocation) {
@@ -85,8 +114,14 @@ export async function getCurrentLocation() {
           maximumAge: 300000
         };
         
+        console.log('Requesting web browser location...');
         navigator.geolocation.getCurrentPosition(
           (position) => {
+            console.log('Web browser location obtained:', {
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+              accuracy: position.coords.accuracy
+            });
             resolve({
               latitude: position.coords.latitude,
               longitude: position.coords.longitude,
@@ -94,6 +129,7 @@ export async function getCurrentLocation() {
             });
           },
           (error) => {
+            console.error('Web browser location error:', error);
             reject(new Error(getGeolocationErrorMessage(error)));
           },
           options
@@ -124,9 +160,9 @@ export async function fetchPrayerTimes() {
     loadingStore.set(true);
     errorStore.set(null);
     
-    console.log('Fetching location...');
+    console.log('Starting prayer times fetch process...');
     const coords = await getCurrentLocation();
-    console.log('Location received:', coords);
+    console.log('Location coordinates received:', coords);
     
     if (!coords || typeof coords.latitude !== 'number' || typeof coords.longitude !== 'number') {
       console.error('Invalid coordinates:', coords);
@@ -136,15 +172,36 @@ export async function fetchPrayerTimes() {
     console.log('Location accuracy (meters):', coords.accuracy);
     
     // Get location name with retry
-    console.log('Fetching location name...');
+    console.log('Fetching location name from BigDataCloud API...');
     let locationData;
     try {
-      const response = await fetch(
-        `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${coords.latitude}&longitude=${coords.longitude}&localityLanguage=en`
-      );
+      const url = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${coords.latitude}&longitude=${coords.longitude}&localityLanguage=en`;
+      console.log('BigDataCloud API URL:', url);
+      
+      const response = await fetch(url);
       locationData = await response.json();
-      console.log('Location data:', locationData);
-      locationStore.set(`${locationData.city || 'Unknown City'}, ${locationData.countryName || 'Unknown Country'}`);
+      console.log('Full BigDataCloud response:', JSON.stringify(locationData, null, 2));
+      
+      // Try to get the most accurate city name using multiple fields
+      const cityName = locationData.locality || 
+                      locationData.city || 
+                      locationData.localityInfo?.administrative?.find(a => a.adminLevel === 8)?.name ||
+                      'Unknown City';
+                      
+      // Simplify country name by removing "(the)" if present
+      const countryName = locationData.countryName.replace(' (the)', '');
+                       
+      const locationString = `${cityName}, ${countryName}`;
+        
+      console.log('Available location fields:', {
+        locality: locationData.locality,
+        city: locationData.city,
+        administrative: locationData.localityInfo?.administrative?.find(a => a.adminLevel === 8)?.name,
+        countryName: locationData.countryName
+      });
+      
+      console.log('Final location string:', locationString);
+      locationStore.set(locationString);
     } catch (error) {
       console.error('Error fetching location name:', error);
       locationStore.set('Location name unavailable');
