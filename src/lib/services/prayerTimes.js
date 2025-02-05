@@ -9,11 +9,21 @@ export const errorStore = writable(null);
 export const locationStore = writable('');
 
 function formatTo12Hour(time24) {
-  const [hours, minutes] = time24.split(':');
-  const hour = parseInt(hours);
-  const ampm = hour >= 12 ? 'PM' : 'AM';
-  const hour12 = hour % 12 || 12;
-  return `${hour12}:${minutes} ${ampm}`;
+  try {
+    console.log('Converting time to 12-hour format:', time24);
+    const [hours, minutes] = time24.split(':').map(num => parseInt(num, 10));
+    const hour = parseInt(hours);
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const hour12 = hour % 12 || 12;
+    // Ensure minutes are padded with leading zero if needed
+    const paddedMinutes = minutes.toString().padStart(2, '0');
+    const formattedTime = `${hour12}:${paddedMinutes} ${ampm}`;
+    console.log('Converted time:', formattedTime);
+    return formattedTime;
+  } catch (error) {
+    console.error('Error formatting time:', error);
+    throw error;
+  }
 }
 
 export async function getCurrentLocation() {
@@ -169,118 +179,167 @@ export async function fetchPrayerTimes() {
       throw new Error('Invalid location data received');
     }
     
-    console.log('Location accuracy (meters):', coords.accuracy);
-    
-    // Get location name with retry
-    console.log('Fetching location name from BigDataCloud API...');
-    let locationData;
+    // Get location name using reverse geocoding
     try {
-      const url = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${coords.latitude}&longitude=${coords.longitude}&localityLanguage=en`;
-      console.log('BigDataCloud API URL:', url);
-      
-      const response = await fetch(url);
-      locationData = await response.json();
-      console.log('Full BigDataCloud response:', JSON.stringify(locationData, null, 2));
-      
-      // Try to get the most accurate city name using multiple fields
-      const cityName = locationData.locality || 
-                      locationData.city || 
-                      locationData.localityInfo?.administrative?.find(a => a.adminLevel === 8)?.name ||
-                      'Unknown City';
-                      
-      // Simplify country name by removing "(the)" if present
-      const countryName = locationData.countryName.replace(' (the)', '');
-                       
-      const locationString = `${cityName}, ${countryName}`;
+      const geocodeResponse = await fetch(
+        `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${coords.latitude}&longitude=${coords.longitude}&localityLanguage=en`
+      );
+      if (geocodeResponse.ok) {
+        const locationData = await geocodeResponse.json();
+        const locality = locationData.locality || locationData.city;
+        const country = locationData.countryName;
         
-      console.log('Available location fields:', {
-        locality: locationData.locality,
-        city: locationData.city,
-        administrative: locationData.localityInfo?.administrative?.find(a => a.adminLevel === 8)?.name,
-        countryName: locationData.countryName
-      });
-      
-      console.log('Final location string:', locationString);
-      locationStore.set(locationString);
+        let locationString = '';
+        if (locality) {
+          locationString = locality;
+          if (country) {
+            locationString += `, ${country}`;
+          }
+        } else if (country) {
+          locationString = country;
+        }
+        
+        if (locationString) {
+          locationStore.set(locationString);
+        }
+      }
     } catch (error) {
-      console.error('Error fetching location name:', error);
-      locationStore.set('Location name unavailable');
+      console.error('Error getting location name:', error);
+      // Don't throw here, we can still get prayer times even if location name fails
     }
     
     // Get prayer times with retry
     const date = new Date();
     const timestamp = Math.floor(date.getTime() / 1000);
     
-    console.log('Fetching prayer times...');
-    let retries = 3;
-    let lastError;
+    console.log('Fetching prayer times from API...');
+    console.log('Using coordinates:', {
+      latitude: coords.latitude,
+      longitude: coords.longitude,
+      timestamp: timestamp,
+      date: date.toISOString()
+    });
     
-    while (retries > 0) {
-      try {
-        const prayerResponse = await fetch(
-          `https://api.aladhan.com/v1/timings/${timestamp}?latitude=${coords.latitude}&longitude=${coords.longitude}&method=2`
-        );
-        
-        if (!prayerResponse.ok) {
-          throw new Error(`HTTP error! status: ${prayerResponse.status}`);
-        }
-        
-        const data = await prayerResponse.json();
-        console.log('Prayer times received:', data);
-        
-        if (!data || !data.data || !data.data.timings) {
-          throw new Error('Invalid prayer times data format');
-        }
-        
-        const timings = data.data.timings;
-        
-        const prayers = [
-          { 
-            name: 'Fajr', 
-            time: formatTo12Hour(timings.Fajr), 
-            done: false, 
-            icon: 'SunDim', 
-            weight: 'regular',
-            isPast: isPrayerPast(timings.Fajr),
-            fetchDate: date.toISOString()
-          },
-          { name: 'Dhuhr', time: formatTo12Hour(timings.Dhuhr), done: false, icon: 'Sun', weight: 'fill', isPast: isPrayerPast(timings.Dhuhr), fetchDate: date.toISOString() },
-          { name: 'Asr', time: formatTo12Hour(timings.Asr), done: false, icon: 'CloudSun', weight: 'regular', isPast: isPrayerPast(timings.Asr), fetchDate: date.toISOString() },
-          { name: 'Maghrib', time: formatTo12Hour(timings.Maghrib), done: false, icon: 'SunHorizon', weight: 'regular', isPast: isPrayerPast(timings.Maghrib), fetchDate: date.toISOString() },
-          { name: 'Isha', time: formatTo12Hour(timings.Isha), done: false, icon: 'MoonStars', weight: 'regular', isPast: isPrayerPast(timings.Isha), fetchDate: date.toISOString() }
-        ];
-        
-        prayerTimesStore.set(prayers);
-        return;
-      } catch (error) {
-        console.error(`Prayer times fetch attempt ${4 - retries} failed:`, error);
-        lastError = error;
-        retries--;
-        if (retries > 0) {
-          // Wait before retrying
-          await new Promise(resolve => setTimeout(resolve, 1000));
-        }
-      }
+    const prayerResponse = await fetch(
+      `https://api.aladhan.com/v1/timings/${timestamp}?latitude=${coords.latitude}&longitude=${coords.longitude}&method=2&adjustment=1`
+    );
+    
+    if (!prayerResponse.ok) {
+      throw new Error(`HTTP error! status: ${prayerResponse.status}`);
     }
     
-    // If we get here, all retries failed
-    throw lastError || new Error('Failed to fetch prayer times after all retries');
+    const data = await prayerResponse.json();
+    console.log('Raw prayer times received:', data);
+    
+    if (!data || !data.data || !data.data.timings) {
+      throw new Error('Invalid prayer times data format');
+    }
+    
+    const timings = data.data.timings;
+    console.log('Processing prayer times:', timings);
+    
+    const prayers = [
+      { 
+        name: 'Fajr', 
+        time: formatTo12Hour(timings.Fajr), 
+        originalTime: timings.Fajr,
+        done: false, 
+        icon: 'SunDim', 
+        weight: 'regular',
+        isPast: isPrayerPast(timings.Fajr),
+        fetchDate: date.toISOString()
+      },
+      { 
+        name: 'Dhuhr', 
+        time: formatTo12Hour(timings.Dhuhr), 
+        originalTime: timings.Dhuhr,
+        done: false, 
+        icon: 'Sun', 
+        weight: 'fill', 
+        isPast: isPrayerPast(timings.Dhuhr), 
+        fetchDate: date.toISOString() 
+      },
+      { 
+        name: 'Asr', 
+        time: formatTo12Hour(timings.Asr), 
+        originalTime: timings.Asr,
+        done: false, 
+        icon: 'CloudSun', 
+        weight: 'regular', 
+        isPast: isPrayerPast(timings.Asr), 
+        fetchDate: date.toISOString() 
+      },
+      { 
+        name: 'Maghrib', 
+        time: formatTo12Hour(timings.Maghrib), 
+        originalTime: timings.Maghrib,
+        done: false, 
+        icon: 'SunHorizon', 
+        weight: 'regular', 
+        isPast: isPrayerPast(timings.Maghrib), 
+        fetchDate: date.toISOString() 
+      },
+      { 
+        name: 'Isha', 
+        time: formatTo12Hour(timings.Isha), 
+        originalTime: timings.Isha,
+        done: false, 
+        icon: 'MoonStars', 
+        weight: 'regular', 
+        isPast: isPrayerPast(timings.Isha), 
+        fetchDate: date.toISOString() 
+      }
+    ];
+    
+    console.log('Processed prayer times:', prayers);
+    prayerTimesStore.set(prayers);
+    loadingStore.set(false);
+    return prayers;
+    
   } catch (error) {
     console.error('Error fetching prayer times:', error);
-    errorStore.set(error.message || 'Unable to fetch prayer times. Please check your internet connection.');
-    locationStore.set('Location unavailable');
-    prayerTimesStore.set([]);
-  } finally {
+    errorStore.set(error.message);
     loadingStore.set(false);
+    throw error;
   }
 }
 
 function isPrayerPast(time24) {
-  const now = new Date();
-  const [hours, minutes] = time24.split(':');
-  const prayerDate = new Date();
-  prayerDate.setHours(parseInt(hours), parseInt(minutes), 0);
-  return now > prayerDate;
+  try {
+    const now = new Date();
+    const [hours, minutes] = time24.split(':').map(num => parseInt(num, 10));
+    const prayerTime = new Date();
+    prayerTime.setHours(hours, minutes, 0, 0);
+
+    // If prayer time is in the past for today, consider it as tomorrow's prayer
+    if (prayerTime < now) {
+      prayerTime.setDate(prayerTime.getDate() + 1);
+    }
+
+    return now >= prayerTime;
+  } catch (error) {
+    console.error('Error checking if prayer is past:', error);
+    return false;
+  }
+}
+
+// Helper function to get prayer time as Date object
+export function getPrayerTimeAsDate(time24) {
+  try {
+    const [hours, minutes] = time24.split(':').map(num => parseInt(num, 10));
+    const prayerTime = new Date();
+    prayerTime.setHours(hours, minutes, 0, 0);
+
+    // If prayer time has passed for today, set it for tomorrow
+    if (prayerTime < new Date()) {
+      prayerTime.setDate(prayerTime.getDate() + 1);
+    }
+
+    return prayerTime;
+  } catch (error) {
+    console.error('Error converting prayer time to Date:', error);
+    throw error;
+  }
 }
 
 export function getNextPrayer() {

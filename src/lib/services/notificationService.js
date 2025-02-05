@@ -1,7 +1,7 @@
 import { LocalNotifications } from '@capacitor/local-notifications';
-import { fetchPrayerTimes, prayerTimesStore, getNextPrayer } from './prayerTimes';
+import { fetchPrayerTimes, prayerTimesStore, getNextPrayer, getPrayerTimeAsDate } from './prayerTimes';
 import { App } from '@capacitor/app';
-import { writable } from 'svelte/store';
+import { writable, get } from 'svelte/store';
 import { scheduleMoodNotifications } from './moodNotificationService';
 import { scheduleEndOfDayReminders } from './prayerReminderService';
 
@@ -18,33 +18,34 @@ export async function initializeNotificationChannels() {
         console.log('Existing channels:', channels.channels);
 
         // Android importance levels: 1 = low, 2 = medium, 3 = high, 4 = max
+        /** @type {import('@capacitor/local-notifications').LocalNotificationChannel[]} */
         const requiredChannels = [
             {
                 id: 'prayer_notifications',
                 name: 'Prayer Times',
                 description: 'Notifications for prayer times',
-                importance: 3,
+                importance: 4,
                 sound: 'notification_sound.wav'
             },
             {
                 id: 'prayer_mark_notifications',
                 name: 'Prayer Marking',
                 description: 'Reminders to mark your prayers',
-                importance: 3,
+                importance: 4,
                 sound: 'notification_sound.wav'
             },
             {
                 id: 'mood_notifications',
                 name: 'Mood Tracking Reminders',
                 description: 'Reminders for mood tracking',
-                importance: 3,
+                importance: 4,
                 sound: 'notification_sound.wav'
             },
             {
                 id: 'journal_notifications',
                 name: 'Journal Reminders',
                 description: 'Reminders for journal entries',
-                importance: 3,
+                importance: 4,
                 sound: 'notification_sound.wav'
             }
         ];
@@ -140,62 +141,74 @@ const MARK_PRAYER_DELAY = 30;
 async function scheduleMarkPrayerNotifications() {
     try {
         console.log('Starting to schedule mark prayer notifications...');
+        const prayerTimes = get(prayerTimesStore);
+        
+        if (!prayerTimes || prayerTimes.length === 0) {
+            console.error('No prayer times available for scheduling mark notifications');
+            return;
+        }
+
+        // Cancel existing mark prayer notifications first
+        console.log('Cancelling existing mark prayer notifications...');
+        const pendingNotifications = await LocalNotifications.getPending();
+        const markNotifications = pendingNotifications.notifications.filter(n => 
+            n.extra && n.extra.type === 'mark_prayer'
+        );
+        if (markNotifications.length > 0) {
+            await LocalNotifications.cancel({ notifications: markNotifications });
+            console.log('Cancelled existing mark prayer notifications');
+        }
+
         // Schedule notifications for each prayer time
         for (const prayer of prayerTimes) {
             console.log(`Scheduling mark notification for ${prayer.name} prayer...`);
-            const [time, period] = prayer.time.split(' ');
-            const [hours, minutes] = time.split(':');
-            let prayerHours = parseInt(hours);
             
-            // Convert to 24-hour format
-            if (period === 'PM' && prayerHours !== 12) {
-                prayerHours += 12;
-            } else if (period === 'AM' && prayerHours === 12) {
-                prayerHours = 0;
-            }
+            // Use the new getPrayerTimeAsDate function to get the correct schedule time
+            const prayerTime = getPrayerTimeAsDate(prayer.originalTime);
+            const scheduleTime = new Date(prayerTime);
+            scheduleTime.setMinutes(scheduleTime.getMinutes() + MARK_PRAYER_DELAY);
 
-            // Create notification schedule time in local timezone
-            const now = new Date();
-            const scheduleTime = new Date(
-                now.getFullYear(),
-                now.getMonth(),
-                now.getDate(),
-                prayerHours,
-                parseInt(minutes) + MARK_PRAYER_DELAY // 30 minutes after prayer time
-            );
+            console.log(`Scheduling ${prayer.name} notification for:`, scheduleTime.toLocaleString());
 
-            // If the prayer time has passed for today, schedule for tomorrow
-            if (scheduleTime < now) {
-                scheduleTime.setDate(scheduleTime.getDate() + 1);
-                console.log(`${prayer.name} prayer time has passed, scheduling for tomorrow`);
-            }
-
-            // Ensure we're working with local time
-            scheduleTime.setMinutes(scheduleTime.getMinutes() - scheduleTime.getTimezoneOffset());
-            
-            console.log(`${prayer.name} mark notification scheduled for: ${scheduleTime.toLocaleString()}`);
+            // Generate a consistent ID for each prayer's mark notification
+            const notificationId = 3000 + getPrayerIndex(prayer.name);
 
             await LocalNotifications.schedule({
                 notifications: [
                     {
                         title: 'Mark Your Prayer',
                         body: `Don't forget to mark your ${prayer.name} prayer in the app`,
-                        id: Math.floor(Math.random() * 100000) + 5000, // Using 5000+ to avoid ID conflicts
-                        schedule: { at: scheduleTime },
+                        id: notificationId,
+                        schedule: { 
+                            at: scheduleTime,
+                            every: 'day',
+                            allowWhileIdle: true
+                        },
                         smallIcon: 'ic_launcher_foreground',
                         channelId: 'prayer_mark_notifications',
                         sound: 'notification_sound',
-                        actionTypeId: '',
-                        extra: null
+                        ongoing: false,
+                        autoCancel: true,
+                        extra: {
+                            type: 'mark_prayer',
+                            prayerName: prayer.name
+                        }
                     }
                 ]
             });
-            console.log(`Successfully scheduled mark notification for ${prayer.name} prayer`);
+            console.log(`Successfully scheduled mark notification for ${prayer.name} prayer at ${scheduleTime.toLocaleString()}`);
         }
         console.log('Completed scheduling all mark prayer notifications');
     } catch (error) {
         console.error('Error scheduling mark prayer notifications:', error);
+        throw error;
     }
+}
+
+// Helper function to get consistent index for each prayer
+function getPrayerIndex(prayerName) {
+    const prayerOrder = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
+    return prayerOrder.indexOf(prayerName);
 }
 
 // Add notification click handler
@@ -212,19 +225,24 @@ async function setupNotificationClickHandler() {
 // Update setupNotifications to include end-of-day reminders and click handler
 export async function setupNotifications() {
     try {
+        console.log('Setting up notification system...');
         const permissionStatus = await checkNotificationPermission();
         if (permissionStatus !== 'granted') {
+            console.log('Notification permission not granted');
             return;
         }
 
         const settings = getNotificationSettings();
+        console.log('Notification settings:', settings);
 
         // Set up notification click handler
         await setupNotificationClickHandler();
+        console.log('Notification click handler set up');
 
         // Set up app lifecycle listeners
         App.addListener('appStateChange', async ({ isActive }) => {
             if (isActive) {
+                console.log('App became active, rescheduling notifications...');
                 if (settings.prayerNotifications) {
                     await scheduleAllPrayerNotifications();
                     await scheduleMarkPrayerNotifications();
@@ -238,11 +256,13 @@ export async function setupNotifications() {
 
         // Do initial scheduling
         if (settings.prayerNotifications) {
+            console.log('Scheduling prayer notifications...');
             await scheduleAllPrayerNotifications();
             await scheduleMarkPrayerNotifications();
             await scheduleEndOfDayReminders();
         }
         if (settings.moodNotifications) {
+            console.log('Scheduling mood notifications...');
             await scheduleMoodNotifications(true);
         }
 
