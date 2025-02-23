@@ -82,7 +82,7 @@
         left: 0;
         right: 0;
         bottom: 0;
-        background: rgba(0, 0, 0, 0.5);
+        background: rgba(33, 105, 116, 0.15);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -97,7 +97,7 @@
         background: white;
         border-radius: 16px;
         padding: 2rem;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 8px 16px rgba(33, 105, 116, 0.15);
     }
     
     .welcome-card {
@@ -108,7 +108,7 @@
         font-size: 2rem;
         font-weight: bold;
         margin-bottom: 0.5rem;
-        color: #1a237e;
+        color: #216974;
     }
     
     .subtitle {
@@ -131,44 +131,46 @@
     }
     
     .status-message.success {
-        background: #E8F5E9;
-        color: #2E7D32;
+        background: rgba(33, 105, 116, 0.1);
+        color: #216974;
     }
     
     .status-message.trial {
-        background: #E3F2FD;
-        color: #1565C0;
+        background: rgba(33, 105, 116, 0.1);
+        color: #216974;
     }
     
     .status-message.ended {
-        background: #FFEBEE;
-        color: #C62828;
+        background: rgba(239, 68, 68, 0.1);
+        color: #216974;
     }
     
     .primary-button {
         width: 100%;
         padding: 1rem;
-        background: #1a237e;
+        background: #216974;
         color: white;
         border: none;
         border-radius: 8px;
         font-size: 1rem;
         font-weight: bold;
         cursor: pointer;
-        transition: background 0.2s;
+        transition: all 0.2s;
         margin-bottom: 1rem;
     }
     
     .primary-button:hover {
-        background: #283593;
+        background: #184f57;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 6px rgba(33, 105, 116, 0.15);
     }
     
     .secondary-button {
         width: 100%;
         padding: 1rem;
         background: white;
-        color: #1a237e;
-        border: 2px solid #1a237e;
+        color: #216974;
+        border: 2px solid #216974;
         border-radius: 8px;
         font-size: 1rem;
         font-weight: bold;
@@ -177,7 +179,8 @@
     }
     
     .secondary-button:hover:not(:disabled) {
-        background: #E8EAF6;
+        background: rgba(33, 105, 116, 0.05);
+        transform: translateY(-1px);
     }
     
     .secondary-button:disabled {
@@ -193,15 +196,16 @@
         background: none;
         border: none;
         font-size: 1.5rem;
-        color: #666;
+        color: #216974;
         cursor: pointer;
         padding: 0.5rem;
         line-height: 1;
         border-radius: 50%;
-        transition: background 0.2s;
+        transition: all 0.2s;
     }
     
     .close-button:hover {
-        background: rgba(0, 0, 0, 0.05);
+        background: rgba(33, 105, 116, 0.1);
+        transform: scale(1.1);
     }
 </style> 

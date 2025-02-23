@@ -130,6 +130,7 @@
         font-size: 2rem;
         font-weight: bold;
         margin-bottom: 0.5rem;
+        color: #216974;
     }
     
     .subtitle {
@@ -141,6 +142,7 @@
     .description {
         margin-bottom: 2rem;
         color: #444;
+        line-height: 1.6;
     }
     
     .plans {
@@ -152,36 +154,39 @@
     
     .plan-card {
         background: white;
-        border-radius: 12px;
+        border-radius: 16px;
         padding: 2rem;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 4px 6px rgba(33, 105, 116, 0.1);
         position: relative;
         cursor: pointer;
-        transition: transform 0.2s, box-shadow 0.2s;
+        transition: all 0.3s ease;
+        border: 2px solid transparent;
     }
     
     .plan-card.selected {
-        transform: scale(1.02);
-        box-shadow: 0 8px 12px rgba(0, 0, 0, 0.15);
-        border: 2px solid #4CAF50;
+        transform: translateY(-4px);
+        box-shadow: 0 8px 16px rgba(33, 105, 116, 0.15);
+        border-color: #216974;
     }
     
     .save-badge {
         position: absolute;
         top: -12px;
         right: -12px;
-        background: #4CAF50;
+        background: #216974;
         color: white;
         padding: 0.5rem 1rem;
         border-radius: 20px;
         font-size: 0.9rem;
         font-weight: bold;
+        box-shadow: 0 2px 4px rgba(33, 105, 116, 0.2);
     }
     
     .price {
         font-size: 2.5rem;
         font-weight: bold;
         margin: 1rem 0;
+        color: #216974;
     }
     
     .price span {
@@ -199,63 +204,93 @@
     li {
         margin: 0.8rem 0;
         color: #444;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    
+    li::before {
+        content: "✓";
+        color: #216974;
+        font-weight: bold;
     }
     
     .plan-button {
         width: 100%;
         padding: 1rem;
-        background: #1a237e;
+        background: #216974;
         color: white;
         border: none;
         border-radius: 8px;
         font-size: 1rem;
         font-weight: bold;
         cursor: pointer;
-        transition: background 0.2s;
+        transition: all 0.2s;
     }
     
     .plan-button:hover {
-        background: #283593;
+        background: #184f57;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 6px rgba(33, 105, 116, 0.15);
     }
     
     .plan-button:disabled {
         background: #ccc;
         cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
     }
     
     .restore-button {
         background: transparent;
         border: none;
-        color: #666;
+        color: #216974;
         text-decoration: underline;
         cursor: pointer;
         margin: 1rem 0;
+        font-size: 0.9rem;
+        transition: all 0.2s;
+    }
+    
+    .restore-button:hover {
+        color: #184f57;
+        transform: translateY(-1px);
     }
     
     .trial-note {
         color: #666;
         font-size: 0.9rem;
         margin-top: 1rem;
+        padding: 1rem;
+        background: rgba(33, 105, 116, 0.05);
+        border-radius: 8px;
+        display: inline-block;
     }
     
     .loading {
         padding: 2rem;
-        color: #666;
+        color: #216974;
+        font-size: 1.1rem;
     }
     
     .error {
-        color: #f44336;
+        color: #ef4444;
         padding: 1rem;
         margin: 1rem 0;
-        background: #ffebee;
+        background: rgba(239, 68, 68, 0.1);
         border-radius: 8px;
     }
     
     .success {
-        color: #4CAF50;
+        color: #216974;
         padding: 2rem;
         margin: 1rem 0;
-        background: #E8F5E9;
+        background: rgba(33, 105, 116, 0.1);
         border-radius: 8px;
+    }
+
+    .success h2 {
+        color: #216974;
+        margin-bottom: 1rem;
     }
 </style> 
