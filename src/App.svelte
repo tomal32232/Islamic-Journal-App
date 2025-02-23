@@ -22,11 +22,14 @@
   import Tasbih from './lib/pages/Tasbih.svelte';
   import { initializeRevenueCat } from './lib/services/revenuecat';
   import Subscription from './lib/pages/Subscription.svelte';
+  import WelcomePopup from './lib/components/WelcomePopup.svelte';
+  import { trialStore, initializeTrialStatus } from './lib/services/trialService';
 
   let user = null;
   let activeTab = 'home';
   let showOnboarding = true;
   let isLoading = true;
+  let showWelcomePopup = false;
 
   onMount(() => {
     // Initialize RevenueCat
@@ -39,9 +42,19 @@
     
     // Listen for auth state changes
     const unsubscribe = auth.onAuthStateChanged(async (authUser) => {
-      user = authUser; // Set the user variable
+      const isNewLogin = !user && authUser;
+      user = authUser;
+      
       if (user) {
-        // Ensure prayer data is initialized when user logs in
+        // Initialize trial status
+        initializeTrialStatus(user.uid);
+        
+        // Show welcome popup for new login
+        if (isNewLogin) {
+          showWelcomePopup = true;
+        }
+        
+        // Ensure prayer data is initialized
         await ensurePrayerData();
       }
       isLoading = false;
@@ -81,6 +94,15 @@
   function navigateTo(page) {
     activeTab = page;
   }
+
+  function handleWelcomeClose() {
+    showWelcomePopup = false;
+  }
+
+  function handleSubscribe() {
+    showWelcomePopup = false;
+    navigateTo('subscription');
+  }
 </script>
 
 {#if isLoading}
@@ -92,6 +114,15 @@
 {:else if user}
   <div class="top-bar"></div>
   <div class="app-container">
+    {#if showWelcomePopup}
+      <WelcomePopup 
+        userId={user.uid}
+        showPopup={showWelcomePopup}
+        on:close={handleWelcomeClose}
+        on:subscribe={handleSubscribe}
+      />
+    {/if}
+    
     {#if activeTab !== 'notifications'}
       <NotificationIcon on:click={() => navigateTo('notifications')} />
     {/if}
