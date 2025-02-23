@@ -120,10 +120,13 @@
 
 <style>
     .subscription-container {
-        padding: 2rem;
+        padding: 1rem;
+        width: 100%;
         max-width: 800px;
         margin: 0 auto;
         text-align: center;
+        box-sizing: border-box;
+        min-height: calc(100vh - 140px);
     }
     
     .title {
@@ -147,20 +150,46 @@
     
     .plans {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-        gap: 2rem;
-        margin-bottom: 2rem;
+        grid-template-columns: 1fr;
+        gap: 1rem;
+        margin: 0 auto 2rem;
+        width: 100%;
+        padding: 0 1rem;
+        box-sizing: border-box;
+    }
+
+    @media (min-width: 768px) {
+        .subscription-container {
+            padding: 2rem;
+        }
+        
+        .plans {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 2rem;
+            padding: 0;
+        }
     }
     
     .plan-card {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 1.5rem;
         background: white;
         border-radius: 16px;
-        padding: 2rem;
         box-shadow: 0 4px 6px rgba(33, 105, 116, 0.1);
         position: relative;
         cursor: pointer;
         transition: all 0.3s ease;
         border: 2px solid transparent;
+        margin: 0 auto;
+        max-width: 400px;
+    }
+
+    @media (min-width: 768px) {
+        .plan-card {
+            padding: 2rem;
+            max-width: none;
+        }
     }
     
     .plan-card.selected {
@@ -247,9 +276,12 @@
         color: #216974;
         text-decoration: underline;
         cursor: pointer;
-        margin: 1rem 0;
+        margin: 1rem auto;
+        padding: 0.5rem;
         font-size: 0.9rem;
         transition: all 0.2s;
+        display: block;
+        width: fit-content;
     }
     
     .restore-button:hover {
@@ -260,11 +292,13 @@
     .trial-note {
         color: #666;
         font-size: 0.9rem;
-        margin-top: 1rem;
+        margin: 1rem auto 0;
         padding: 1rem;
         background: rgba(33, 105, 116, 0.05);
         border-radius: 8px;
-        display: inline-block;
+        width: auto;
+        max-width: 400px;
+        display: block;
     }
     
     .loading {

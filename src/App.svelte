@@ -175,6 +175,8 @@
     justify-content: center;
     align-items: center;
     background: #fff;
+    overflow: hidden;
+    box-sizing: border-box;
   }
 
   .loading-logo {
@@ -215,11 +217,26 @@
     min-height: 100vh;
     padding-bottom: 80px;
     background: #F8FAFC;
+    overflow-x: hidden;
+    box-sizing: border-box;
   }
 
   main {
     width: 100%;
-    min-height: 100vh;
+    min-height: calc(100vh - 80px);
     padding-top: 10px;
+    box-sizing: border-box;
+    overflow-x: hidden;
+  }
+
+  :global(body) {
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+    width: 100%;
+  }
+
+  :global(*) {
+    box-sizing: border-box;
   }
 </style>
