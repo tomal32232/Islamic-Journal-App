@@ -1,39 +1,123 @@
 <!-- Subscription.svelte -->
 <script>
     import { onMount } from 'svelte';
-    import { subscriptionStore, getCurrentOffering, purchasePackage, restorePurchases } from '../services/revenuecat';
+    import { subscriptionStore, getCurrentOffering, purchasePackage, restorePurchases, initializeRevenueCat } from '../services/revenuecat';
     
     let isLoading = true;
     let error = null;
     let offerings = null;
     let selectedPlan = 'annual'; // Default to annual plan
+    let initializationAttempts = 0;
+    const MAX_RETRIES = 3;
     
     // Subscribe to subscription status
     $: isSubscribed = $subscriptionStore.isSubscribed;
     
-    onMount(async () => {
+    async function loadOfferings() {
+        console.log('Starting to load offerings...');
         try {
-            offerings = await getCurrentOffering();
-            isLoading = false;
+            // Ensure RevenueCat is initialized first
+            if (initializationAttempts < MAX_RETRIES) {
+                console.log(`Initialization attempt ${initializationAttempts + 1} of ${MAX_RETRIES}`);
+                try {
+                    await Promise.race([
+                        initializeRevenueCat(),
+                        new Promise((_, reject) => 
+                            setTimeout(() => reject(new Error('Initialization timeout')), 15000)
+                        )
+                    ]);
+                    initializationAttempts++;
+                } catch (initError) {
+                    console.error('Initialization failed:', initError);
+                    if (initError.message === 'Initialization timeout') {
+                        // Reset initialization state and retry
+                        console.log('Initialization timed out, retrying...');
+                        error = 'Initializing payment system...';
+                        setTimeout(() => {
+                            console.log('Retrying after timeout...');
+                            error = null;
+                            isLoading = true;
+                            loadOfferings();
+                        }, 2000);
+                        return;
+                    }
+                    throw initError;
+                }
+            }
+            
+            console.log('Getting offerings from RevenueCat...');
+            try {
+                offerings = await getCurrentOffering();
+                console.log('Successfully loaded offerings');
+                isLoading = false;
+                error = null;
+            } catch (offeringsError) {
+                console.error('Failed to load offerings:', offeringsError);
+                
+                // Display a user-friendly error message
+                if (offeringsError.message?.includes('RevenueCat configuration error')) {
+                    error = offeringsError.message;
+                } else if (offeringsError.message?.includes('must be configured')) {
+                    error = 'Initializing payment system...';
+                    // Retry after a short delay
+                    setTimeout(() => {
+                        console.log('Retrying subscription load...');
+                        error = null;
+                        isLoading = true;
+                        loadOfferings();
+                    }, 2000);
+                } else {
+                    error = 'Unable to load subscription options. Please try again later.';
+                }
+                isLoading = false;
+            }
         } catch (err) {
-            error = err.message;
+            console.error('Subscription loading error:', err);
+            console.error('Error details:', {
+                message: err.message,
+                code: err.code,
+                stack: err.stack
+            });
+            
+            error = err.message || 'Failed to load subscription options';
             isLoading = false;
         }
+    }
+    
+    onMount(() => {
+        console.log('Subscription component mounted, loading offerings...');
+        loadOfferings();
     });
     
     async function handlePurchase(plan) {
+        console.log(`Attempting to purchase ${plan} plan...`);
         try {
+            if (!offerings?.[plan]) {
+                console.error(`Selected plan ${plan} not available`);
+                throw new Error('Selected plan is not available');
+            }
+            
             isLoading = true;
             error = null;
             
-            const packageToPurchase = plan === 'annual' ? offerings.annual : offerings.monthly;
-            if (!packageToPurchase) {
-                throw new Error('Selected package not available');
-            }
-            
-            await purchasePackage(packageToPurchase);
+            console.log('Ensuring RevenueCat is initialized...');
+            await initializeRevenueCat();
+            console.log(`Processing purchase for ${plan} plan...`);
+            await purchasePackage(offerings[plan]);
+            console.log('Purchase successful');
         } catch (err) {
-            error = err.message;
+            console.error('Purchase error:', err);
+            console.error('Error details:', {
+                message: err.message,
+                code: err.code,
+                stack: err.stack
+            });
+
+            if (err.code === 'PURCHASE_CANCELLED') {
+                console.log('Purchase cancelled by user');
+                return;
+            }
+            error = err.message || 'Failed to process purchase';
         } finally {
             isLoading = false;
         }
@@ -43,9 +127,12 @@
         try {
             isLoading = true;
             error = null;
+            
+            // Ensure RevenueCat is initialized before restore
+            await initializeRevenueCat();
             await restorePurchases();
         } catch (err) {
-            error = err.message;
+            error = err.message || 'Failed to restore purchases';
         } finally {
             isLoading = false;
         }
@@ -60,25 +147,34 @@
     </p>
     
     {#if isLoading}
-        <div class="loading">Loading...</div>
+        <div class="loading">Loading subscription options...</div>
     {:else if error}
-        <div class="error">{error}</div>
+        <div class="error">
+            {error}
+            <button class="retry-button" on:click={() => {
+                error = null;
+                isLoading = true;
+                loadOfferings();
+            }}>
+                Try Again
+            </button>
+        </div>
     {:else if isSubscribed}
         <div class="success">
             <h2>Thank you for your subscription!</h2>
             <p>You have full access to all premium features.</p>
         </div>
-    {:else}
+    {:else if offerings?.monthly || offerings?.annual}
         <div class="plans">
             <!-- Monthly Plan -->
-            <div class="plan-card {selectedPlan === 'monthly' ? 'selected' : ''}" 
+            <div class="plan-card {selectedPlan === 'monthly' ? 'selected' : ''}"
                  on:click={() => selectedPlan = 'monthly'}>
                 <h3>Monthly Journey</h3>
                 <div class="price">$2.99<span>/month</span></div>
                 <ul>
-                    <li>✓ Worship tracking</li>
-                    <li>✓ Prayer reminders</li>
-                    <li>✓ Progress analytics</li>
+                    <li>Worship tracking</li>
+                    <li>Prayer reminders</li>
+                    <li>Progress analytics</li>
                 </ul>
                 <button 
                     class="plan-button"
@@ -95,9 +191,9 @@
                 <h3>Annual Journey</h3>
                 <div class="price">$19.99<span>/year</span></div>
                 <ul>
-                    <li>✓ All monthly features</li>
-                    <li>✓ Priority support</li>
-                    <li>✓ Advanced analytics</li>
+                    <li>All monthly features</li>
+                    <li>Priority support</li>
+                    <li>Advanced analytics</li>
                 </ul>
                 <button 
                     class="plan-button"
@@ -115,6 +211,17 @@
         <p class="trial-note">
             Start with a 3-day free trial. Cancel anytime.
         </p>
+    {:else}
+        <div class="error">
+            Unable to load subscription options.
+            <button class="retry-button" on:click={() => {
+                error = null;
+                isLoading = true;
+                loadOfferings();
+            }}>
+                Try Again
+            </button>
+        </div>
     {/if}
 </div>
 
@@ -326,5 +433,23 @@
     .success h2 {
         color: #216974;
         margin-bottom: 1rem;
+    }
+    
+    .retry-button {
+        background: transparent;
+        border: none;
+        color: #216974;
+        text-decoration: underline;
+        cursor: pointer;
+        margin-top: 1rem;
+        padding: 0.5rem;
+        font-size: 0.9rem;
+        display: block;
+        width: fit-content;
+        margin: 1rem auto 0;
+    }
+    
+    .retry-button:hover {
+        color: #184f57;
     }
 </style> 
