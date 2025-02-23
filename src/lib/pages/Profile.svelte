@@ -3,12 +3,14 @@
   import { prayerHistoryStore } from '../stores/prayerHistoryStore';
   import { weeklyStatsStore } from '../stores/tasbihStore';
   import { badgeStore } from '../stores/badgeStore';
-  import { SignOut, CaretRight, PencilSimple, Camera } from 'phosphor-svelte';
+  import { SignOut, CaretRight, PencilSimple, Camera, Lock } from 'phosphor-svelte';
   import { currentPage } from '../stores/pageStore';
   import { onMount, onDestroy } from 'svelte';
   import { fade } from 'svelte/transition';
   import { getTodayReadingTime } from '../services/readingTimeService';
   import { getFirestore, collection, query, where, getDocs } from 'firebase/firestore';
+  import { signOut } from 'firebase/auth';
+  import { subscriptionStore } from '../services/revenuecat';
 
   interface StatItem {
     value: () => number;
@@ -23,7 +25,7 @@
     stats?: StatItem[];
   }
 
-  const user = auth.currentUser;
+  let user = auth.currentUser;
   let prayerStats = { onTime: 0, late: 0, missed: 0, total: 0 };
   let todayReadingTime = 0;
   let todayDhikrCount = 0;
@@ -36,6 +38,7 @@
   let displayName = localStorage.getItem('user_display_name') || user?.displayName || 'User';
   let profilePicture = '';
   let fileInput: HTMLInputElement;
+  let isLoading = true;
 
   // Calculate prayer statistics when prayerHistoryStore changes
   $: if ($prayerHistoryStore?.history) {
@@ -86,6 +89,9 @@
     earnedBadges = badgeStore.getEarnedBadges($badgeStore.earnedBadges);
   }
 
+  // Subscribe to subscription status
+  $: isSubscribed = $subscriptionStore.isSubscribed;
+
   const menuItems: MenuItem[] = [
     {
       title: 'Your Progress',
@@ -124,6 +130,17 @@
       title: 'Notifications',
       description: 'Manage prayer and journal reminder settings',
       path: 'notifications'
+    },
+    {
+      title: 'Subscription',
+      description: isSubscribed ? 'Manage Subscription' : 'Upgrade to Premium',
+      path: 'subscription',
+      stats: [
+        {
+          value: () => isSubscribed ? 'Active' : 'Free Trial',
+          label: 'Subscription Status'
+        }
+      ]
     }
   ];
 
@@ -206,6 +223,13 @@
       console.error('Error fetching yesterday\'s reading time:', error);
       yesterdayReadingTime = 0;
     }
+
+    const unsubscribe = auth.onAuthStateChanged((authUser) => {
+      user = authUser;
+      isLoading = false;
+    });
+
+    return () => unsubscribe();
   });
 
   onDestroy(() => {
@@ -214,7 +238,7 @@
 
   async function handleLogout() {
     try {
-      await auth.signOut();
+      await signOut(auth);
       currentPage.set('home');
     } catch (error) {
       console.error("Error signing out:", error);

@@ -20,6 +20,8 @@
   import { onboardingComplete, checkOnboardingStatus } from './lib/stores/onboardingStore';
   import QuranReading from './lib/components/QuranReading.svelte';
   import Tasbih from './lib/pages/Tasbih.svelte';
+  import { initializeRevenueCat } from './lib/services/revenuecat';
+  import Subscription from './lib/pages/Subscription.svelte';
 
   let user = null;
   let activeTab = 'home';
@@ -27,6 +29,11 @@
   let isLoading = true;
 
   onMount(() => {
+    // Initialize RevenueCat
+    initializeRevenueCat().catch(error => {
+      console.error('Failed to initialize RevenueCat:', error);
+    });
+
     // Check onboarding status
     checkOnboardingStatus();
     
@@ -114,6 +121,8 @@
         <Progress onBack={() => navigateTo('profile')} />
       {:else if activeTab === 'achievements'}
         <Achievements onBack={() => navigateTo('profile')} />
+      {:else if activeTab === 'subscription'}
+        <Subscription on:back={() => navigateTo('profile')} />
       {:else}
         <Home />
       {/if}
