@@ -19,11 +19,9 @@
         "useExactTimer": true
       }
     }
+  },
+  "server": {
+    "androidScheme": "https",
+    "cleartext": true
   }
-  // "server": {
-  //   "androidScheme": "http",
-  //   "iosScheme": "http",
-  //   "url": "http://10.0.2.2:5173",
-  //   "cleartext": true
-  // }
 }
