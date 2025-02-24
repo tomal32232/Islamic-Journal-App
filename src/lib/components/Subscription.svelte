@@ -3,6 +3,8 @@
     import { onMount } from 'svelte';
     import { subscriptionStore, getCurrentOffering, purchasePackage, restorePurchases, initializeRevenueCat } from '../services/revenuecat';
     import { trialStore, getTrialTimeRemaining, formatTrialTimeRemaining } from '../services/trialService';
+    import { Purchases } from '@revenuecat/purchases-capacitor';
+    import { Capacitor } from '@capacitor/core';
     
     let isLoading = true;
     let error = null;
@@ -148,6 +150,21 @@
             isLoading = false;
         }
     }
+
+    async function handleManageSubscription() {
+        try {
+            if (Capacitor.getPlatform() === 'android') {
+                window.open('market://account/subscriptions', '_blank');
+            } else if (Capacitor.getPlatform() === 'ios') {
+                window.open('itms-apps://apps.apple.com/account/subscriptions', '_blank');
+            } else {
+                // Fallback for web
+                console.log('Subscription management not available on web');
+            }
+        } catch (error) {
+            console.error('Error opening subscription management:', error);
+        }
+    }
 </script>
 
 <div class="subscription-container">
@@ -173,6 +190,9 @@
         <div class="success">
             <h2>Thank you for your subscription!</h2>
             <p>You have full access to all premium features.</p>
+            <button class="manage-button" on:click={handleManageSubscription}>
+                Manage Subscription
+            </button>
         </div>
     {:else if offerings?.monthly || offerings?.annual}
         <div class="plans">
@@ -495,5 +515,24 @@
     
     .retry-button:hover {
         color: #184f57;
+    }
+
+    .manage-button {
+        background: transparent;
+        border: 2px solid #216974;
+        color: #216974;
+        padding: 0.75rem 1.5rem;
+        border-radius: 8px;
+        font-size: 1rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+        margin-top: 1rem;
+    }
+    
+    .manage-button:hover {
+        background: rgba(33, 105, 116, 0.05);
+        transform: translateY(-1px);
+        box-shadow: 0 2px 4px rgba(33, 105, 116, 0.1);
     }
 </style> 
