@@ -141,8 +141,22 @@ export async function getOfferings() {
 export async function purchasePackage(packageToPurchase) {
     try {
         await initializeRevenueCat();
+        console.log('Attempting to purchase package:', packageToPurchase);
+        
+        // Enable test mode for development
+        if (process.env.NODE_ENV === 'development') {
+            console.log('Running in development mode - using test purchase flow');
+            await Purchases.setSimulatesAskToBuyInSandbox({
+                simulatesAskToBuyInSandbox: true
+            });
+        }
+        
         const { customerInfo } = await Purchases.purchasePackage({ 
-            aPackage: packageToPurchase 
+            aPackage: packageToPurchase,
+            googleProductChangeInfo: {
+                oldProductIdentifier: null,
+                prorationMode: null
+            }
         });
         await checkSubscriptionStatus();
         return customerInfo;
@@ -151,6 +165,7 @@ export async function purchasePackage(packageToPurchase) {
             console.log('User cancelled the purchase');
             return null;
         }
+        console.error('Purchase error:', error);
         throw error;
     }
 }

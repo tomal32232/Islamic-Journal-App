@@ -13,6 +13,13 @@
     // Subscribe to subscription status
     $: isSubscribed = $subscriptionStore.isSubscribed;
     
+    $: monthlyPrice = offerings?.monthly?.product?.priceString || '$2.99';
+    $: annualPrice = offerings?.annual?.product?.priceString || '$19.99';
+    $: monthlyTitle = offerings?.monthly?.product?.title || 'Monthly Journey';
+    $: annualTitle = offerings?.annual?.product?.title || 'Annual Journey';
+    $: monthlyDescription = offerings?.monthly?.product?.description;
+    $: annualDescription = offerings?.annual?.product?.description;
+    
     async function loadOfferings() {
         console.log('Starting to load offerings...');
         try {
@@ -169,12 +176,16 @@
             <!-- Monthly Plan -->
             <div class="plan-card {selectedPlan === 'monthly' ? 'selected' : ''}"
                  on:click={() => selectedPlan = 'monthly'}>
-                <h3>Monthly Journey</h3>
-                <div class="price">$2.99<span>/month</span></div>
+                <h3>{monthlyTitle}</h3>
+                <div class="price">{monthlyPrice}<span>/month</span></div>
                 <ul>
-                    <li>Worship tracking</li>
-                    <li>Prayer reminders</li>
-                    <li>Progress analytics</li>
+                    {#if monthlyDescription}
+                        <li>{monthlyDescription}</li>
+                    {:else}
+                        <li>Worship tracking</li>
+                        <li>Prayer reminders</li>
+                        <li>Progress analytics</li>
+                    {/if}
                 </ul>
                 <button 
                     class="plan-button"
@@ -188,12 +199,16 @@
             <div class="plan-card {selectedPlan === 'annual' ? 'selected' : ''}"
                  on:click={() => selectedPlan = 'annual'}>
                 <div class="save-badge">Save 44%</div>
-                <h3>Annual Journey</h3>
-                <div class="price">$19.99<span>/year</span></div>
+                <h3>{annualTitle}</h3>
+                <div class="price">{annualPrice}<span>/year</span></div>
                 <ul>
-                    <li>All monthly features</li>
-                    <li>Priority support</li>
-                    <li>Advanced analytics</li>
+                    {#if annualDescription}
+                        <li>{annualDescription}</li>
+                    {:else}
+                        <li>All monthly features</li>
+                        <li>Priority support</li>
+                        <li>Advanced analytics</li>
+                    {/if}
                 </ul>
                 <button 
                     class="plan-button"
