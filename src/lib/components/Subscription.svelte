@@ -2,6 +2,7 @@
 <script>
     import { onMount } from 'svelte';
     import { subscriptionStore, getCurrentOffering, purchasePackage, restorePurchases, initializeRevenueCat } from '../services/revenuecat';
+    import { trialStore, getTrialTimeRemaining, formatTrialTimeRemaining } from '../services/trialService';
     
     let isLoading = true;
     let error = null;
@@ -12,11 +13,14 @@
     
     // Subscribe to subscription status
     $: isSubscribed = $subscriptionStore.isSubscribed;
+    $: isInTrial = $trialStore.isInTrial;
+    $: hasTrialEnded = $trialStore.hasTrialEnded;
+    $: trialTimeRemaining = getTrialTimeRemaining();
     
-    $: monthlyPrice = offerings?.monthly?.product?.priceString || '$2.99';
-    $: annualPrice = offerings?.annual?.product?.priceString || '$19.99';
-    $: monthlyTitle = offerings?.monthly?.product?.title || 'Monthly Journey';
-    $: annualTitle = offerings?.annual?.product?.title || 'Annual Journey';
+    $: monthlyPrice = offerings?.monthly?.product?.priceString || 'BDT 420';
+    $: annualPrice = offerings?.annual?.product?.priceString || 'BDT 2,800';
+    $: monthlyTitle = 'Monthly Journey';
+    $: annualTitle = 'Annual Journey';
     $: monthlyDescription = offerings?.monthly?.product?.description;
     $: annualDescription = offerings?.annual?.product?.description;
     
@@ -147,12 +151,11 @@
 </script>
 
 <div class="subscription-container">
-    <h1 class="title">Welcome to Deen Reflections</h1>
-    <p class="subtitle">Strengthening your connection with Allah (swt)</p>
-    <p class="description">
-        Transform your daily worship with personalized insights, meaningful reminders, and powerful tracking tools.
-    </p>
-    
+    <div class="header">
+        <h1 class="title">Begin Your Spiritual Journey</h1>
+        <p class="subtitle">Choose your path to enhance your daily worship and strengthen your connection with Allah (swt)</p>
+    </div>
+
     {#if isLoading}
         <div class="loading">Loading subscription options...</div>
     {:else if error}
@@ -191,7 +194,7 @@
                     class="plan-button"
                     disabled={isLoading}
                     on:click={() => handlePurchase('monthly')}>
-                    Start Monthly Plan
+                    Start Monthly Journey
                 </button>
             </div>
             
@@ -214,7 +217,7 @@
                     class="plan-button"
                     disabled={isLoading}
                     on:click={() => handlePurchase('annual')}>
-                    Start Annual Plan
+                    Start Annual Journey
                 </button>
             </div>
         </div>
@@ -223,9 +226,15 @@
             Restore Purchase
         </button>
         
-        <p class="trial-note">
-            Start with a 3-day free trial. Cancel anytime.
-        </p>
+        {#if isInTrial}
+            <p class="trial-note">
+                Free trial - {formatTrialTimeRemaining(trialTimeRemaining)} remaining
+            </p>
+        {:else if hasTrialEnded}
+            <p class="trial-note trial-ended">
+                Your free trial has ended. Subscribe to continue using premium features.
+            </p>
+        {/if}
     {:else}
         <div class="error">
             Unable to load subscription options.
@@ -249,19 +258,30 @@
         text-align: center;
         box-sizing: border-box;
         min-height: calc(100vh - 140px);
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-start;
+    }
+    
+    .header {
+        margin-bottom: 2.5rem;
     }
     
     .title {
         font-size: 2rem;
         font-weight: bold;
-        margin-bottom: 0.5rem;
+        margin-bottom: 0.75rem;
         color: #216974;
+        letter-spacing: -0.5px;
     }
     
     .subtitle {
-        font-size: 1.2rem;
+        font-size: 1.1rem;
         color: #666;
-        margin-bottom: 1rem;
+        margin: 0;
+        line-height: 1.5;
+        max-width: 600px;
+        margin: 0 auto;
     }
     
     .description {
@@ -421,6 +441,11 @@
         width: auto;
         max-width: 400px;
         display: block;
+    }
+    
+    .trial-note.trial-ended {
+        background: rgba(239, 68, 68, 0.05);
+        color: #ef4444;
     }
     
     .loading {

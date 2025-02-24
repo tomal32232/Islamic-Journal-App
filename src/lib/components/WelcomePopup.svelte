@@ -3,6 +3,7 @@
     import { trialStore, startTrial, getTrialTimeRemaining, formatTrialTimeRemaining } from '../services/trialService';
     import { subscriptionStore } from '../services/revenuecat';
     import { fade, fly } from 'svelte/transition';
+    import { onMount } from 'svelte';
     
     export let userId;
     export let showPopup = true;
@@ -26,6 +27,13 @@
     function handleClose() {
         dispatch('close');
     }
+
+    onMount(() => {
+        // Start trial automatically when welcome popup is shown
+        if (!isSubscribed && !isInTrial && !hasTrialEnded) {
+            startTrial(userId);
+        }
+    });
 </script>
 
 {#if showPopup}

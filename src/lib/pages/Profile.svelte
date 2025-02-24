@@ -149,7 +149,7 @@
           ? `Free trial - ${formatTrialTimeRemaining(trialTimeRemaining)}`
           : hasTrialEnded
             ? 'Free trial ended - Upgrade now'
-            : 'Start your 3-day free trial',
+            : 'Begin Your Spiritual Journey',
       path: 'subscription',
       stats: [
         {
