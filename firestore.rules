@@ -147,5 +147,13 @@ service cloud.firestore {
       allow update: if isOwner(resource.data.userId);
       allow delete: if isOwner(resource.data.userId);
     }
+
+    // Add rules for trials collection
+    match /trials/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId);
+      allow delete: if isOwner(userId);
+    }
   }
 }

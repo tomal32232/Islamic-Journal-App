@@ -20,16 +20,28 @@
   import { onboardingComplete, checkOnboardingStatus } from './lib/stores/onboardingStore';
   import QuranReading from './lib/components/QuranReading.svelte';
   import Tasbih from './lib/pages/Tasbih.svelte';
-  import { initializeRevenueCat } from './lib/services/revenuecat';
+  import { initializeRevenueCat, subscriptionStore } from './lib/services/revenuecat';
   import Subscription from './lib/pages/Subscription.svelte';
   import WelcomePopup from './lib/components/WelcomePopup.svelte';
   import { trialStore, initializeTrialStatus } from './lib/services/trialService';
+  import { getFirestore, doc, getDoc } from 'firebase/firestore';
+  import { startTrial } from './lib/services/trialService';
 
   let user = null;
   let activeTab = 'home';
   let showOnboarding = true;
   let isLoading = true;
   let showWelcomePopup = false;
+
+  // Subscribe to subscription and trial status
+  $: isSubscribed = $subscriptionStore?.isSubscribed || false;
+  $: isInTrial = $trialStore?.isInTrial || false;
+  $: hasTrialEnded = $trialStore?.hasTrialEnded || false;
+
+  // Force subscription page when trial ends and not subscribed
+  $: if (hasTrialEnded && !isSubscribed && activeTab !== 'subscription') {
+    activeTab = 'subscription';
+  }
 
   onMount(() => {
     // Initialize RevenueCat
@@ -46,16 +58,38 @@
       user = authUser;
       
       if (user) {
-        // Initialize trial status
-        initializeTrialStatus(user.uid);
-        
-        // Show welcome popup for new login
-        if (isNewLogin) {
-          showWelcomePopup = true;
+        try {
+          console.log('User authenticated:', user.uid);
+          // Initialize trial status and start trial if not exists
+          const db = getFirestore();
+          const trialRef = doc(db, 'trials', user.uid);
+          console.log('Checking trial document:', trialRef.path);
+          const trialDoc = await getDoc(trialRef);
+          
+          if (!trialDoc.exists()) {
+            console.log('No trial found, starting new trial for user:', user.uid);
+            await startTrial(user.uid);
+          } else {
+            console.log('Existing trial found:', trialDoc.data());
+            await initializeTrialStatus(user.uid);
+          }
+          
+          // Show welcome popup for new login
+          if (isNewLogin) {
+            console.log('New login detected, showing welcome popup');
+            showWelcomePopup = true;
+          }
+          
+          // Ensure prayer data is initialized
+          await ensurePrayerData();
+        } catch (error) {
+          console.error('Error initializing trial:', error);
+          console.error('Error details:', {
+            code: error.code,
+            message: error.message,
+            stack: error.stack
+          });
         }
-        
-        // Ensure prayer data is initialized
-        await ensurePrayerData();
       }
       isLoading = false;
     });
@@ -123,12 +157,14 @@
       />
     {/if}
     
-    {#if activeTab !== 'notifications'}
+    {#if activeTab !== 'notifications' && (!hasTrialEnded || isSubscribed)}
       <NotificationIcon on:click={() => navigateTo('notifications')} />
     {/if}
     
     <main>
-      {#if activeTab === 'home'}
+      {#if hasTrialEnded && !isSubscribed}
+        <Subscription />
+      {:else if activeTab === 'home'}
         <Home on:navigate={e => navigateTo(e.detail)} />
       {:else if activeTab === 'notifications'}
         <Notifications onBack={() => navigateTo('home')} />
@@ -158,7 +194,9 @@
         <Home />
       {/if}
     </main>
-    <BottomNav {activeTab} on:tabChange={handleTabChange} />
+    {#if !hasTrialEnded || isSubscribed}
+      <BottomNav {activeTab} on:tabChange={handleTabChange} />
+    {/if}
   </div>
   <div class="bottom-bar"></div>
 {:else}

@@ -207,7 +207,6 @@ export async function restorePurchases() {
 // Get current offering
 export async function getCurrentOffering() {
     try {
-        console.log('Getting current offerings...');
         await Promise.race([
             initializeRevenueCat(),
             new Promise((_, reject) => 
@@ -215,37 +214,10 @@ export async function getCurrentOffering() {
             )
         ]);
         
-        console.log('Initialization completed, getting offerings...');
         try {
             const offerings = await Purchases.getOfferings();
-            console.log('Raw offerings response:', JSON.stringify(offerings, null, 2));
-
-            // Log all available offerings
-            if (offerings) {
-                console.log('All offerings:', Object.keys(offerings));
-                console.log('Current offering:', offerings.current);
-                if (offerings.all) {
-                    console.log('All available offerings:', Object.keys(offerings.all));
-                    Object.entries(offerings.all).forEach(([key, offering]) => {
-                        console.log(`Offering "${key}":`, {
-                            identifier: offering.identifier,
-                            serverDescription: offering.serverDescription,
-                            availablePackages: offering.availablePackages?.map(pkg => ({
-                                identifier: pkg.identifier,
-                                packageType: pkg.packageType,
-                                product: {
-                                    identifier: pkg.product.identifier,
-                                    description: pkg.product.description,
-                                    title: pkg.product.title
-                                }
-                            }))
-                        });
-                    });
-                }
-            }
 
             if (!offerings?.current) {
-                console.log('No current offerings available');
                 throw new Error(
                     'No products are configured in RevenueCat. ' +
                     'Please ensure you have:\n' +
@@ -255,18 +227,6 @@ export async function getCurrentOffering() {
                     '4. Published the changes'
                 );
             }
-
-            console.log('Available packages in current offering:', 
-                offerings.current.availablePackages?.map(pkg => ({
-                    identifier: pkg.identifier,
-                    packageType: pkg.packageType,
-                    product: {
-                        identifier: pkg.product.identifier,
-                        description: pkg.product.description,
-                        title: pkg.product.title
-                    }
-                }))
-            );
 
             if (!offerings.current.availablePackages?.length) {
                 throw new Error(
@@ -284,26 +244,6 @@ export async function getCurrentOffering() {
                 pkg => pkg.identifier === PRODUCT_IDS.ANNUAL
             );
 
-            console.log('Found monthly package:', monthlyPackage ? {
-                identifier: monthlyPackage.identifier,
-                packageType: monthlyPackage.packageType,
-                product: {
-                    identifier: monthlyPackage.product.identifier,
-                    description: monthlyPackage.product.description,
-                    title: monthlyPackage.product.title
-                }
-            } : 'Not found');
-            
-            console.log('Found annual package:', annualPackage ? {
-                identifier: annualPackage.identifier,
-                packageType: annualPackage.packageType,
-                product: {
-                    identifier: annualPackage.product.identifier,
-                    description: annualPackage.product.description,
-                    title: annualPackage.product.title
-                }
-            } : 'Not found');
-
             if (!monthlyPackage && !annualPackage) {
                 throw new Error(
                     'No matching packages found. Please ensure:\n' +
@@ -314,13 +254,10 @@ export async function getCurrentOffering() {
                 );
             }
 
-            const result = {
+            return {
                 monthly: monthlyPackage,
                 annual: annualPackage
             };
-
-            console.log('Returning offerings:', result);
-            return result;
         } catch (offeringsError) {
             // Check for specific RevenueCat configuration errors
             if (offeringsError.code === 'ConfigurationError' || 

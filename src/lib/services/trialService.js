@@ -1,4 +1,5 @@
 import { writable } from 'svelte/store';
+import { getFirestore, doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 export const trialStore = writable({
     isInTrial: false,
@@ -8,40 +9,99 @@ export const trialStore = writable({
 
 // Constants
 const TRIAL_DURATION_DAYS = 3;
-const TRIAL_STATUS_KEY = 'trial_status';
+const TRIAL_COLLECTION = 'trials';
 
 // Initialize trial status
-export function initializeTrialStatus(userId) {
-    const savedStatus = localStorage.getItem(`${TRIAL_STATUS_KEY}_${userId}`);
-    if (savedStatus) {
-        const status = JSON.parse(savedStatus);
-        updateTrialStatus(status.trialEndDate);
+export async function initializeTrialStatus(userId) {
+    const db = getFirestore();
+    const trialRef = doc(db, TRIAL_COLLECTION, userId);
+    
+    try {
+        const trialDoc = await getDoc(trialRef);
+        if (trialDoc.exists()) {
+            const trialData = trialDoc.data();
+            updateTrialStatus(trialData.trialEndDate);
+            return trialData;
+        }
+        return null;
+    } catch (error) {
+        console.error('Error initializing trial status:', error);
+        throw error;
+    }
+}
+
+// Check if trial exists
+export async function checkTrialExists(userId) {
+    const db = getFirestore();
+    const trialRef = doc(db, TRIAL_COLLECTION, userId);
+    
+    try {
+        const trialDoc = await getDoc(trialRef);
+        return trialDoc.exists();
+    } catch (error) {
+        console.error('Error checking trial existence:', error);
+        return false;
     }
 }
 
 // Start trial
-export function startTrial(userId) {
-    const trialEndDate = new Date();
-    trialEndDate.setDate(trialEndDate.getDate() + TRIAL_DURATION_DAYS);
+export async function startTrial(userId) {
+    console.log('Starting trial creation process for user:', userId);
+    const db = getFirestore();
+    const trialRef = doc(db, TRIAL_COLLECTION, userId);
     
-    const status = {
-        isInTrial: true,
-        trialEndDate: trialEndDate.toISOString(),
-        hasTrialEnded: false
-    };
-    
-    // Save to localStorage
-    localStorage.setItem(`${TRIAL_STATUS_KEY}_${userId}`, JSON.stringify(status));
-    
-    // Update store
-    trialStore.set(status);
-    
-    return status;
+    try {
+        // Check if trial already exists
+        console.log('Checking if trial exists...');
+        const trialDoc = await getDoc(trialRef);
+        if (trialDoc.exists()) {
+            console.log('Trial already exists:', trialDoc.data());
+            const existingTrial = trialDoc.data();
+            updateTrialStatus(existingTrial.trialEndDate);
+            return existingTrial;
+        }
+        
+        console.log('No existing trial found, creating new trial...');
+        // Calculate trial end date
+        const trialEndDate = new Date();
+        trialEndDate.setDate(trialEndDate.getDate() + TRIAL_DURATION_DAYS);
+        
+        const trialData = {
+            startDate: serverTimestamp(),
+            trialEndDate: trialEndDate.toISOString(),
+            userId,
+            createdAt: serverTimestamp()
+        };
+        
+        console.log('Saving trial data to Firestore:', trialData);
+        // Save to Firestore
+        await setDoc(trialRef, trialData);
+        console.log('Trial data saved successfully');
+        
+        // Update store
+        const status = {
+            isInTrial: true,
+            trialEndDate: trialEndDate.toISOString(),
+            hasTrialEnded: false
+        };
+        trialStore.set(status);
+        console.log('Trial store updated:', status);
+        
+        return trialData;
+    } catch (error) {
+        console.error('Error starting trial:', error);
+        console.error('Error details:', {
+            code: error.code,
+            message: error.message,
+            stack: error.stack
+        });
+        throw error;
+    }
 }
 
 // Check and update trial status
 export function updateTrialStatus(trialEndDate) {
-    if (!trialEndDate) return;
+    if (!trialEndDate) return null;
     
     const now = new Date();
     const endDate = new Date(trialEndDate);
