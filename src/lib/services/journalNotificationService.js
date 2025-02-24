@@ -6,11 +6,16 @@ import { get } from 'svelte/store';
 const NOTIFICATION_DELAY = 15; // 15 minutes after prayer
 
 export async function scheduleJournalNotifications(enabled = true) {
+    console.log('=== Starting Journal Notification Setup ===');
+    console.log('Journal notifications enabled:', enabled);
+    
     if (!enabled) {
+        console.log('Journal notifications disabled, cancelling existing notifications...');
         // Cancel any existing journal notifications
         const pendingNotifications = await LocalNotifications.getPending();
         if (pendingNotifications.notifications.length > 0) {
             await LocalNotifications.cancel(pendingNotifications);
+            console.log('Existing journal notifications cancelled');
         }
         return;
     }
@@ -47,7 +52,48 @@ export async function scheduleJournalNotifications(enabled = true) {
 
         const prayerTimes = get(prayerTimesStore);
         if (!prayerTimes || prayerTimes.length === 0) {
-            console.error('Prayer times not available');
+            console.error('Prayer times not available for journal notifications');
+            // Schedule default times
+            const morningTime = new Date();
+            morningTime.setHours(7, 0, 0); // 7:00 AM
+            
+            const eveningTime = new Date();
+            eveningTime.setHours(21, 0, 0); // 9:00 PM
+
+            console.log('Using fallback times for journal notifications:',
+                `Morning: ${morningTime.toLocaleString()}, Evening: ${eveningTime.toLocaleString()}`);
+
+            // Schedule morning notification
+            await LocalNotifications.schedule({
+                notifications: [{
+                    title: 'Morning Journal',
+                    body: 'Time for your morning reflection. Start your day mindfully!',
+                    id: 1001,
+                    schedule: { at: morningTime, every: 'day' },
+                    smallIcon: 'ic_launcher_foreground',
+                    channelId: 'journal_notifications',
+                    sound: 'notification_sound',
+                    actionTypeId: '',
+                    extra: null
+                }]
+            });
+            console.log('Fixed morning journal notification scheduled');
+
+            // Schedule evening notification
+            await LocalNotifications.schedule({
+                notifications: [{
+                    title: 'Evening Journal',
+                    body: 'Time for your evening reflection. How was your day?',
+                    id: 1002,
+                    schedule: { at: eveningTime, every: 'day' },
+                    smallIcon: 'ic_launcher_foreground',
+                    channelId: 'journal_notifications',
+                    sound: 'notification_sound',
+                    actionTypeId: '',
+                    extra: null
+                }]
+            });
+            console.log('Fixed evening journal notification scheduled');
             return;
         }
 
@@ -56,9 +102,14 @@ export async function scheduleJournalNotifications(enabled = true) {
         const ishaPrayer = prayerTimes.find(p => p.name === 'Isha');
 
         if (!fajrPrayer || !ishaPrayer) {
-            console.error('Could not find Fajr or Isha prayer times');
+            console.error('Could not find Fajr or Isha prayer times for journal notifications');
             return;
         }
+
+        console.log('Found prayer times for journal notifications:', {
+            fajr: fajrPrayer.time,
+            isha: ishaPrayer.time
+        });
 
         // Helper function to convert prayer time to Date
         function getPrayerTimeDate(timeStr) {
@@ -86,6 +137,8 @@ export async function scheduleJournalNotifications(enabled = true) {
 
         // Schedule morning notification (after Fajr)
         const morningTime = getPrayerTimeDate(fajrPrayer.time);
+        console.log('Scheduling morning journal notification for:', morningTime.toLocaleString());
+        
         await LocalNotifications.schedule({
             notifications: [{
                 title: 'Morning Journal',
@@ -99,9 +152,12 @@ export async function scheduleJournalNotifications(enabled = true) {
                 extra: null
             }]
         });
+        console.log('Morning journal notification scheduled successfully');
 
         // Schedule evening notification (after Isha)
         const eveningTime = getPrayerTimeDate(ishaPrayer.time);
+        console.log('Scheduling evening journal notification for:', eveningTime.toLocaleString());
+        
         await LocalNotifications.schedule({
             notifications: [{
                 title: 'Evening Journal',
@@ -115,8 +171,23 @@ export async function scheduleJournalNotifications(enabled = true) {
                 extra: null
             }]
         });
+        console.log('Evening journal notification scheduled successfully');
+
+        // Log all scheduled journal notifications
+        const finalPending = await LocalNotifications.getPending();
+        console.log('Currently scheduled journal notifications:', 
+            finalPending.notifications
+                .filter(n => n.id === 1001 || n.id === 1002)
+                .map(n => ({
+                    id: n.id,
+                    title: n.title,
+                    scheduledTime: new Date(n.schedule.at).toLocaleString()
+                }))
+        );
+        console.log('=== Journal Notification Setup Complete ===');
 
     } catch (error) {
-        console.error('Error scheduling journal notifications:', error);
+        console.error('=== Error in Journal Notification Setup ===');
+        console.error('Error details:', error);
     }
 } 

@@ -39,8 +39,15 @@ service cloud.firestore {
       allow write: if isAuthenticated() && request.auth.token.admin == true;  // Only admins can write
     }
 
-    // Reading sessions collection
+    // Reading sessions collections (supporting both naming conventions)
     match /readingSessions/{document=**} {
+      allow read: if isOwner(resource.data.userId);
+      allow create: if isOwner(request.resource.data.userId);
+      allow update: if isOwner(resource.data.userId);
+      allow delete: if isOwner(resource.data.userId);
+    }
+
+    match /reading_sessions/{document=**} {
       allow read: if isOwner(resource.data.userId);
       allow create: if isOwner(request.resource.data.userId);
       allow update: if isOwner(resource.data.userId);

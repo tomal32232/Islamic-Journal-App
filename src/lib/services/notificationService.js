@@ -235,14 +235,32 @@ export async function setupNotifications() {
         const settings = getNotificationSettings();
         console.log('Notification settings:', settings);
 
+        // Initialize notification channels first
+        await initializeNotificationChannels();
+        console.log('Notification channels initialized');
+
         // Set up notification click handler
         await setupNotificationClickHandler();
         console.log('Notification click handler set up');
+
+        // Fetch prayer times first
+        console.log('Fetching prayer times...');
+        await fetchPrayerTimes();
+        const prayerTimes = get(prayerTimesStore);
+        
+        if (!prayerTimes || prayerTimes.length === 0) {
+            console.log('Retrying prayer times fetch...');
+            await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+            await fetchPrayerTimes();
+        }
 
         // Set up app lifecycle listeners
         App.addListener('appStateChange', async ({ isActive }) => {
             if (isActive) {
                 console.log('App became active, rescheduling notifications...');
+                // Fetch fresh prayer times when app becomes active
+                await fetchPrayerTimes();
+                
                 if (settings.prayerNotifications) {
                     await scheduleAllPrayerNotifications();
                     await scheduleMarkPrayerNotifications();
@@ -324,6 +342,8 @@ async function scheduleAllPrayerNotifications() {
 
 async function scheduleNotification(prayerName, scheduleTime) {
     try {
+        console.log(`Scheduling prayer notification for ${prayerName} at ${scheduleTime.toLocaleString()}`);
+        
         // Convert the local time to UTC for the notification
         const utcScheduleTime = new Date(
             Date.UTC(
@@ -335,13 +355,16 @@ async function scheduleNotification(prayerName, scheduleTime) {
                 0
             )
         );
-
+        
+        console.log(`Converted to UTC time: ${utcScheduleTime.toISOString()}`);
+        const notificationId = Math.floor(Math.random() * 100000);
+        
         await LocalNotifications.schedule({
             notifications: [
                 {
                     title: 'Prayer Time',
                     body: `It's almost time for ${prayerName} prayer`,
-                    id: Math.floor(Math.random() * 100000),
+                    id: notificationId,
                     schedule: { at: utcScheduleTime },
                     smallIcon: 'ic_launcher_foreground',
                     channelId: 'prayer_notifications',
@@ -351,8 +374,22 @@ async function scheduleNotification(prayerName, scheduleTime) {
                 }
             ]
         });
+        
+        console.log(`Successfully scheduled ${prayerName} prayer notification (ID: ${notificationId})`);
+        
+        // Log next 24 hours of scheduled notifications
+        const pending = await LocalNotifications.getPending();
+        console.log('Currently scheduled prayer notifications:', 
+            pending.notifications
+                .filter(n => n.channelId === 'prayer_notifications')
+                .map(n => ({
+                    id: n.id,
+                    title: n.title,
+                    scheduledTime: new Date(n.schedule.at).toLocaleString()
+                }))
+        );
     } catch (error) {
-        console.error('Error scheduling notification:', error);
+        console.error(`Error scheduling notification for ${prayerName}:`, error);
     }
 }
 
