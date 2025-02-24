@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { fade } from 'svelte/transition';
   import Profile from './Profile.svelte';
   import { iconMap } from '../utils/icons';
@@ -17,7 +17,8 @@
     updatePrayerStatuses,
     saveExcusedPeriod,
     endExcusedPeriod,
-    getActiveExcusedPeriod 
+    getActiveExcusedPeriod,
+    cache as prayerHistoryCache
   } from '../stores/prayerHistoryStore';
   import WeeklyPrayerHistory from '../components/WeeklyPrayerHistory.svelte';
   import { createEventDispatcher } from 'svelte';
@@ -214,7 +215,7 @@
 
   let upcomingPrayer = null;
   let pendingPrayers = [];
-  let isLoadingPrayers = true;
+  let isLoadingPrayers = false;
 
   let upcomingCountdown = '';
   let countdownEnded = false;
@@ -356,79 +357,55 @@
 
   async function updatePrayerStatus() {
     console.log('Starting updatePrayerStatus...');
-    console.log('Current prayer times store:', $prayerTimesStore);
-    console.log('Current prayer history store:', $prayerHistoryStore);
     
     isLoadingPrayers = true;
     try {
       // Check if we have data in the store
       if (!$prayerTimesStore || $prayerTimesStore.length === 0) {
         console.log('No prayer times in store, fetching...');
-        // Only fetch if we don't have any data
         await fetchPrayerTimes();
       } else {
         // Check if we need to fetch new prayer times (after midnight)
         const now = new Date();
         const lastFetchDate = $prayerTimesStore[0]?.fetchDate;
-        console.log('Last fetch date:', lastFetchDate);
-        if (lastFetchDate && new Date(lastFetchDate).getDate() !== now.getDate()) {
-          console.log('New day detected, fetching new prayer times...');
-          await fetchPrayerTimes();
+        
+        if (lastFetchDate) {
+          const lastFetch = new Date(lastFetchDate);
+          const isSameDay = lastFetch.getDate() === now.getDate() && 
+                           lastFetch.getMonth() === now.getMonth() &&
+                           lastFetch.getFullYear() === now.getFullYear();
+                           
+          if (!isSameDay) {
+            console.log('New day detected, fetching new prayer times...');
+            await fetchPrayerTimes();
+          } else {
+            console.log('Using cached prayer times from same day');
+          }
         } else {
-          console.log('Using cached prayer times');
+          console.log('No fetch date found, fetching new prayer times...');
+          await fetchPrayerTimes();
         }
       }
 
-      // Only update prayer statuses if we have no history data
-      if (!$prayerHistoryStore?.history) {
-        console.log('No prayer history in store, fetching...');
+      // Only fetch prayer history if we don't have it or if it's stale
+      if (!$prayerHistoryStore?.history || !prayerHistoryCache.lastFetched) {
+        console.log('No prayer history in store or cache expired, fetching...');
         await getPrayerHistory();
       } else {
-        console.log('Using cached prayer history');
-      }
-
-      // Skip updatePrayerStatuses if we already have data
-      if (!$prayerHistoryStore?.pendingByDate) {
-        console.log('Updating prayer statuses...');
-        await updatePrayerStatuses();
-      } else {
-        console.log('Using cached prayer statuses');
-      }
-      
-      // Use the same counting logic as NotificationIcon
-      pendingPrayers = Object.values($prayerHistoryStore.pendingByDate)
-        .reduce((prayers, { prayers: datePrayers }) => [...prayers, ...datePrayers], []);
-      
-      upcomingPrayer = null;
-      
-      // Check if all prayers for today have passed
-      let allPrayersPassed = true;
-      if ($prayerTimesStore && $prayerTimesStore.length > 0) {
-        const now = new Date();
-        for (const prayer of $prayerTimesStore) {
-          if (!prayer?.time) continue;
-          const prayerTime = convertPrayerTimeToDate(prayer.time);
-          if (prayerTime > now) {
-            allPrayersPassed = false;
-            if (!upcomingPrayer) {
-              upcomingPrayer = prayer;
-              console.log('Found upcoming prayer:', prayer);
-              break;
-            }
-          }
+        const cacheAge = Number(Date.now()) - Number(prayerHistoryCache.lastFetched);
+        const CACHE_MAX_AGE = 5 * 60 * 1000; // 5 minutes
+        
+        if (cacheAge > CACHE_MAX_AGE) {
+          console.log('Prayer history cache expired, fetching fresh data...');
+          await getPrayerHistory();
+        } else {
+          console.log('Using cached prayer history, age:', Math.round(cacheAge / 1000), 'seconds');
         }
-      }
-
-      // If all prayers have passed, set upcomingPrayer to null to show appropriate message
-      if (allPrayersPassed) {
-        console.log('All prayers have passed for today');
-        upcomingPrayer = null;
       }
     } catch (error) {
       console.error('Error updating prayer status:', error);
     } finally {
       isLoadingPrayers = false;
-      console.log('Finished updatePrayerStatus');
     }
   }
 

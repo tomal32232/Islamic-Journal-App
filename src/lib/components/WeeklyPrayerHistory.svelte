@@ -63,12 +63,23 @@
   let gridCache = {
     data: null,
     timestamp: null,
-    historyHash: null
+    historyHash: null,
+    weekStartDate: null // Add this to track week changes
   };
 
   // Function to generate a simple hash of prayer history
   function getPrayerHistoryHash(history) {
+    if (!history) return '';
     return history.map(p => `${p.date}-${p.prayerName}-${p.status}`).join('|');
+  }
+
+  function getWeekStartDate() {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const dayOfWeek = today.getDay();
+    const startDate = new Date(today);
+    startDate.setDate(today.getDate() - dayOfWeek);
+    return startDate.toISOString();
   }
 
   function getCurrentWeekDays() {
@@ -95,13 +106,20 @@
     const prayers = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
     const grid = [];
     
+    // Get current week start date
+    const currentWeekStart = getWeekStartDate();
+    
     // Check if we can use cached data
     const currentHistoryHash = getPrayerHistoryHash($prayerHistoryStore.history);
     if (gridCache.data && 
         gridCache.historyHash === currentHistoryHash && 
-        Date.now() - gridCache.timestamp < 60000) { // Cache valid for 1 minute
+        gridCache.weekStartDate === currentWeekStart &&
+        Date.now() - gridCache.timestamp < 5 * 60 * 1000) { // Cache valid for 5 minutes
+      console.log('Using cached grid data');
       return gridCache.data;
     }
+    
+    console.log('Generating new grid data');
     
     // Reset weekly stats
     weeklyStats = {
@@ -205,44 +223,47 @@
       grid.push(row);
     }
 
-    // Update cache
+    // Update cache with new data and week start date
     gridCache = {
       data: { days, grid, weeklyStats },
       timestamp: Date.now(),
-      historyHash: currentHistoryHash
+      historyHash: currentHistoryHash,
+      weekStartDate: currentWeekStart
     };
 
     return { days, grid, weeklyStats };
   }
 
   onMount(async () => {
-    console.log('\n=== WeeklyPrayerHistory Mounted ===');
-    console.log('Fetching initial data...');
-    await Promise.all([
-      getPrayerHistory(),
-      fetchPrayerTimes()
-    ]);
-    console.log('Initial prayer history:', $prayerHistoryStore);
-    console.log('Initial prayer times:', $prayerTimesStore);
+    console.log('WeeklyPrayerHistory Mounted');
+    if (!$prayerHistoryStore.history || $prayerHistoryStore.history.length === 0) {
+      await Promise.all([
+        getPrayerHistory(),
+        fetchPrayerTimes()
+      ]);
+    }
     await updateGrid();
   });
 
+  let isUpdating = false;
   async function updateGrid() {
-    console.log('\n=== Updating Grid ===');
-    if ($prayerHistoryStore.history) {
-      console.log('Prayer history available, generating grid...');
-      const gridData = await generatePrayerGrid();
-      weeklyGrid = gridData.grid;
-      weeklyStats = gridData.weeklyStats;
-      console.log('Grid updated successfully');
-    } else {
-      console.log('No prayer history available');
+    if (isUpdating) return;
+    isUpdating = true;
+    
+    try {
+      if ($prayerHistoryStore.history) {
+        const gridData = await generatePrayerGrid();
+        weeklyGrid = gridData.grid;
+        weeklyStats = gridData.weeklyStats;
+      }
+    } finally {
+      isUpdating = false;
     }
   }
 
   let updateTimeout;
   let lastUpdateTime = 0;
-  const UPDATE_THROTTLE = 2000; // 2 seconds throttle
+  const UPDATE_THROTTLE = 5000; // Increase throttle to 5 seconds
 
   $: if ($prayerHistoryStore.history) {
     const now = Date.now();
@@ -251,7 +272,7 @@
       updateTimeout = setTimeout(() => {
         updateGrid();
         lastUpdateTime = now;
-      }, 1000);
+      }, 100);
     }
   }
 
