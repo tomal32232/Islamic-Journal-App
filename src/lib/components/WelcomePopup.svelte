@@ -36,7 +36,7 @@
     });
 </script>
 
-{#if showPopup}
+{#if showPopup && !isSubscribed}
 <div class="popup-overlay" transition:fade>
     <div class="popup-content" transition:fly="{{ y: 20, duration: 300 }}">
         <div class="welcome-card">
@@ -47,11 +47,7 @@
                 and powerful tracking tools.
             </p>
             
-            {#if isSubscribed}
-                <p class="status-message success">
-                    Thank you for your subscription! You have full access to all features.
-                </p>
-            {:else if isInTrial}
+            {#if isInTrial}
                 <p class="status-message trial">
                     Your free trial is active - {formatTrialTimeRemaining(trialTimeRemaining)}
                 </p>
