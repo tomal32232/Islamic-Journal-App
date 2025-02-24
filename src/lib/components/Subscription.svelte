@@ -154,9 +154,11 @@
     async function handleManageSubscription() {
         try {
             if (Capacitor.getPlatform() === 'android') {
-                window.open('market://account/subscriptions', '_blank');
+                // For Android, open Play Store subscriptions
+                window.location.href = 'https://play.google.com/store/account/subscriptions';
             } else if (Capacitor.getPlatform() === 'ios') {
-                window.open('itms-apps://apps.apple.com/account/subscriptions', '_blank');
+                // For iOS, open App Store subscriptions
+                window.location.href = 'https://apps.apple.com/account/subscriptions';
             } else {
                 // Fallback for web
                 console.log('Subscription management not available on web');
