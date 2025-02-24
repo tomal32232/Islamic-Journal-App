@@ -15,6 +15,7 @@
     
     // Subscribe to subscription status
     $: isSubscribed = $subscriptionStore.isSubscribed;
+    $: activeSubscription = $subscriptionStore.activeSubscription;
     $: isInTrial = $trialStore.isInTrial;
     $: hasTrialEnded = $trialStore.hasTrialEnded;
     $: trialTimeRemaining = getTrialTimeRemaining();
@@ -25,74 +26,44 @@
     $: annualTitle = 'Annual Journey';
     $: monthlyDescription = offerings?.monthly?.product?.description;
     $: annualDescription = offerings?.annual?.product?.description;
+
+    // Check if subscription is expired
+    function isSubscriptionExpired() {
+        if (!activeSubscription) return true;
+        const expirationDate = new Date(activeSubscription.expirationDate);
+        const now = new Date();
+        return expirationDate < now;
+    }
     
     async function loadOfferings() {
         console.log('Starting to load offerings...');
         try {
-            // Ensure RevenueCat is initialized first
-            if (initializationAttempts < MAX_RETRIES) {
-                console.log(`Initialization attempt ${initializationAttempts + 1} of ${MAX_RETRIES}`);
-                try {
-                    await Promise.race([
-                        initializeRevenueCat(),
-                        new Promise((_, reject) => 
-                            setTimeout(() => reject(new Error('Initialization timeout')), 15000)
-                        )
-                    ]);
-                    initializationAttempts++;
-                } catch (initError) {
-                    console.error('Initialization failed:', initError);
-                    if (initError.message === 'Initialization timeout') {
-                        // Reset initialization state and retry
-                        console.log('Initialization timed out, retrying...');
-                        error = 'Initializing payment system...';
-                        setTimeout(() => {
-                            console.log('Retrying after timeout...');
-                            error = null;
-                            isLoading = true;
-                            loadOfferings();
-                        }, 2000);
-                        return;
-                    }
-                    throw initError;
-                }
-            }
+            // First check subscription status
+            await initializeRevenueCat();
+            const { customerInfo } = await Purchases.getCustomerInfo();
+            console.log('Customer info:', customerInfo);
             
-            console.log('Getting offerings from RevenueCat...');
-            try {
+            // Update subscription store with latest info
+            const entitlements = customerInfo.entitlements.active;
+            const hasAccess = entitlements['premium_access'] !== undefined;
+            subscriptionStore.set({
+                isSubscribed: hasAccess,
+                activeSubscription: hasAccess ? entitlements['premium_access'] : null,
+                entitlements: entitlements
+            });
+
+            // If subscription is expired, load offerings
+            if (!hasAccess || isSubscriptionExpired()) {
+                console.log('No active subscription, loading offerings...');
                 offerings = await getCurrentOffering();
                 console.log('Successfully loaded offerings');
-                isLoading = false;
-                error = null;
-            } catch (offeringsError) {
-                console.error('Failed to load offerings:', offeringsError);
-                
-                // Display a user-friendly error message
-                if (offeringsError.message?.includes('RevenueCat configuration error')) {
-                    error = offeringsError.message;
-                } else if (offeringsError.message?.includes('must be configured')) {
-                    error = 'Initializing payment system...';
-                    // Retry after a short delay
-                    setTimeout(() => {
-                        console.log('Retrying subscription load...');
-                        error = null;
-                        isLoading = true;
-                        loadOfferings();
-                    }, 2000);
-                } else {
-                    error = 'Unable to load subscription options. Please try again later.';
-                }
-                isLoading = false;
             }
-        } catch (err) {
-            console.error('Subscription loading error:', err);
-            console.error('Error details:', {
-                message: err.message,
-                code: err.code,
-                stack: err.stack
-            });
             
-            error = err.message || 'Failed to load subscription options';
+            isLoading = false;
+            error = null;
+        } catch (error) {
+            console.error('Error loading subscription info:', error);
+            error = error.message || 'Failed to load subscription options';
             isLoading = false;
         }
     }
@@ -188,7 +159,7 @@
                 Try Again
             </button>
         </div>
-    {:else if isSubscribed}
+    {:else if isSubscribed && !isSubscriptionExpired()}
         <div class="success">
             <h2>Thank you for your subscription!</h2>
             <p>You have full access to all premium features.</p>
