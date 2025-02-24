@@ -261,10 +261,13 @@
         display: flex;
         flex-direction: column;
         justify-content: flex-start;
+        align-items: center;
     }
     
     .header {
         margin-bottom: 2.5rem;
+        width: 100%;
+        max-width: 600px;
     }
     
     .title {
@@ -296,13 +299,14 @@
         gap: 1rem;
         margin: 0 auto 2rem;
         width: 100%;
-        padding: 0 1rem;
+        max-width: 800px;
+        padding: 0;
         box-sizing: border-box;
     }
 
     @media (min-width: 768px) {
         .subscription-container {
-            padding: 2rem;
+            padding: 2rem 1rem;
         }
         
         .plans {
