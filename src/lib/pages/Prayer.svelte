@@ -189,7 +189,23 @@
   }
 
   async function exitCounter() {
-    await saveSession();
+    if (totalCount > 0) {
+      try {
+        for (const dhikr of selectedDhikrs) {
+          await saveTasbihSession({
+            dhikr,
+            count,
+            sets,
+            totalCount,
+            isManualEntry: dhikr.isCustom
+          });
+        }
+        const stats = await getWeeklyStats();
+        weeklyStreak = stats?.streak || 0;
+      } catch (error) {
+        console.error('Error saving dhikr session:', error);
+      }
+    }
     isCounterMode = false;
     count = 0;
   }
@@ -333,31 +349,34 @@
   async function submitManualDhikr() {
     if (manualDhikrText?.trim() && manualDhikrCount > 0) {
       try {
-        console.log('Saving manual dhikr:', manualDhikrText, manualDhikrCount);
-        await saveTasbihSession({
-          dhikr: {
-            text: manualDhikrText.trim(),
-            isCustom: true
-          },
-          count: manualDhikrCount % selectedTarget,
-          sets: Math.floor(manualDhikrCount / selectedTarget),
-          totalCount: manualDhikrCount,
-          isManualEntry: true
-        });
+        // Create a custom dhikr object similar to predefined ones
+        const customDhikr = {
+          text: manualDhikrText.trim(),
+          latin: manualDhikrText.trim(),
+          arabic: manualDhikrText.trim(),
+          meaning: '',
+          isCustom: true
+        };
         
-        // Update local state
-        totalCount += manualDhikrCount;
-        count = manualDhikrCount % selectedTarget;
-        sets += Math.floor(manualDhikrCount / selectedTarget);
+        // Set this as the selected dhikr
+        selectedDhikrs = [customDhikr];
         
-        // Update streak after saving
-        const stats = await getWeeklyStats();
-        weeklyStreak = stats?.streak || 0;
-        
+        // Close the popup
         showManualDhikrPopup = false;
-        console.log('Manual dhikr successfully saved');
+        
+        // Start counter mode
+        isCounterMode = true;
+        
+        // Reset counters
+        count = 0;
+        sets = 0;
+        totalCount = 0;
+        
+        // Set the target
+        selectedTarget = manualDhikrCount;
+        target = manualDhikrCount;
       } catch (error) {
-        console.error('Error saving manual dhikr:', error);
+        console.error('Error setting up manual dhikr:', error);
       }
     }
   }
@@ -476,7 +495,7 @@
           </div>
 
           <button class="add-manual-button" on:click={openManualDhikrPopup}>
-            Add Manual Dhikr
+            Choose your own Dhikr
           </button>
 
           <div class="target-selector">
@@ -534,9 +553,11 @@
           <div class="dhikr-display">
             {#each selectedDhikrs as dhikr}
               <div class="dhikr-item">
-                <span class="arabic-large">{dhikr.arabic}</span>
+                <span class="arabic-large">{dhikr.isCustom ? dhikr.text : dhikr.arabic}</span>
                 <span class="latin-large">{dhikr.latin}</span>
-                <span class="meaning">{dhikr.meaning}</span>
+                {#if !dhikr.isCustom}
+                  <span class="meaning">{dhikr.meaning}</span>
+                {/if}
               </div>
             {/each}
           </div>
@@ -619,7 +640,7 @@
       on:click|stopPropagation
       transition:slide={{ duration: 300, axis: 'y' }}
     >
-      <h3>Add Manual Dhikr</h3>
+      <h3>Start Dhikr</h3>
       
       <div class="popup-section">
         <h4>Enter Dhikr Text</h4>
