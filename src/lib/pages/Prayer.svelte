@@ -51,6 +51,7 @@
   let showManualDhikrPopup = false;
   let manualDhikrSelection = null;
   let manualDhikrCount = 33;
+  let manualDhikrText = '';
 
   function getNextPrayer(prayers) {
     const now = new Date();
@@ -324,17 +325,20 @@
   }
 
   function openManualDhikrPopup() {
-    manualDhikrSelection = null;
+    manualDhikrText = '';
     manualDhikrCount = 33;
     showManualDhikrPopup = true;
   }
 
   async function submitManualDhikr() {
-    if (manualDhikrSelection && manualDhikrCount > 0) {
+    if (manualDhikrText?.trim() && manualDhikrCount > 0) {
       try {
-        console.log('Saving manual dhikr:', manualDhikrSelection.latin, manualDhikrCount);
+        console.log('Saving manual dhikr:', manualDhikrText, manualDhikrCount);
         await saveTasbihSession({
-          dhikr: manualDhikrSelection,
+          dhikr: {
+            text: manualDhikrText.trim(),
+            isCustom: true
+          },
           count: manualDhikrCount % selectedTarget,
           sets: Math.floor(manualDhikrCount / selectedTarget),
           totalCount: manualDhikrCount,
@@ -618,17 +622,14 @@
       <h3>Add Manual Dhikr</h3>
       
       <div class="popup-section">
-        <h4>Select Dhikr</h4>
-        <div class="dhikr-slider">
-          {#each dhikrOptions as dhikr}
-            <button 
-              class="dhikr-option {manualDhikrSelection === dhikr ? 'active' : ''}"
-              on:click={() => manualDhikrSelection = dhikr}
-            >
-              <span class="arabic">{dhikr.arabic}</span>
-              <span class="latin">{dhikr.latin}</span>
-            </button>
-          {/each}
+        <h4>Enter Dhikr Text</h4>
+        <div class="dhikr-input">
+          <input 
+            type="text" 
+            bind:value={manualDhikrText}
+            placeholder="Enter your dhikr"
+            class="text-input"
+          />
         </div>
       </div>
 
@@ -655,7 +656,7 @@
         <button 
           class="submit-button" 
           on:click={submitManualDhikr}
-          disabled={!manualDhikrSelection || manualDhikrCount <= 0}
+          disabled={!manualDhikrText?.trim() || manualDhikrCount <= 0}
         >
           Add Dhikr
         </button>
@@ -761,10 +762,10 @@
   }
 
   h2 {
-    font-size: 1.125rem;
+    font-size: 1rem;
     color: #216974;
+    margin-bottom: 1rem;
     font-weight: 500;
-    margin: 0;
   }
 
   .prayer-times-grid {
@@ -891,14 +892,14 @@
 
   .streak-display {
     text-align: center;
-    margin-bottom: 2rem;
-    padding: 1rem;
+    margin-bottom: 1.5rem;
+    padding: 0.75rem;
     background: rgba(33, 105, 116, 0.1);
     border-radius: 8px;
   }
 
   .streak-count {
-    font-size: 1.5rem;
+    font-size: 1.25rem;
     color: #216974;
     font-weight: 500;
   }
@@ -906,20 +907,20 @@
   .dhikr-options {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 0.75rem;
-    margin-bottom: 2rem;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
   }
 
   .dhikr-button {
     background: white;
     border: 1px solid #E0E0E0;
-    padding: 1rem;
+    padding: 0.75rem 0.5rem;
     border-radius: 8px;
     width: 100%;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.25rem;
     transition: all 0.2s ease;
     cursor: pointer;
   }
@@ -931,33 +932,33 @@
   }
 
   .arabic {
-    font-size: 1.5rem;
+    font-size: 1.25rem;
     font-weight: 500;
   }
 
   .latin {
-    font-size: 0.875rem;
+    font-size: 0.75rem;
   }
 
   .target-selector {
-    margin-bottom: 2rem;
+    margin-bottom: 1.5rem;
   }
 
   .target-options {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 0.75rem;
-    margin-bottom: 1rem;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
   }
 
   .target-button {
     background: white;
     border: 1px solid #E0E0E0;
-    padding: 0.75rem;
-    border-radius: 8px;
+    padding: 0.5rem;
+    border-radius: 6px;
     cursor: pointer;
     transition: all 0.2s ease;
-    font-size: 1rem;
+    font-size: 0.875rem;
     color: #216974;
   }
 
@@ -976,16 +977,16 @@
     align-items: center;
     gap: 0.5rem;
     background: white;
-    padding: 0.75rem;
-    border-radius: 8px;
+    padding: 0.5rem;
+    border-radius: 6px;
     border: 1px solid #E0E0E0;
   }
 
   .custom-target input {
-    width: 100px;
+    width: 80px;
     border: none;
-    padding: 0.5rem;
-    font-size: 1rem;
+    padding: 0.375rem;
+    font-size: 0.875rem;
     color: #216974;
     text-align: center;
   }
@@ -998,10 +999,10 @@
     background: #216974;
     color: white;
     width: 100%;
-    padding: 1rem;
+    padding: 0.75rem;
     border: none;
     border-radius: 8px;
-    font-size: 1.125rem;
+    font-size: 1rem;
     cursor: pointer;
     transition: all 0.2s ease;
   }
@@ -1287,29 +1288,23 @@
     margin-bottom: 0.5rem;
   }
 
-  .dhikr-slider {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
+  .dhikr-input {
+    margin-bottom: 1rem;
   }
 
-  .dhikr-option {
-    background: white;
-    border: 1px solid #E0E0E0;
+  .text-input {
+    width: 100%;
     padding: 0.75rem;
+    border: 1px solid #E0E0E0;
     border-radius: 8px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.25rem;
-    cursor: pointer;
-    transition: all 0.2s ease;
+    font-size: 1rem;
+    color: #216974;
   }
 
-  .dhikr-option.active {
-    background: #216974;
+  .text-input:focus {
+    outline: none;
     border-color: #216974;
-    color: white;
+    box-shadow: 0 0 0 2px rgba(33, 105, 116, 0.1);
   }
 
   .count-input {
