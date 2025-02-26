@@ -1,15 +1,18 @@
 <script>
   import { onMount } from 'svelte';
-  import { Timer, ChartLine, Heart, Brain } from 'phosphor-svelte';
+  import { Timer, ChartLine, Heart, Brain, HandsPraying } from 'phosphor-svelte';
   import { prayerHistoryStore, getPrayerHistory } from '../stores/prayerHistoryStore';
   import { moodHistoryStore, getMoodHistory } from '../stores/moodStore';
   import { auth } from '../firebase';
   import { quranHistoryStore, getQuranHistory, addTestQuranReading } from '../stores/quranHistoryStore';
+  import { weeklyStatsStore, getWeeklyStats } from '../stores/tasbihStore';
 
   let prayerStreak = 0;
   let longestStreak = 0;
   let onTimeRate = 0;
   let onTimeChange = 0;
+  let dhikrStreak = 0;
+  let longestDhikrStreak = 0;
   let prayerAnalysis = {
     Fajr: { rate: 0, change: 0 },
     Dhuhr: { rate: 0, change: 0 },
@@ -129,10 +132,18 @@
     await Promise.all([
       getPrayerHistory(),
       getMoodHistory(),
-      getQuranHistory()
+      getQuranHistory(),
+      getWeeklyStats()
     ]);
     calculateInsights();
   });
+
+  // Subscribe to weeklyStatsStore changes
+  $: if ($weeklyStatsStore) {
+    dhikrStreak = $weeklyStatsStore.streak || 0;
+    // For longest streak, we'll need to track it separately as it's not in the store
+    longestDhikrStreak = Math.max(longestDhikrStreak, dhikrStreak);
+  }
 
   function calculateInsights() {
     if (!$prayerHistoryStore.history) return;
@@ -553,6 +564,18 @@
         <div class="sub-text {onTimeChange >= 0 ? 'positive' : 'negative'}">
           {onTimeChange >= 0 ? '+' : ''}{onTimeChange}% from last week
         </div>
+      </div>
+    </div>
+
+    <!-- Dhikr Streak Card -->
+    <div class="insight-card">
+      <div class="card-header">
+        <HandsPraying weight="fill" size={24} />
+        <h2>Dhikr Streak</h2>
+      </div>
+      <div class="card-content">
+        <div class="big-number">{dhikrStreak} Days</div>
+        <div class="sub-text">Longest: {longestDhikrStreak} days</div>
       </div>
     </div>
 
