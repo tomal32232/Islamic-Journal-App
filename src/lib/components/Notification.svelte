@@ -20,10 +20,16 @@
         
         return confetti;
     }
+
+    // Debug logging
+    $: if ($notificationStore.length > 0) {
+        console.log('Active notifications:', $notificationStore);
+    }
 </script>
 
 <div class="notifications-container">
     {#each $notificationStore as notification (notification.id)}
+        {@const confetti = createConfetti()}
         <div
             class="notification"
             transition:fly={{ y: 50, duration: 300 }}
@@ -31,14 +37,14 @@
         >
             <div class="notification-content">
                 <div class="icon">
-                    <Trophy weight="fill" />
+                    <Trophy weight="fill" size={24} />
                 </div>
                 <p>{notification.message}</p>
             </div>
             
             <!-- Confetti effect -->
             <div class="confetti-container">
-                {#each createConfetti() as particle}
+                {#each confetti as particle}
                     <div
                         class="confetti"
                         style="
@@ -58,21 +64,23 @@
 <style>
     .notifications-container {
         position: fixed;
-        bottom: 20px;
+        bottom: 80px;  /* Increased to avoid bottom nav */
         right: 20px;
-        z-index: 1000;
+        z-index: 9999;  /* Increased z-index */
         display: flex;
         flex-direction: column-reverse;
         gap: 10px;
         pointer-events: none;
+        max-width: 90%;
     }
 
     .notification {
         background: white;
         border-radius: 12px;
         padding: 1rem;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
         width: 300px;
+        max-width: 100%;
         position: relative;
         overflow: hidden;
         pointer-events: auto;
@@ -97,6 +105,7 @@
         background: #216974;
         border-radius: 50%;
         color: white;
+        flex-shrink: 0;
     }
 
     p {
@@ -105,6 +114,7 @@
         font-size: 0.9rem;
         line-height: 1.4;
         flex: 1;
+        word-break: break-word;
     }
 
     .confetti-container {
@@ -114,6 +124,7 @@
         width: 100%;
         height: 100%;
         pointer-events: none;
+        overflow: hidden;
     }
 
     .confetti {

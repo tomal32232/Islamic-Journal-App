@@ -5,6 +5,7 @@
   import Home from './lib/pages/Home.svelte';
   import Notifications from './lib/pages/Notifications.svelte';
   import NotificationIcon from './lib/components/NotificationIcon.svelte';
+  import Notification from './lib/components/Notification.svelte';
   import Badges from './lib/pages/Badges.svelte';
   import Profile from './lib/pages/Profile.svelte';
   import Tracker from './lib/pages/Tracker.svelte';
@@ -166,6 +167,8 @@
         on:subscribe={handleSubscribe}
       />
     {/if}
+    
+    <Notification />
     
     {#if activeTab !== 'notifications' && (!hasTrialEnded || isSubscribed)}
       <NotificationIcon on:click={() => navigateTo('notifications')} />

@@ -4,6 +4,7 @@ import { auth } from '../firebase';
 import { db } from '../firebase';
 import { doc, setDoc, getDoc, onSnapshot } from 'firebase/firestore';
 import { achievementStore } from './achievementStore';
+import { notificationStore } from './notificationStore';
 
 // Debounce helper function
 function debounce(func, wait) {
@@ -151,16 +152,21 @@ function createBadgeStore() {
     async updateProgress(type, value, silent = false) {
       const now = Date.now();
       if (now - lastUpdate < RATE_LIMIT_WINDOW) {
-        return; // Skip update if within rate limit window
+        console.log('Skipping update due to rate limiting');
+        return;
       }
       lastUpdate = now;
 
       const userId = auth.currentUser?.uid;
-      if (!userId) return;
+      if (!userId) {
+        console.log('No user ID found for badge update');
+        return;
+      }
 
       const userDoc = doc(db, 'users', userId, 'achievements', 'badges');
       
       try {
+        console.log(`Updating badge progress for ${type}:`, value);
         const docSnap = await getDoc(userDoc);
         const exists = docSnap.exists();
         const currentData = exists ? docSnap.data() : { earnedBadges: [], progress: {} };
@@ -177,6 +183,13 @@ function createBadgeStore() {
           currentData.earnedBadges || []
         );
 
+        // Log badge verification results
+        console.log('Badge verification results:', {
+          currentBadges: currentData.earnedBadges || [],
+          newBadges: newlyEarnedBadges.map(b => b.id),
+          totalEarned: earnedBadges.length
+        });
+
         // Update Firestore
         const updatedData = {
           earnedBadges,
@@ -188,6 +201,22 @@ function createBadgeStore() {
         
         // Update local store
         set(updatedData);
+
+        // Trigger notifications for newly earned badges
+        if (newlyEarnedBadges.length > 0 && !silent) {
+          console.log('Triggering notifications for new badges:', 
+            newlyEarnedBadges.map(badge => ({
+              id: badge.id,
+              name: badge.name,
+              notification: badge.notification
+            }))
+          );
+          newlyEarnedBadges.forEach(badge => {
+            const message = badge.notification || `🎉 New achievement unlocked: ${badge.name}!`;
+            console.log('Showing notification with message:', message);
+            notificationStore.showNotification(message, 'achievement');
+          });
+        }
 
         return newlyEarnedBadges;
       } catch (error) {
