@@ -478,11 +478,6 @@
     {#if !isCounterMode}
       <div class="tasbih-section">
         <div class="setup-card">
-          <div class="streak-display">
-            <h3>Weekly Streak</h3>
-            <span class="streak-count">{weeklyStreak} days</span>
-          </div>
-          
           <h2>Select Dhikr (Multiple Selection)</h2>
           <div class="dhikr-options">
             {#each dhikrOptions as dhikr}
@@ -911,20 +906,6 @@
     padding: 1.5rem;
     border-radius: 12px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-  }
-
-  .streak-display {
-    text-align: center;
-    margin-bottom: 1.5rem;
-    padding: 0.75rem;
-    background: rgba(33, 105, 116, 0.1);
-    border-radius: 8px;
-  }
-
-  .streak-count {
-    font-size: 1.25rem;
-    color: #216974;
-    font-weight: 500;
   }
 
   .dhikr-options {
