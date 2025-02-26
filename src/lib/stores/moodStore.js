@@ -136,15 +136,13 @@ export function shouldShowMoodSelector(prayerTimes) {
   };
 }
 
+// Helper function to convert prayer time string to Date object
 function convertPrayerTimeToDate(timeStr) {
-  const [time, period] = timeStr.split(' ');
-  const [hours, minutes] = time.split(':');
-  const date = new Date();
-  let hour = parseInt(hours);
+  const now = new Date();
+  const [hours, minutes] = timeStr.split(':').map(Number);
   
-  if (period === 'PM' && hour !== 12) hour += 12;
-  if (period === 'AM' && hour === 12) hour = 0;
+  const date = new Date(now);
+  date.setHours(hours, minutes, 0, 0);
   
-  date.setHours(hour, parseInt(minutes), 0, 0);
   return date;
 } 

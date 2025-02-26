@@ -41,6 +41,7 @@
   import { fetchMoodGuidance } from '../services/moodGuidanceService';
   import QuranReading from '../components/QuranReading.svelte';
   import LocationPermissionDialog from '../components/LocationPermissionDialog.svelte';
+  import MoodPopup from '../components/MoodPopup.svelte';
   const dispatch = createEventDispatcher();
   
   let currentPage = 'home';
@@ -52,6 +53,31 @@
   let showLocationDialog = false;
 
   let isAdmin = false;
+
+  type MoodPeriod = 'morning' | 'evening';
+  type PrayerTime = {
+    name: string;
+    timestamp: string;
+  };
+
+  type WeekMoods = {
+    [date: string]: {
+      morning?: any;
+      evening?: any;
+    };
+  };
+
+  type MoodSelectorResult = {
+    showMorningMood: boolean;
+    showEveningMood: boolean;
+  };
+
+  type PrayerTimesStore = Array<PrayerTime>;
+
+  let showMoodPopup = false;
+  let currentMoodPeriod: MoodPeriod = 'morning';
+  let lastMoodCheck: Date | null = null;
+  let weekMoods: WeekMoods = {};
 
   async function checkAndSetAdminStatus() {
     const firebaseAuth = getAuth();
@@ -138,11 +164,16 @@
     const countdownInterval = setInterval(updateCountdown, 1000);
     const notificationInterval = setInterval(checkPrayerNotifications, 60000);
     
+    // Initial check and setup interval
+    checkMoodPopup();
+    const moodCheckInterval = setInterval(checkMoodPopup, 60000);
+
     return () => {
       cleanup();
       clearInterval(prayerInterval);
       clearInterval(countdownInterval);
       clearInterval(notificationInterval);
+      clearInterval(moodCheckInterval);
       container?.removeEventListener('scroll', handleScroll);
     };
   });
@@ -228,8 +259,6 @@
   let showMoodSelector = false;
   let currentMorningMood = null;
   let currentEveningMood = null;
-  let weekMoods = {};
-  let currentMoodPeriod = 'morning';
 
   let selectedHistoryMood = null;
 
@@ -500,10 +529,63 @@
     }
   }
 
-  async function handleMoodSelect(event) {
-    const selectedMood = event.detail;
+  // Function to check if we should show the mood popup
+  function checkMoodPopup(): void {
+    if (!$prayerTimesStore || !Array.isArray($prayerTimesStore) || $prayerTimesStore.length === 0) return;
+
+    const now = new Date();
+    const today = now.toLocaleDateString();
+
+    // Don't check more than once per minute
+    const timeDiff = lastMoodCheck ? now.getTime() - lastMoodCheck.getTime() : Infinity;
+    if (timeDiff < 60000) return;
+    lastMoodCheck = now;
+
+    // Get today's moods
+    const todayMoods = weekMoods[today] || {};
+
+    // Get prayer times
+    const prayerTimes = $prayerTimesStore as PrayerTimesStore;
+    const fajrPrayer = prayerTimes.find(p => p.name === 'Fajr');
+    const ishaPrayer = prayerTimes.find(p => p.name === 'Isha');
+    const dhuhrPrayer = prayerTimes.find(p => p.name === 'Dhuhr');
+
+    if (!fajrPrayer || !ishaPrayer || !dhuhrPrayer) return;
+
+    const fajrTime = new Date(fajrPrayer.timestamp);
+    const ishaTime = new Date(ishaPrayer.timestamp);
+    const dhuhrTime = new Date(dhuhrPrayer.timestamp);
+
+    // Check if we're in the morning window (after Fajr, before Dhuhr)
+    const isMorningWindow = now >= fajrTime && now < dhuhrTime;
+    
+    // Check if we're in the evening window (after Isha, before midnight)
+    const isEveningWindow = now >= ishaTime && now.getHours() < 24;
+
+    // Show popup for morning if:
+    // 1. It's after Fajr and before Dhuhr
+    // 2. We haven't recorded morning mood yet
+    if (isMorningWindow && !todayMoods.morning) {
+      currentMoodPeriod = 'morning';
+      showMoodPopup = true;
+      return;
+    }
+
+    // Show popup for evening if:
+    // 1. It's after Isha and before midnight
+    // 2. We haven't recorded evening mood yet
+    if (isEveningWindow && !todayMoods.evening) {
+      currentMoodPeriod = 'evening';
+      showMoodPopup = true;
+      return;
+    }
+
+    showMoodPopup = false;
+  }
+
+  async function handleMoodSubmit(selectedMood: any, period: MoodPeriod): Promise<void> {
     try {
-      await saveMood(selectedMood, selectedMood.guidance, currentMoodPeriod);
+      await saveMood(selectedMood, selectedMood.guidance, period);
       
       // Use the local mood template to ensure we have the icon
       const matchingMood = moods.find(m => m.value === selectedMood.value);
@@ -516,17 +598,25 @@
           guidance: selectedMood.guidance
         };
 
-        if (currentMoodPeriod === 'morning') {
+        if (period === 'morning') {
           currentMorningMood = moodData;
         } else {
           currentEveningMood = moodData;
         }
       }
-      showMoodSelector = false;
       await loadWeekMoods();
     } catch (error) {
       console.error('Error saving mood:', error);
     }
+  }
+
+  function handleMoodSelect(event: CustomEvent): void {
+    void handleMoodSubmit(event.detail, currentMoodPeriod);
+    showMoodPopup = false;
+  }
+
+  function handleMoodSkip(): void {
+    showMoodPopup = false;
   }
 
   async function loadWeekMoods() {
@@ -761,13 +851,25 @@
       fetchPrayerTimes();
     }
   }
+
+  function handleTestMoodPopup() {
+    // Toggle between morning and evening
+    currentMoodPeriod = currentMoodPeriod === 'morning' ? 'evening' : 'morning';
+    showMoodPopup = true;
+  }
 </script>
 
 <div class="home-container">
-  <NotificationIcon on:click={() => navigateTo('notifications')} />
+  <div class="top-bar">
+    <NotificationIcon on:click={() => navigateTo('notifications')} />
+    <button class="test-button" on:click={handleTestMoodPopup}>
+      Test {currentMoodPeriod === 'morning' ? 'Evening' : 'Morning'} Mood
+    </button>
+  </div>
   <div class="content">
     {#if currentPage === 'home'}
       <div class="home-content">
+        <!-- Add test button at the top -->
         <div class="quote-card" class:scrolled={isScrolled}>
           <div class="greeting-section">
             <div class="greeting-content">
@@ -1000,6 +1102,14 @@
 
 {#if showLocationDialog}
   <LocationPermissionDialog on:permissionResult={handleLocationResult} />
+{/if}
+
+{#if showMoodPopup}
+  <MoodPopup
+    period={currentMoodPeriod}
+    onSelect={handleMoodSelect}
+    onSkip={handleMoodSkip}
+  />
 {/if}
 
 <style>
@@ -1662,7 +1772,6 @@
 
   .mood-icon-button:hover {
     transform: scale(1.1);
-    color: #184f57;
   }
 
   .mood-icon-button :global(svg) {
@@ -1873,11 +1982,6 @@
     padding: 0.25rem 0;
   }
 
-  /* Remove the old calendar-strip transition styles */
-  .quote-card.scrolled + .calendar-strip {
-    display: none;
-  }
-
   .mood-icons {
     display: flex;
     gap: 0.5rem;
@@ -1957,6 +2061,49 @@
     display: flex;
     gap: 10px;
     margin-top: 10px;
+  }
+
+  .test-button-container {
+    padding: 0.5rem 0;
+    display: flex;
+    justify-content: center;
+    margin-bottom: 0.5rem;
+  }
+
+  .test-button {
+    background: #216974;
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 12px;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 2px 4px rgba(33, 105, 116, 0.1);
+    flex-grow: 1;
+  }
+
+  .test-button:hover {
+    background-color: #184f57;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 6px rgba(33, 105, 116, 0.15);
+  }
+
+  .test-button:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 2px rgba(33, 105, 116, 0.1);
+  }
+
+  .top-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem;
+    background: white;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    gap: 1rem;
   }
 </style>
 
