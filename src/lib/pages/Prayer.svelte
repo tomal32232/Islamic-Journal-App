@@ -1035,54 +1035,74 @@
     right: 0;
     bottom: 0;
     background: linear-gradient(135deg, #216974, #1a545d);
-    padding: 2rem;
     display: flex;
     flex-direction: column;
     align-items: center;
     color: white;
-    z-index: 1000;
+    z-index: 1001;
   }
 
   .exit-button {
     position: absolute;
     top: 1rem;
     left: 1rem;
-    background: rgba(255,255,255,0.2);
+    background: rgba(255,255,255,0.15);
     color: white;
     border: none;
-    padding: 0.5rem 1rem;
-    border-radius: 4px;
+    padding: 0.5rem 1.5rem;
+    border-radius: 8px;
     cursor: pointer;
+    font-size: 0.875rem;
+    transition: all 0.2s ease;
+  }
+
+  .exit-button:hover {
+    background: rgba(255,255,255,0.2);
   }
 
   .counter-content {
     height: 100%;
+    width: 100%;
+    max-width: 400px;
+    margin: 0 auto;
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    gap: 2rem;
+    justify-content: space-between;
+    padding: 4rem 1rem 2rem;
+    box-sizing: border-box;
   }
 
   .dhikr-display {
     text-align: center;
+    width: 100%;
+    padding: 1rem;
+    background: rgba(255,255,255,0.1);
+    border-radius: 12px;
+    margin-bottom: 2rem;
+  }
+
+  .dhikr-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
   }
 
   .arabic-large {
-    font-size: 3rem;
-    display: block;
-    margin-bottom: 0.5rem;
+    font-size: 2.5rem;
+    font-weight: 500;
+    line-height: 1.2;
   }
 
   .latin-large {
-    font-size: 1.5rem;
-    display: block;
-    margin-bottom: 0.25rem;
+    font-size: 1.25rem;
+    opacity: 0.9;
   }
 
   .meaning {
-    font-size: 1rem;
-    opacity: 0.8;
+    font-size: 0.875rem;
+    opacity: 0.7;
   }
 
   .progress {
@@ -1090,28 +1110,41 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.75rem;
+    margin: 1rem 0 2rem;
   }
 
   .count-large {
-    font-size: 5rem;
+    font-size: 4.5rem;
+    font-weight: 600;
+    line-height: 1;
+    color: #fff;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+
+  .sets-display {
+    font-size: 1.125rem;
+    opacity: 0.9;
     font-weight: 500;
   }
 
-  .sets-display, .target-display {
-    font-size: 1.25rem;
-    opacity: 0.8;
+  .target-display {
+    font-size: 1rem;
+    opacity: 0.7;
   }
 
   .total-count {
-    font-size: 1rem;
-    color: #E09453;
+    font-size: 0.875rem;
+    color: rgba(255,255,255,0.9);
+    background: rgba(224, 148, 83, 0.2);
+    padding: 0.375rem 1rem;
+    border-radius: 100px;
     margin-top: 0.5rem;
   }
 
   .counter-button {
-    width: 200px;
-    height: 200px;
+    width: 160px;
+    height: 160px;
     border-radius: 50%;
     background: rgba(255,255,255,0.1);
     border: 2px solid rgba(255,255,255,0.2);
@@ -1120,80 +1153,75 @@
     justify-content: center;
     cursor: pointer;
     transition: all 0.2s ease;
+    margin-bottom: 1.5rem;
   }
 
   .inner-circle {
-    width: 80%;
-    height: 80%;
+    width: 85%;
+    height: 85%;
     border-radius: 50%;
     background: rgba(255,255,255,0.15);
     display: flex;
     align-items: center;
     justify-content: center;
+    transition: all 0.15s ease;
   }
 
   .tap-text {
-    font-size: 1.5rem;
+    font-size: 1.125rem;
     opacity: 0.9;
+    font-weight: 500;
   }
 
-  .counter-button:active {
+  .counter-button:active .inner-circle {
     transform: scale(0.95);
-    background: rgba(255,255,255,0.15);
+    background: rgba(255,255,255,0.25);
   }
 
   .reset-button {
     background: rgba(255,255,255,0.1);
     color: white;
     border: none;
-    padding: 0.75rem 1.5rem;
-    border-radius: 4px;
+    padding: 0.625rem 1.5rem;
+    border-radius: 8px;
     cursor: pointer;
-    font-size: 1rem;
+    font-size: 0.875rem;
+    transition: all 0.2s ease;
   }
 
-  @media (max-width: 640px) {
-    .prayer-container {
-      padding: 0;
+  .reset-button:hover {
+    background: rgba(255,255,255,0.15);
+  }
+
+  @media (max-height: 700px) {
+    .counter-content {
+      padding: 3rem 1rem 1.5rem;
     }
 
-    .prayer-times-grid {
-      grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-      gap: 0.75rem;
-      padding: 0.75rem;
-      margin: 0.5rem;
+    .dhikr-display {
+      margin-bottom: 1.5rem;
     }
 
-    .prayer-time-card {
-      padding: 1rem 0.75rem;
-      gap: 0.5rem;
+    .arabic-large {
+      font-size: 2rem;
     }
 
-    .icon-wrapper {
-      padding: 0.5rem;
-    }
-
-    .prayer-name {
-      font-size: 0.875rem;
-    }
-
-    .prayer-time {
+    .latin-large {
       font-size: 1rem;
     }
 
-    .tabs {
-      padding: 0.5rem;
-      gap: 0.25rem;
+    .progress {
+      margin: 0.75rem 0 1.5rem;
     }
 
-    .tab-button {
-      padding: 0.5rem;
-      font-size: 0.75rem;
+    .count-large {
+      font-size: 3.5rem;
     }
 
-    .tab-button :global(svg) {
-      width: 16px;
-      height: 16px;
+    .counter-button {
+      width: 140px;
+      height: 140px;
+      margin-bottom: 1rem;
     }
   }
 
