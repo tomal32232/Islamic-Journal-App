@@ -14,12 +14,6 @@ function createNotificationStore() {
                 console.log('Current notifications:', newNotifications);
                 return newNotifications;
             });
-
-            // Auto-remove notification after 5 seconds
-            setTimeout(() => {
-                console.log('🗑️ Auto-removing notification:', id);
-                update(notifications => notifications.filter(n => n.id !== id));
-            }, 5000);
         },
         removeNotification: (id) => {
             console.log('❌ Manually removing notification:', id);

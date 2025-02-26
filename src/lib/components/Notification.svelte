@@ -30,32 +30,41 @@
 <div class="notifications-container">
     {#each $notificationStore as notification (notification.id)}
         {@const confetti = createConfetti()}
-        <div
-            class="notification"
-            transition:fly={{ y: 50, duration: 300 }}
-            on:click={() => notificationStore.removeNotification(notification.id)}
-        >
-            <div class="notification-content">
-                <div class="icon">
-                    <Trophy weight="fill" size={24} />
+        <div class="notification-overlay" transition:fade>
+            <div
+                class="notification"
+                transition:fly={{ y: 50, duration: 300 }}
+            >
+                <div class="notification-content">
+                    <div class="icon">
+                        <Trophy weight="fill" size={24} />
+                    </div>
+                    <p>{notification.message}</p>
                 </div>
-                <p>{notification.message}</p>
-            </div>
-            
-            <!-- Confetti effect -->
-            <div class="confetti-container">
-                {#each confetti as particle}
-                    <div
-                        class="confetti"
-                        style="
-                            left: {particle.x}%;
-                            top: {particle.y}%;
-                            background-color: {particle.color};
-                            width: {particle.r}px;
-                            height: {particle.r}px;
-                        "
-                    />
-                {/each}
+                
+                <!-- Confetti effect -->
+                <div class="confetti-container">
+                    {#each confetti as particle}
+                        <div
+                            class="confetti"
+                            style="
+                                left: {particle.x}%;
+                                top: {particle.y}%;
+                                background-color: {particle.color};
+                                width: {particle.r}px;
+                                height: {particle.r}px;
+                            "
+                        />
+                    {/each}
+                </div>
+
+                <!-- Close button -->
+                <button 
+                    class="close-button"
+                    on:click={() => notificationStore.removeNotification(notification.id)}
+                >
+                    Got it!
+                </button>
             </div>
         </div>
     {/each}
@@ -64,28 +73,44 @@
 <style>
     .notifications-container {
         position: fixed;
-        bottom: 80px;  /* Increased to avoid bottom nav */
-        right: 20px;
-        z-index: 9999;  /* Increased z-index */
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 9999;
         display: flex;
-        flex-direction: column-reverse;
-        gap: 10px;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
         pointer-events: none;
-        max-width: 90%;
+    }
+
+    .notification-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        pointer-events: auto;
     }
 
     .notification {
         background: white;
-        border-radius: 12px;
-        padding: 1rem;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-        width: 300px;
-        max-width: 100%;
+        border-radius: 16px;
+        padding: 1.5rem;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+        width: 90%;
+        max-width: 400px;
         position: relative;
         overflow: hidden;
-        pointer-events: auto;
-        cursor: pointer;
-        animation: slide-in 0.3s ease-out;
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+        animation: pop-in 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
     }
 
     .notification-content {
@@ -100,8 +125,8 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        width: 40px;
-        height: 40px;
+        width: 48px;
+        height: 48px;
         background: #216974;
         border-radius: 50%;
         color: white;
@@ -111,10 +136,32 @@
     p {
         margin: 0;
         color: #333;
-        font-size: 0.9rem;
-        line-height: 1.4;
+        font-size: 1rem;
+        line-height: 1.5;
         flex: 1;
         word-break: break-word;
+    }
+
+    .close-button {
+        background: #216974;
+        color: white;
+        border: none;
+        border-radius: 12px;
+        padding: 0.75rem 2rem;
+        font-size: 1rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+        width: 100%;
+    }
+
+    .close-button:hover {
+        background: #1a545d;
+        transform: translateY(-1px);
+    }
+
+    .close-button:active {
+        transform: translateY(0);
     }
 
     .confetti-container {
@@ -129,23 +176,23 @@
 
     .confetti {
         position: absolute;
-        animation: confetti-fall 1s ease-out forwards;
+        animation: confetti-fall 1.5s ease-out forwards;
     }
 
-    @keyframes slide-in {
-        from {
-            transform: translateX(100%);
+    @keyframes pop-in {
+        0% {
+            transform: scale(0.8);
             opacity: 0;
         }
-        to {
-            transform: translateX(0);
+        100% {
+            transform: scale(1);
             opacity: 1;
         }
     }
 
     @keyframes confetti-fall {
         0% {
-            transform: translateY(0) rotate(0deg);
+            transform: translateY(-10px) rotate(0deg);
             opacity: 1;
         }
         100% {
