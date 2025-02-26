@@ -211,7 +211,6 @@
       <BottomNav {activeTab} on:tabChange={handleTabChange} />
     {/if}
   </div>
-  <div class="bottom-bar"></div>
 {:else}
   <main>
     <SignIn />
@@ -248,16 +247,6 @@
     left: 0;
     right: 0;
     height: 10px;
-    background: white;
-    z-index: 99;
-  }
-
-  .bottom-bar {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 60px;
     background: white;
     z-index: 99;
   }

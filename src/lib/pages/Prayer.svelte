@@ -171,6 +171,7 @@
 
   function startCounter() {
     isCounterMode = true;
+    document.body.classList.add('counter-active');
   }
 
   async function saveSession() {
@@ -207,6 +208,7 @@
       }
     }
     isCounterMode = false;
+    document.body.classList.remove('counter-active');
     count = 0;
   }
 
@@ -1039,7 +1041,30 @@
     flex-direction: column;
     align-items: center;
     color: white;
-    z-index: 1001;
+    z-index: 999999;
+    height: 100vh;
+    min-height: 100vh;
+    max-height: 100vh;
+    overflow: hidden;
+  }
+
+  :global(body.counter-active) {
+    overflow: hidden !important;
+    position: fixed !important;
+    width: 100% !important;
+    height: 100% !important;
+    max-height: 100vh !important;
+  }
+
+  :global(body.counter-active nav),
+  :global(body.counter-active div[style*="position: fixed"]),
+  :global(body.counter-active div[style*="position:fixed"]),
+  :global(body.counter-active *[style*="bottom: 0"]),
+  :global(body.counter-active *[style*="bottom:0"]) {
+    display: none !important;
+    z-index: -1 !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
   }
 
   .exit-button {
