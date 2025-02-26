@@ -178,26 +178,26 @@
 
   const deenReflectionQuestions = [
     {
-      question: "Duas you want Allah to accept",
-      placeholder: "Write the duas that are close to your heart...",
+      question: "Duas You Are Praying For",
+      placeholder: "write down the duas that are close to your heart—whether for yourself, your loved ones, or the Ummah. Keep track of what you’re asking Allah (SWT) for and reflect on them over time.",
       field: "duas",
       rows: 4
     },
     {
-      question: "Surahs you know/want to know",
-      placeholder: "List the surahs you're learning or wish to learn...",
+      question: "Surahs You’re Learning or Want to Learn",
+      placeholder: "Keep a list of the Surahs you are currently memorizing or plan to learn in the future. This will help track your progress and keep you motivated on your Quran memorization journey.",
       field: "surahs",
       rows: 3
     },
     {
-      question: "Resonating Quranic quotes",
-      placeholder: "Note down Quranic verses that touched your heart...",
+      question: "Quranic Verses That Resonate With You",
+      placeholder: "Jot down the Quranic verses that deeply inspire you, bring you comfort, or serve as a reminder in your daily life. This section helps you reflect on their meanings and how they apply to your journey",
       field: "quranQuotes",
       rows: 4
     },
     {
-      question: "Gratitude List to Allah",
-      placeholder: "Express your gratitude to Allah...",
+      question: "Gratitude List for Allah (SWT)",
+      placeholder: "A space to list the blessings in your life that you are thankful to Allah (SWT) for. Practicing gratitude strengthens faith and reminds us of Allah’s endless mercy and kindness.",
       field: "gratitude",
       rows: 4
     }
