@@ -489,11 +489,11 @@
                 <span class="latin">{dhikr.latin}</span>
               </button>
             {/each}
+            <button class="dhikr-button add-dhikr" on:click={openManualDhikrPopup}>
+              <span class="arabic">+</span>
+              <span class="latin">Choose your own Dhikr</span>
+            </button>
           </div>
-
-          <button class="add-manual-button" on:click={openManualDhikrPopup}>
-            Choose your own Dhikr
-          </button>
 
           <div class="target-selector">
             <h3>Select Target</h3>
@@ -933,6 +933,21 @@
     border-color: #216974;
     background: #216974;
     color: white;
+  }
+
+  .dhikr-button.add-dhikr {
+    border-style: dashed;
+    color: #216974;
+  }
+
+  .dhikr-button.add-dhikr:hover {
+    background: rgba(33, 105, 116, 0.05);
+    border-color: #216974;
+  }
+
+  .dhikr-button.add-dhikr .arabic {
+    font-size: 1.5rem;
+    font-weight: 300;
   }
 
   .arabic {
