@@ -1,11 +1,12 @@
 <script>
   import { onMount } from 'svelte';
-  import { Timer, ChartLine, Heart, Brain, HandsPraying } from 'phosphor-svelte';
+  import { Timer, ChartLine, Heart, Brain, HandsPraying, Info } from 'phosphor-svelte';
   import { prayerHistoryStore, getPrayerHistory } from '../stores/prayerHistoryStore';
   import { moodHistoryStore, getMoodHistory } from '../stores/moodStore';
   import { auth } from '../firebase';
   import { quranHistoryStore, getQuranHistory, addTestQuranReading } from '../stores/quranHistoryStore';
   import { weeklyStatsStore, getWeeklyStats } from '../stores/tasbihStore';
+  import { fade } from 'svelte/transition';
 
   let prayerStreak = 0;
   let longestStreak = 0;
@@ -28,6 +29,23 @@
   let bestMoodCount = 0;
   let quranStreak = 0;
   let longestQuranStreak = 0;
+
+  let activeTooltip = null;
+
+  const tooltips = {
+    prayer_streak: "Track how many consecutive days you've prayed all your salah. Keep going to maintain your streak!",
+    on_time_rate: "See how often you pray each salah on time. Aim for 100% to build consistency!",
+    prayer_analysis: "View a breakdown of your prayer habits over time. Identify which salah you perform best and where to improve!",
+    quran_streak: "Track how many consecutive days you've read Quran. Even a few verses a day can build a habit!",
+    mood_streak: "Log your moods daily after Fajr and Isha to see patterns over time!",
+    common_mood: "Your most frequently selected mood based on your entries. See how your emotions shift over time!",
+    mood_patterns: "Compare your moods after Fajr and Isha to understand how your emotions change throughout the day.",
+    dhikr_streak: "Track how many consecutive days you've engaged in dhikr. Stay consistent and strengthen your remembrance of Allah!"
+  };
+
+  function toggleTooltip(id) {
+    activeTooltip = activeTooltip === id ? null : id;
+  }
 
   const moods = [
     { 
@@ -543,10 +561,16 @@
   <div class="insights-grid">
     <!-- Prayer Streak Card -->
     <div class="insight-card">
-      <div class="card-header">
+      <div class="card-header" on:click={() => toggleTooltip('prayer_streak')}>
         <Timer weight="fill" size={24} />
         <h2>Prayer Streak</h2>
+        <Info size={16} weight="bold" class="info-icon" />
       </div>
+      {#if activeTooltip === 'prayer_streak'}
+        <div class="tooltip" transition:fade>
+          {tooltips.prayer_streak}
+        </div>
+      {/if}
       <div class="card-content">
         <div class="big-number">{prayerStreak} Days</div>
         <div class="sub-text">Longest: {longestStreak} days</div>
@@ -555,10 +579,16 @@
 
     <!-- On-Time Rate Card -->
     <div class="insight-card">
-      <div class="card-header">
+      <div class="card-header" on:click={() => toggleTooltip('on_time_rate')}>
         <ChartLine weight="fill" size={24} />
         <h2>On-Time Rate</h2>
+        <Info size={16} weight="bold" class="info-icon" />
       </div>
+      {#if activeTooltip === 'on_time_rate'}
+        <div class="tooltip" transition:fade>
+          {tooltips.on_time_rate}
+        </div>
+      {/if}
       <div class="card-content">
         <div class="big-number">{onTimeRate}%</div>
         <div class="sub-text {onTimeChange >= 0 ? 'positive' : 'negative'}">
@@ -569,10 +599,16 @@
 
     <!-- Dhikr Streak Card -->
     <div class="insight-card">
-      <div class="card-header">
+      <div class="card-header" on:click={() => toggleTooltip('dhikr_streak')}>
         <HandsPraying weight="fill" size={24} />
         <h2>Dhikr Streak</h2>
+        <Info size={16} weight="bold" class="info-icon" />
       </div>
+      {#if activeTooltip === 'dhikr_streak'}
+        <div class="tooltip" transition:fade>
+          {tooltips.dhikr_streak}
+        </div>
+      {/if}
       <div class="card-content">
         <div class="big-number">{dhikrStreak} Days</div>
         <div class="sub-text">Longest: {longestDhikrStreak} days</div>
@@ -580,8 +616,8 @@
     </div>
 
     <!-- Quran Streak Card -->
-    <div class="analysis-card quran-streak">
-      <div class="card-header">
+    <div class="insight-card">
+      <div class="card-header" on:click={() => toggleTooltip('quran_streak')}>
         <svg class="quran-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
           <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
@@ -589,7 +625,13 @@
           <path d="M12 13c0 2.5 2 3 2 3s-2 .5-2 3"/>
         </svg>
         <h2>Quran Streak</h2>
+        <Info size={16} weight="bold" class="info-icon" />
       </div>
+      {#if activeTooltip === 'quran_streak'}
+        <div class="tooltip" transition:fade>
+          {tooltips.quran_streak}
+        </div>
+      {/if}
       <div class="card-content">
         <div class="big-number">{quranStreak} Days</div>
         <div class="sub-text">Longest: {longestQuranStreak} days</div>
@@ -608,10 +650,16 @@
 
   <!-- Prayer Time Analysis -->
   <div class="analysis-card">
-    <div class="card-header">
+    <div class="card-header" on:click={() => toggleTooltip('prayer_analysis')}>
       <Brain weight="fill" size={24} />
       <h2>Prayer Time Analysis</h2>
+      <Info size={16} weight="bold" class="info-icon" />
     </div>
+    {#if activeTooltip === 'prayer_analysis'}
+      <div class="tooltip" transition:fade>
+        {tooltips.prayer_analysis}
+      </div>
+    {/if}
     <div class="prayer-analysis">
       {#each Object.entries(prayerAnalysis) as [prayer, stats]}
         <div class="prayer-row">
@@ -635,10 +683,16 @@
   <!-- Mood Insights -->
   <div class="insights-grid">
     <div class="insight-card">
-      <div class="card-header">
+      <div class="card-header" on:click={() => toggleTooltip('mood_streak')}>
         <Brain weight="fill" size={24} />
         <h2>Mood Streak</h2>
+        <Info size={16} weight="bold" class="info-icon" />
       </div>
+      {#if activeTooltip === 'mood_streak'}
+        <div class="tooltip" transition:fade>
+          {tooltips.mood_streak}
+        </div>
+      {/if}
       <div class="card-content">
         <div class="big-number">{moodStreak} Days</div>
         <div class="sub-text">Longest: {longestMoodStreak} days</div>
@@ -646,10 +700,16 @@
     </div>
 
     <div class="insight-card">
-      <div class="card-header">
+      <div class="card-header" on:click={() => toggleTooltip('common_mood')}>
         <Heart weight="fill" size={24} />
         <h2>Most Common Mood</h2>
+        <Info size={16} weight="bold" class="info-icon" />
       </div>
+      {#if activeTooltip === 'common_mood'}
+        <div class="tooltip" transition:fade>
+          {tooltips.common_mood}
+        </div>
+      {/if}
       <div class="card-content">
         <div class="mood-display">
           {#if mostCommonMood}
@@ -671,10 +731,16 @@
 
   <!-- Mood & Prayer Patterns -->
   <div class="analysis-card">
-    <div class="card-header">
+    <div class="card-header" on:click={() => toggleTooltip('mood_patterns')}>
       <Brain weight="fill" size={24} />
       <h2>Daily Mood Patterns</h2>
+      <Info size={16} weight="bold" class="info-icon" />
     </div>
+    {#if activeTooltip === 'mood_patterns'}
+      <div class="tooltip" transition:fade>
+        {tooltips.mood_patterns}
+      </div>
+    {/if}
     <div class="patterns-list">
       {#each calculateInsights() as pattern}
         <div class="pattern-item">
@@ -746,12 +812,29 @@
     gap: 0.5rem;
     margin-bottom: 1rem;
     color: #216974;
+    cursor: pointer;
+    padding: 0.5rem;
+    border-radius: 8px;
+    transition: background-color 0.2s;
   }
 
-  .card-header h2 {
-    font-size: 1rem;
-    font-weight: 500;
-    margin: 0;
+  .card-header:hover {
+    background: rgba(33, 105, 116, 0.05);
+  }
+
+  .info-icon {
+    margin-left: auto;
+    opacity: 0.6;
+  }
+
+  .tooltip {
+    background: #216974;
+    color: white;
+    padding: 0.75rem;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    line-height: 1.4;
+    margin: -0.5rem 0 1rem;
   }
 
   .big-number {
