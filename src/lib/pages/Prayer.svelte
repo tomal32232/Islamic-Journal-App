@@ -1076,32 +1076,39 @@
   .dhikr-display {
     text-align: center;
     width: 100%;
-    padding: 1rem;
+    padding: 0.75rem;
     background: rgba(255,255,255,0.1);
     border-radius: 12px;
-    margin-bottom: 2rem;
+    margin-bottom: 1.5rem;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+    align-items: start;
   }
 
   .dhikr-item {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.25rem;
+    padding: 0.5rem;
+    background: rgba(255,255,255,0.05);
+    border-radius: 8px;
   }
 
   .arabic-large {
-    font-size: 2.5rem;
+    font-size: 1.5rem;
     font-weight: 500;
     line-height: 1.2;
   }
 
   .latin-large {
-    font-size: 1.25rem;
+    font-size: 0.875rem;
     opacity: 0.9;
   }
 
   .meaning {
-    font-size: 0.875rem;
+    font-size: 0.75rem;
     opacity: 0.7;
   }
 
@@ -1110,7 +1117,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.75rem;
+    gap: 0.5rem;
     margin: 1rem 0 2rem;
   }
 
@@ -1143,8 +1150,8 @@
   }
 
   .counter-button {
-    width: 160px;
-    height: 160px;
+    width: 180px;
+    height: 180px;
     border-radius: 50%;
     background: rgba(255,255,255,0.1);
     border: 2px solid rgba(255,255,255,0.2);
@@ -1154,6 +1161,7 @@
     cursor: pointer;
     transition: all 0.2s ease;
     margin-bottom: 1.5rem;
+    flex-shrink: 0;
   }
 
   .inner-circle {
@@ -1199,15 +1207,21 @@
     }
 
     .dhikr-display {
-      margin-bottom: 1.5rem;
+      margin-bottom: 1rem;
+      padding: 0.5rem;
+      gap: 0.5rem;
     }
 
     .arabic-large {
-      font-size: 2rem;
+      font-size: 1.25rem;
     }
 
     .latin-large {
-      font-size: 1rem;
+      font-size: 0.75rem;
+    }
+
+    .meaning {
+      font-size: 0.675rem;
     }
 
     .progress {
@@ -1219,8 +1233,8 @@
     }
 
     .counter-button {
-      width: 140px;
-      height: 140px;
+      width: 160px;
+      height: 160px;
       margin-bottom: 1rem;
     }
   }
