@@ -26,6 +26,9 @@
   import { trialStore, initializeTrialStatus } from './lib/services/trialService';
   import { getFirestore, doc, getDoc } from 'firebase/firestore';
   import { startTrial } from './lib/services/trialService';
+  import { achievementStore } from './lib/stores/achievementStore';
+  import { onAuthStateChanged } from 'firebase/auth';
+  import { badgeStore } from './lib/stores/badgeStore';
 
   let user = null;
   let activeTab = 'home';
@@ -60,6 +63,12 @@
       if (user) {
         try {
           console.log('User authenticated:', user.uid);
+          
+          // Initialize badge and achievement tracking first
+          console.log('Initializing badge and achievement tracking...');
+          badgeStore.init(user.uid);
+          achievementStore.init(user.uid);
+
           // Initialize trial status and start trial if not exists
           const db = getFirestore();
           const trialRef = doc(db, 'trials', user.uid);
@@ -83,13 +92,12 @@
           // Ensure prayer data is initialized
           await ensurePrayerData();
         } catch (error) {
-          console.error('Error initializing trial:', error);
-          console.error('Error details:', {
-            code: error.code,
-            message: error.message,
-            stack: error.stack
-          });
+          console.error('Error during initialization:', error);
         }
+      } else {
+        // Cleanup when user logs out
+        badgeStore.cleanup();
+        achievementStore.cleanup();
       }
       isLoading = false;
     });
@@ -102,6 +110,8 @@
     return () => {
       unsubscribe();
       unsubscribeOnboarding();
+      badgeStore.cleanup();
+      achievementStore.cleanup();
     };
   });
 

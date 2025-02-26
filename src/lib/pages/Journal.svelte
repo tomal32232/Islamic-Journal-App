@@ -5,6 +5,8 @@
   import { journalStore } from '../stores/journalStore';
   import { fade, fly } from 'svelte/transition';
   import { quintOut } from 'svelte/easing';
+  import { notificationStore } from '../stores/notificationStore';
+  import Notification from '../components/Notification.svelte';
 
   // Get current week days
   function getCurrentWeek() {
@@ -179,12 +181,12 @@
   const deenReflectionQuestions = [
     {
       question: "Duas You Are Praying For",
-      placeholder: "write down the duas that are close to your heart—whether for yourself, your loved ones, or the Ummah. Keep track of what you’re asking Allah (SWT) for and reflect on them over time.",
+      placeholder: "write down the duas that are close to your heart—whether for yourself, your loved ones, or the Ummah. Keep track of what you're asking Allah (SWT) for and reflect on them over time.",
       field: "duas",
       rows: 4
     },
     {
-      question: "Surahs You’re Learning or Want to Learn",
+      question: "Surahs You're Learning or Want to Learn",
       placeholder: "Keep a list of the Surahs you are currently memorizing or plan to learn in the future. This will help track your progress and keep you motivated on your Quran memorization journey.",
       field: "surahs",
       rows: 3
@@ -197,7 +199,7 @@
     },
     {
       question: "Gratitude List for Allah (SWT)",
-      placeholder: "A space to list the blessings in your life that you are thankful to Allah (SWT) for. Practicing gratitude strengthens faith and reminds us of Allah’s endless mercy and kindness.",
+      placeholder: "A space to list the blessings in your life that you are thankful to Allah (SWT) for. Practicing gratitude strengthens faith and reminds us of Allah's endless mercy and kindness.",
       field: "gratitude",
       rows: 4
     }
@@ -351,26 +353,73 @@
   $: challengeMessage = getChallengeMessage();
   $: console.log('Challenge message updated:', challengeMessage, 'Completed days:', $journalStore.completedDays);
 
+  // Add achievement checking function
+  function checkAchievements() {
+    const completedDays = $journalStore.completedDays;
+    const streakDays = $journalStore.streak?.days || 0;
+    
+    console.log('Checking achievements:', {
+      completedDays,
+      streakDays,
+      streak: $journalStore.streak,
+      store: $journalStore
+    });
+    
+    // Journal streak achievements
+    if (completedDays === 1) {
+      console.log('🎯 Triggering first entry achievement');
+      notificationStore.showNotification('🎉 First journal entry complete! Your journey begins now!');
+    } else if (completedDays === 7) {
+      console.log('🎯 Triggering week completion achievement');
+      notificationStore.showNotification('🏆 Amazing! You\'ve completed your first week of journaling!');
+    } else if (completedDays === 30) {
+      console.log('🎯 Triggering month completion achievement');
+      notificationStore.showNotification('⭐ Incredible milestone! You\'ve journaled for 30 days!');
+    }
+    
+    // Streak achievements
+    if (streakDays === 3) {
+      console.log('🎯 Triggering 3-day streak achievement');
+      notificationStore.showNotification('🔥 3-day streak! You\'re building a beautiful habit!');
+    } else if (streakDays === 7) {
+      console.log('🎯 Triggering week streak achievement');
+      notificationStore.showNotification('🌟 Wonderful! A full week streak achieved!');
+    } else if (streakDays === 30) {
+      console.log('🎯 Triggering month streak achievement');
+      notificationStore.showNotification('👑 Mastery achieved! 30-day streak completed!');
+    }
+  }
+
+  // Modify the save functions to check achievements
   async function saveMorningReflection() {
+    console.log('Saving morning reflection...');
     await journalStore.saveMorningReflection(morningReflection);
-    await journalStore.loadTodayReflections(); // Refresh the store data
-    weekDays = getCurrentWeek(); // Refresh the week display
-    morningReflection = { plans: '', newThing: '', affirmation: '' }; // Reset form
+    await journalStore.loadTodayReflections();
+    weekDays = getCurrentWeek();
+    morningReflection = { plans: '', newThing: '', affirmation: '' };
+    console.log('Checking achievements after morning reflection...');
+    checkAchievements();
   }
 
   async function saveEveningReflection() {
+    console.log('Saving evening reflection...');
     await journalStore.saveEveningReflection(eveningReflection);
-    await journalStore.loadTodayReflections(); // Refresh the store data
-    weekDays = getCurrentWeek(); // Refresh the week display
-    eveningReflection = { highlights: '', learnings: '', satisfaction: '', barriers: '' }; // Reset form
+    await journalStore.loadTodayReflections();
+    weekDays = getCurrentWeek();
+    eveningReflection = { highlights: '', learnings: '', satisfaction: '', barriers: '' };
+    console.log('Checking achievements after evening reflection...');
+    checkAchievements();
   }
 
   async function saveDeenReflection() {
+    console.log('Saving deen reflection...');
     isSubmitting = true;
     try {
       await journalStore.saveDeenReflection(deenReflections);
-      deenReflections = { duas: '', surahs: '', quranQuotes: '', gratitude: '' }; // Reset form
+      deenReflections = { duas: '', surahs: '', quranQuotes: '', gratitude: '' };
       selectedReflection = null;
+      console.log('Checking achievements after deen reflection...');
+      checkAchievements();
     } catch (error) {
       console.error('Error saving deen reflection:', error);
     } finally {
@@ -379,11 +428,14 @@
   }
 
   async function saveFreeWrite() {
+    console.log('Saving free write...');
     isSubmitting = true;
     try {
       await journalStore.saveFreeWrite(freeWriteContent);
-      freeWriteContent = ''; // Reset the content
+      freeWriteContent = '';
       selectedReflection = null;
+      console.log('Checking achievements after free write...');
+      checkAchievements();
     } catch (error) {
       console.error('Error saving free write:', error);
     } finally {
@@ -413,6 +465,7 @@
 </script>
 
 <div class="journal-container">
+  <Notification />
   <div class="journal-header">
     <div class="week-strip" class:scrolled={scrollY > 50}>
       {#each weekDays as { day, date, isToday, fullDate }}
