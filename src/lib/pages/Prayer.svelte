@@ -560,10 +560,12 @@
           </div>
 
           <div class="progress">
-            <span class="sets-display">Set {sets + 1}</span>
+            <div class="count-info">
+              <span class="sets-display">Set {sets + 1}</span>
+              <span class="total-count">Total: {totalCount}</span>
+            </div>
             <span class="count-large">{count}</span>
             <span class="target-display">of {selectedTarget}</span>
-            <span class="total-count">Total: {totalCount}</span>
           </div>
 
           <button class="counter-button" on:click={increment}>
@@ -1142,6 +1144,12 @@
     margin: 1rem 0 2rem;
   }
 
+  .count-info {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
   .count-large {
     font-size: 4.5rem;
     font-weight: 600;
@@ -1167,12 +1175,11 @@
     background: rgba(224, 148, 83, 0.2);
     padding: 0.375rem 1rem;
     border-radius: 100px;
-    margin-top: 0.5rem;
   }
 
   .counter-button {
-    width: 180px;
-    height: 180px;
+    width: 130px;
+    height: 130px;
     border-radius: 50%;
     background: rgba(255,255,255,0.1);
     border: 2px solid rgba(255,255,255,0.2);
@@ -1254,8 +1261,8 @@
     }
 
     .counter-button {
-      width: 160px;
-      height: 160px;
+      width: 130px;
+      height: 130px;
       margin-bottom: 1rem;
     }
   }
