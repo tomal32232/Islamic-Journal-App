@@ -24,10 +24,11 @@
         const prayerDate = new Date(prayer.date);
         const prayerDateTime = new Date(prayer.date + ' ' + prayer.time);
         
+        // Include all prayers from the filter date up to today, including today's prayers
+        // regardless of whether they've passed or not, but exclude 'upcoming' status prayers
         return prayerDate >= filterDate && 
                prayerDate <= today && 
-               prayer.status !== 'upcoming' &&
-               (prayerDate.getTime() < now.setHours(0,0,0,0) || prayerDateTime.getTime() < now.getTime());
+               prayer.status !== 'upcoming';
       })
       .sort((a, b) => {
         const dateA = new Date(a.date).getTime();
