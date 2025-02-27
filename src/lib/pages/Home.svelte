@@ -1081,12 +1081,6 @@
                   {/if}
                 </div>
               </div>
-              <button 
-                class="test-notification-btn"
-                on:click={testNotification}
-              >
-                Test Notification
-              </button>
             {:else}
               <div class="no-prayer-message">
                 <p>All prayers for today have passed. The next prayer times will be shown after midnight.</p>
@@ -1938,27 +1932,6 @@
     font-size: 0.875rem;
   }
 
-  .test-notification-btn {
-    background-color: #4CAF50;
-    color: white;
-    border: none;
-    padding: 8px 16px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 14px;
-    margin-top: 12px;
-    width: 100%;
-    transition: background-color 0.2s ease;
-  }
-  
-  .test-notification-btn:hover {
-    background-color: #45a049;
-  }
-  
-  .test-notification-btn:active {
-    background-color: #3d8b40;
-  }
-  
   .next-prayer-card {
     background: white;
     padding: 16px;
@@ -2121,10 +2094,11 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 1rem;
-    background: white;
-    position: sticky;
+    padding: 0.5rem 1rem;
+    background: transparent;
+    position: absolute;
     top: 0;
+    right: 0;
     z-index: 100;
     gap: 1rem;
   }
