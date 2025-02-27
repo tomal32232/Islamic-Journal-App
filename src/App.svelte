@@ -157,7 +157,6 @@
 {:else if showOnboarding}
   <Onboarding />
 {:else if user}
-  <div class="top-bar"></div>
   <div class="app-container">
     {#if showWelcomePopup}
       <WelcomePopup 
@@ -241,16 +240,6 @@
     100% { transform: scale(1); opacity: 1; }
   }
 
-  .top-bar {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 10px;
-    background: white;
-    z-index: 99;
-  }
-
   .app-container {
     position: relative;
     width: 100%;
@@ -264,7 +253,6 @@
   main {
     width: 100%;
     min-height: calc(100vh - 80px);
-    padding-top: 10px;
     box-sizing: border-box;
     overflow-x: hidden;
   }

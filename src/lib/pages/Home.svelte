@@ -385,13 +385,13 @@
   }
 
   async function updatePrayerStatus() {
-    console.log('Starting updatePrayerStatus...');
+    console.log('pppp Starting updatePrayerStatus...');
     
     isLoadingPrayers = true;
     try {
       // Check if we have data in the store
       if (!$prayerTimesStore || $prayerTimesStore.length === 0) {
-        console.log('No prayer times in store, fetching...');
+        console.log('pppp No prayer times in store, fetching...');
         await fetchPrayerTimes();
       } else {
         // Check if we need to fetch new prayer times (after midnight)
@@ -405,34 +405,50 @@
                            lastFetch.getFullYear() === now.getFullYear();
                            
           if (!isSameDay) {
-            console.log('New day detected, fetching new prayer times...');
+            console.log('pppp New day detected, fetching new prayer times...');
             await fetchPrayerTimes();
           } else {
-            console.log('Using cached prayer times from same day');
+            console.log('pppp Using cached prayer times from same day');
           }
         } else {
-          console.log('No fetch date found, fetching new prayer times...');
+          console.log('pppp No fetch date found, fetching new prayer times...');
           await fetchPrayerTimes();
         }
       }
 
       // Only fetch prayer history if we don't have it or if it's stale
       if (!$prayerHistoryStore?.history || !prayerHistoryCache.lastFetched) {
-        console.log('No prayer history in store or cache expired, fetching...');
+        console.log('pppp No prayer history in store or cache expired, fetching...');
         await getPrayerHistory();
       } else {
         const cacheAge = Number(Date.now()) - Number(prayerHistoryCache.lastFetched);
         const CACHE_MAX_AGE = 5 * 60 * 1000; // 5 minutes
         
         if (cacheAge > CACHE_MAX_AGE) {
-          console.log('Prayer history cache expired, fetching fresh data...');
+          console.log('pppp Prayer history cache expired, fetching fresh data...');
           await getPrayerHistory();
         } else {
-          console.log('Using cached prayer history, age:', Math.round(cacheAge / 1000), 'seconds');
+          console.log('pppp Using cached prayer history, age:', Math.round(cacheAge / 1000), 'seconds');
         }
       }
+
+      // Update the upcoming prayer
+      console.log('pppp Updating upcoming prayer...');
+      console.log('pppp Prayer times store:', $prayerTimesStore);
+      
+      // Get the next prayer
+      upcomingPrayer = getNextPrayer();
+      console.log('pppp Next prayer:', upcomingPrayer);
+      
+      // Update countdown if we have an upcoming prayer
+      if (upcomingPrayer) {
+        updateCountdown();
+        console.log('pppp Updated countdown:', upcomingCountdown);
+      } else {
+        console.log('pppp No upcoming prayer found');
+      }
     } catch (error) {
-      console.error('Error updating prayer status:', error);
+      console.error('pppp Error updating prayer status:', error);
     } finally {
       isLoadingPrayers = false;
     }
@@ -785,12 +801,19 @@
 
   // Function to get the next prayer
   function getNextPrayer() {
-    if (!$prayerTimesStore || $prayerTimesStore.length === 0) return null;
+    console.log('pppp getNextPrayer called');
+    if (!$prayerTimesStore || $prayerTimesStore.length === 0) {
+      console.log('pppp No prayer times in store, returning null');
+      return null;
+    }
     
     const now = new Date();
     const currentTime = Number(now.getHours()) * 60 + Number(now.getMinutes());
+    console.log('pppp Current time (minutes since midnight):', currentTime);
+    console.log('pppp Current date/time:', now.toLocaleString());
     
     for (const prayer of $prayerTimesStore) {
+      console.log('pppp Checking prayer:', prayer.name, prayer.time);
       const [time, period] = prayer.time.split(' ');
       const [hours, minutes] = time.split(':');
       let prayerHours = Number(parseInt(hours));
@@ -803,13 +826,16 @@
       }
       
       const prayerTime = prayerHours * 60 + Number(parseInt(minutes));
+      console.log('pppp Prayer time (minutes since midnight):', prayerTime);
       
       if (prayerTime > currentTime) {
+        console.log('pppp Found next prayer:', prayer.name);
         return prayer;
       }
     }
     
     // If no prayer is found for today, return the first prayer of tomorrow
+    console.log('pppp No upcoming prayers today, returning first prayer for tomorrow:', $prayerTimesStore[0].name);
     return $prayerTimesStore[0];
   }
 
@@ -862,9 +888,6 @@
 <div class="home-container">
   <div class="top-bar">
     <NotificationIcon on:click={() => navigateTo('notifications')} />
-    <button class="test-button" on:click={handleTestMoodPopup}>
-      Test {currentMoodPeriod === 'morning' ? 'Evening' : 'Morning'} Mood
-    </button>
   </div>
   <div class="content">
     {#if currentPage === 'home'}

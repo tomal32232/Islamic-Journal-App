@@ -54,9 +54,16 @@
   let manualDhikrText = '';
 
   function getNextPrayer(prayers) {
+    console.log('tttt prayers:', prayers);
+    
+    if (!prayers || prayers.length === 0) {
+      console.log('tttt No prayers available');
+      return null;
+    }
+    
     const now = new Date();
-    const today = now.toLocaleDateString('en-CA');
     const currentTime = now.getHours() * 60 + now.getMinutes();
+    console.log('tttt currentTime in minutes:', currentTime);
 
     // Convert prayer times to minutes for comparison
     const prayerMinutes = prayers.map(prayer => {
@@ -66,35 +73,26 @@
       if (period === 'PM' && hour !== 12) hour += 12;
       if (period === 'AM' && hour === 12) hour = 0;
       
-      // Get full date for this prayer time
-      const prayerDate = new Date();
-      prayerDate.setHours(hour, parseInt(minutes), 0);
+      const totalMinutes = hour * 60 + parseInt(minutes);
+      console.log(`tttt Prayer ${prayer.name}: ${prayer.time} -> ${totalMinutes} minutes`);
       
       return {
         ...prayer,
-        minutes: hour * 60 + parseInt(minutes),
-        date: prayerDate.toLocaleDateString('en-CA')
+        minutes: totalMinutes
       };
     });
 
-    // Find the next prayer for today only
-    let next = prayerMinutes.find(prayer => 
-      prayer.date === today && prayer.minutes > currentTime
-    );
+    // Find the next prayer for today
+    let next = prayerMinutes.find(prayer => prayer.minutes > currentTime);
+    console.log('tttt Next prayer found:', next);
     
-    // If no next prayer today, return null
+    // If no next prayer today, return first prayer for tomorrow
     if (!next) {
-      return null;
+      console.log('tttt No next prayer today, returning first prayer for tomorrow:', prayers[0]);
+      return prayers[0];
     }
 
     return next;
-  }
-
-  function updateNextPrayer() {
-    const prayers = $prayerTimesStore;
-    if (prayers.length > 0) {
-      nextPrayer = getNextPrayer(prayers);
-    }
   }
 
   function handleScroll(event) {
@@ -124,17 +122,26 @@
       container.addEventListener('scroll', handleScroll);
     }
 
-    timeInterval = setInterval(updateNextPrayer, 60000);
-    updateNextPrayer();
+    // Set up interval to update next prayer
+    timeInterval = setInterval(() => {
+      if ($prayerTimesStore.length > 0) {
+        nextPrayer = getNextPrayer($prayerTimesStore);
+      }
+    }, 60000); // Update every minute
 
-    // Initial data load - wait for all promises to resolve
+    // Initial update
+    if ($prayerTimesStore.length > 0) {
+      nextPrayer = getNextPrayer($prayerTimesStore);
+    }
+
+    // Initial data load
     Promise.all([
       getPrayerHistory(),
       fetchPrayerTimes(),
       updatePrayerStatuses()
     ]).then(() => {
-      // Force a UI update after initial data load
-      $prayerTimesStore = [...$prayerTimesStore];
+      // Update next prayer after data is loaded
+      nextPrayer = getNextPrayer($prayerTimesStore);
     }).catch(error => {
       console.error('Error loading initial data:', error);
     });
