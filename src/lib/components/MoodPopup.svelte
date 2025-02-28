@@ -1,10 +1,28 @@
 <script lang="ts">
   import { fade, fly } from 'svelte/transition';
+  import { onMount } from 'svelte';
   import MoodSelector from './MoodSelector.svelte';
+  import OnboardingGuide from './OnboardingGuide.svelte';
+  import { isFirstTimeVisitor } from '../stores/userPreferences';
 
   export let onSelect = (event) => {};
   export let onSkip = () => {};
   export let period: 'morning' | 'evening';
+
+  let showOnboarding = false;
+
+  onMount(() => {
+    // Check if user is a first-time visitor
+    const unsubscribe = isFirstTimeVisitor.subscribe(value => {
+      showOnboarding = value;
+    });
+
+    return unsubscribe;
+  });
+
+  function handleGuideClose() {
+    showOnboarding = false;
+  }
 
   const titles = {
     morning: 'Morning Reflection',
@@ -14,6 +32,26 @@
   const subtitles = {
     morning: 'Start your day with mindful reflection',
     evening: 'End your day with peaceful contemplation'
+  };
+
+  // Add time indicator icons
+  const timeIcons = {
+    morning: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v2" stroke-linecap="round" />
+      <path d="M12 20v2" stroke-linecap="round" />
+      <path d="M4.93 4.93l1.41 1.41" stroke-linecap="round" />
+      <path d="M17.66 17.66l1.41 1.41" stroke-linecap="round" />
+      <path d="M2 12h2" stroke-linecap="round" />
+      <path d="M20 12h2" stroke-linecap="round" />
+      <path d="M6.34 17.66l-1.41 1.41" stroke-linecap="round" />
+      <path d="M19.07 4.93l-1.41 1.41" stroke-linecap="round" />
+    </svg>`,
+    evening: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M12 3a9 9 0 1 0 9 9" />
+      <path d="M12 3v9l5.2 3.2" />
+      <path d="M21 12h-9" />
+    </svg>`
   };
 </script>
 
@@ -26,6 +64,9 @@
     </button>
     
     <div class="popup-header">
+      <div class="time-indicator {period}">
+        {@html timeIcons[period]}
+      </div>
       <h2>{titles[period]}</h2>
       <p class="subtitle">{subtitles[period]}</p>
     </div>
@@ -39,6 +80,10 @@
     </button>
   </div>
 </div>
+
+{#if showOnboarding}
+  <OnboardingGuide onClose={handleGuideClose} />
+{/if}
 
 <style>
   .popup-backdrop {
@@ -97,6 +142,34 @@
   .popup-header {
     text-align: center;
     margin-bottom: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .time-indicator {
+    width: 3rem;
+    height: 3rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 0.75rem;
+  }
+  
+  .time-indicator svg {
+    width: 1.5rem;
+    height: 1.5rem;
+  }
+  
+  .morning {
+    background: #FFF8E1;
+    color: #F59E0B;
+  }
+  
+  .evening {
+    background: #E8F5E9;
+    color: #10B981;
   }
 
   .popup-header h2 {
