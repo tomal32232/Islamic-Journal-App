@@ -148,9 +148,9 @@
   }
 
   // Add a more robust function to check if a prayer is in the future
-  function isPrayerInFuture(dateStr, timeStr) {
+  function isPrayerInFuture(dateStr, timeStr, timezoneOffset = null) {
     const now = new Date();
-    const prayerDateTime = getPrayerDateTime(dateStr, timeStr);
+    const prayerDateTime = getPrayerDateTime(dateStr, timeStr, timezoneOffset);
     
     // Add debug logging
     console.log(`Comparing prayer time: ${prayerDateTime.toISOString()} with current time: ${now.toISOString()}`);
@@ -188,7 +188,7 @@
         gridCache.weekStartDate === currentWeekStart &&
         Date.now() - gridCache.timestamp < 30 * 60 * 1000) { // Cache valid for 30 minutes
       console.log('Using cached grid data');
-      return gridCache.data;
+      return gridCache.data.grid;
     }
     
     console.log('Generating new grid data');
@@ -267,7 +267,10 @@
           // Today's prayers
           else if (isToday(day.date)) {
             // If prayer time is in the future, mark as 'none'
-            if (isPrayerInFuture(day.date, prayerTime)) {
+            // Get timezone offset if available
+            const timezoneOffset = prayerRecord?.timezoneOffset || null;
+            
+            if (isPrayerInFuture(day.date, prayerTime, timezoneOffset)) {
               status = 'none';
               console.log(`Today's upcoming prayer: ${prayer} at ${prayerTime} marked as ${status}`);
             } 

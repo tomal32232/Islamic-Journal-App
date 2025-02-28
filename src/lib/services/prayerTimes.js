@@ -324,11 +324,22 @@ function isPrayerPast(time24) {
 }
 
 // Helper function to get prayer time as Date object
-export function getPrayerTimeAsDate(time24) {
+export function getPrayerTimeAsDate(time24, timezoneOffset = null) {
   try {
     const [hours, minutes] = time24.split(':').map(num => parseInt(num, 10));
     const prayerTime = new Date();
     prayerTime.setHours(hours, minutes, 0, 0);
+
+    // If we have timezone offset information, adjust the date
+    if (timezoneOffset !== null) {
+      const currentOffset = new Date().getTimezoneOffset();
+      const offsetDiff = currentOffset - timezoneOffset; // Difference in minutes
+      
+      if (offsetDiff !== 0) {
+        prayerTime.setMinutes(prayerTime.getMinutes() + offsetDiff);
+        console.log(`Adjusted prayer notification time by ${offsetDiff} minutes for timezone difference`);
+      }
+    }
 
     // If prayer time has passed for today, set it for tomorrow
     if (prayerTime < new Date()) {

@@ -1,6 +1,9 @@
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { prayerHistoryStore } from '../stores/prayerHistoryStore';
-import { prayerTimesStore } from './prayerTimes';
+import { prayerTimesStore } from '../stores/prayerTimes';
+import { auth } from '../firebase';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '../firebase';
 
 let prayerTimes = [];
 prayerTimesStore.subscribe(value => {
@@ -32,6 +35,33 @@ export async function scheduleEndOfDayReminders() {
             await LocalNotifications.cancel({ notifications: existingReminders });
         }
 
+        // Get user's timezone offset
+        const userTimezoneOffset = new Date().getTimezoneOffset();
+        console.log(`User's timezone offset for end-of-day reminders: ${userTimezoneOffset} minutes`);
+
+        // Check if we have timezone information for any prayer in the database
+        let prayerTimezoneOffset = null;
+        try {
+            const user = auth.currentUser;
+            if (user) {
+                const today = new Date().toLocaleDateString('en-CA');
+                const prayerQuery = query(
+                    collection(db, 'prayer_history'),
+                    where('userId', '==', user.uid),
+                    where('date', '==', today)
+                );
+                const querySnapshot = await getDocs(prayerQuery);
+                if (!querySnapshot.empty) {
+                    // Use the first prayer's timezone offset
+                    const prayerData = querySnapshot.docs[0].data();
+                    prayerTimezoneOffset = prayerData.timezoneOffset || null;
+                    console.log(`Found timezone offset for end-of-day reminders: ${prayerTimezoneOffset}`);
+                }
+            }
+        } catch (error) {
+            console.error('Error getting prayer timezone information for end-of-day reminders:', error);
+        }
+
         // Schedule new reminders for 9 PM, 10 PM, and 11 PM
         const reminderTimes = [21, 22, 23]; // Hours in 24-hour format
         const now = new Date();
@@ -45,6 +75,13 @@ export async function scheduleEndOfDayReminders() {
                 0,
                 0
             );
+
+            // Adjust for timezone if we have the information
+            if (prayerTimezoneOffset !== null && prayerTimezoneOffset !== userTimezoneOffset) {
+                const offsetDiff = userTimezoneOffset - prayerTimezoneOffset;
+                scheduleTime.setMinutes(scheduleTime.getMinutes() + offsetDiff);
+                console.log(`Adjusted end-of-day reminder time by ${offsetDiff} minutes for timezone difference`);
+            }
 
             // If the time has passed for today, schedule for tomorrow
             if (scheduleTime < now) {

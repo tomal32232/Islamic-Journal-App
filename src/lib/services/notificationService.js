@@ -4,6 +4,9 @@ import { App } from '@capacitor/app';
 import { writable, get } from 'svelte/store';
 import { scheduleMoodNotifications } from './moodNotificationService';
 import { scheduleEndOfDayReminders } from './prayerReminderService';
+import { auth } from '../firebase';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '../firebase';
 
 let prayerTimes = [];
 prayerTimesStore.subscribe(value => {
@@ -159,16 +162,43 @@ async function scheduleMarkPrayerNotifications() {
             console.log('Cancelled existing mark prayer notifications');
         }
 
+        // Get user's timezone offset
+        const userTimezoneOffset = new Date().getTimezoneOffset();
+        console.log(`User's timezone offset for mark notifications: ${userTimezoneOffset} minutes`);
+
         // Schedule notifications for each prayer time
         for (const prayer of prayerTimes) {
             console.log(`Scheduling mark notification for ${prayer.name} prayer...`);
             
-            // Use the new getPrayerTimeAsDate function to get the correct schedule time
-            const prayerTime = getPrayerTimeAsDate(prayer.originalTime);
+            // Check if we have timezone information for this prayer in the database
+            let prayerTimezoneOffset = null;
+            try {
+                const user = auth.currentUser;
+                if (user) {
+                    const today = new Date().toLocaleDateString('en-CA');
+                    const prayerId = `${today}-${prayer.name.toLowerCase()}`;
+                    const prayerQuery = query(
+                        collection(db, 'prayer_history'),
+                        where('userId', '==', user.uid),
+                        where('prayerId', '==', prayerId)
+                    );
+                    const querySnapshot = await getDocs(prayerQuery);
+                    if (!querySnapshot.empty) {
+                        const prayerData = querySnapshot.docs[0].data();
+                        prayerTimezoneOffset = prayerData.timezoneOffset || null;
+                        console.log(`Found timezone offset for ${prayer.name} mark notification: ${prayerTimezoneOffset}`);
+                    }
+                }
+            } catch (error) {
+                console.error('Error getting prayer timezone information for mark notification:', error);
+            }
+            
+            // Use the getPrayerTimeAsDate function with timezone offset
+            const prayerTime = getPrayerTimeAsDate(prayer.originalTime, prayerTimezoneOffset);
             const scheduleTime = new Date(prayerTime);
             scheduleTime.setMinutes(scheduleTime.getMinutes() + MARK_PRAYER_DELAY);
 
-            console.log(`Scheduling ${prayer.name} notification for:`, scheduleTime.toLocaleString());
+            console.log(`Scheduling ${prayer.name} mark notification for:`, scheduleTime.toLocaleString());
 
             // Generate a consistent ID for each prayer's mark notification
             const notificationId = 3000 + getPrayerIndex(prayer.name);
@@ -302,6 +332,10 @@ async function scheduleAllPrayerNotifications() {
             await LocalNotifications.cancel(pendingNotifications);
         }
 
+        // Get user's timezone offset
+        const userTimezoneOffset = new Date().getTimezoneOffset();
+        console.log(`User's timezone offset: ${userTimezoneOffset} minutes`);
+
         // Schedule notifications for each prayer time
         for (const prayer of prayerTimes) {
             const [time, period] = prayer.time.split(' ');
@@ -330,8 +364,35 @@ async function scheduleAllPrayerNotifications() {
                 scheduleTime.setDate(scheduleTime.getDate() + 1);
             }
 
-            // Ensure we're working with local time
-            scheduleTime.setMinutes(scheduleTime.getMinutes() - scheduleTime.getTimezoneOffset());
+            // Check if we have timezone information for this prayer in the database
+            let prayerTimezoneOffset = null;
+            try {
+                const user = auth.currentUser;
+                if (user) {
+                    const today = new Date().toLocaleDateString('en-CA');
+                    const prayerId = `${today}-${prayer.name.toLowerCase()}`;
+                    const prayerQuery = query(
+                        collection(db, 'prayer_history'),
+                        where('userId', '==', user.uid),
+                        where('prayerId', '==', prayerId)
+                    );
+                    const querySnapshot = await getDocs(prayerQuery);
+                    if (!querySnapshot.empty) {
+                        const prayerData = querySnapshot.docs[0].data();
+                        prayerTimezoneOffset = prayerData.timezoneOffset || null;
+                        console.log(`Found timezone offset for ${prayer.name}: ${prayerTimezoneOffset}`);
+                    }
+                }
+            } catch (error) {
+                console.error('Error getting prayer timezone information:', error);
+            }
+
+            // Adjust for timezone if we have the information
+            if (prayerTimezoneOffset !== null && prayerTimezoneOffset !== userTimezoneOffset) {
+                const offsetDiff = userTimezoneOffset - prayerTimezoneOffset;
+                scheduleTime.setMinutes(scheduleTime.getMinutes() + offsetDiff);
+                console.log(`Adjusted notification time for ${prayer.name} by ${offsetDiff} minutes for timezone difference`);
+            }
 
             await scheduleNotification(prayer.name, scheduleTime);
         }
