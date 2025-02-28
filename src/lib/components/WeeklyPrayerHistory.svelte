@@ -123,6 +123,35 @@
       console.log('Cannot mark upcoming prayer:', prayer.name);
       return;
     }
+    
+    // Check if this prayer is out of order (marking a later prayer before an earlier one)
+    if (day.date === todayStr) {
+      const prayerOrder = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
+      const currentPrayerIndex = prayerOrder.indexOf(prayer.name);
+      
+      // Check all prayers that come before this one
+      for (let i = 0; i < currentPrayerIndex; i++) {
+        const earlierPrayer = prayerOrder[i];
+        const earlierPrayerTime = $prayerTimesStore.find(p => p.name === earlierPrayer)?.time || '00:00 AM';
+        
+        // Skip if the earlier prayer is still in the future
+        if (isPrayerInFuture(day.date, earlierPrayerTime)) {
+          continue;
+        }
+        
+        // Check if the earlier prayer has been marked
+        const earlierPrayerRecord = $prayerHistoryStore.history.find(
+          h => h.date === day.date && h.prayerName === earlierPrayer
+        );
+        
+        // If an earlier prayer hasn't been marked yet, don't allow marking this one
+        if (!earlierPrayerRecord || !['ontime', 'late', 'missed', 'excused'].includes(earlierPrayerRecord.status)) {
+          console.log(`Cannot mark ${prayer.name} before marking ${earlierPrayer}`);
+          alert(`Please mark ${earlierPrayer} before marking ${prayer.name}`);
+          return;
+        }
+      }
+    }
 
     // Determine the new status based on single or double tap
     const newStatus = lastTappedCell === `${day.date}-${prayer.name}` ? 'late' : 'ontime';
@@ -513,19 +542,54 @@
                     status = 'none';
                     console.log(`Today's upcoming prayer: ${prayer} at ${prayerTime} marked as ${status}`);
                   } 
-                  // Prayer time has passed but not marked - pending
+                  // Also check if any earlier prayer today is still in the future
+                  // If so, this prayer should also be marked as 'none' to maintain order
                   else {
-                    status = 'pending';
-                    console.log(`Today's passed prayer: ${prayer} at ${prayerTime} marked as ${status}`);
-                    // Add to pending prayers list
-                    if (!$prayerHistoryStore.pendingByDate[day.date]) {
-                      $prayerHistoryStore.pendingByDate[day.date] = { prayers: [] };
+                    const prayerOrder = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
+                    const currentPrayerIndex = prayerOrder.indexOf(prayer);
+                    let earlierPrayerInFuture = false;
+                    
+                    // Check all prayers that come before this one
+                    for (let i = 0; i < currentPrayerIndex; i++) {
+                      const earlierPrayer = prayerOrder[i];
+                      const earlierPrayerTime = $prayerTimesStore.find(p => p.name === earlierPrayer)?.time || '00:00 AM';
+                      
+                      // If an earlier prayer is in the future, this one should be too
+                      if (isPrayerInFuture(day.date, earlierPrayerTime, timezoneOffset)) {
+                        earlierPrayerInFuture = true;
+                        break;
+                      }
+                      
+                      // Also check if earlier prayer is unmarked
+                      const earlierPrayerRecord = $prayerHistoryStore.history.find(
+                        h => h.date === day.date && h.prayerName === earlierPrayer
+                      );
+                      
+                      // If an earlier prayer hasn't been marked yet, this one should be 'none' too
+                      if (!earlierPrayerRecord || !['ontime', 'late', 'missed', 'excused'].includes(earlierPrayerRecord.status)) {
+                        earlierPrayerInFuture = true;
+                        break;
+                      }
                     }
-                    if (!$prayerHistoryStore.pendingByDate[day.date].prayers.some(p => p.prayerName === prayer)) {
-                      $prayerHistoryStore.pendingByDate[day.date].prayers.push({
-                        prayerName: prayer,
-                        time: prayerTime
-                      });
+                    
+                    if (earlierPrayerInFuture) {
+                      status = 'none';
+                      console.log(`Prayer ${prayer} marked as 'none' because an earlier prayer is still in the future or unmarked`);
+                    }
+                    // Prayer time has passed but not marked - pending
+                    else {
+                      status = 'pending';
+                      console.log(`Today's passed prayer: ${prayer} at ${prayerTime} marked as ${status}`);
+                      // Add to pending prayers list
+                      if (!$prayerHistoryStore.pendingByDate[day.date]) {
+                        $prayerHistoryStore.pendingByDate[day.date] = { prayers: [] };
+                      }
+                      if (!$prayerHistoryStore.pendingByDate[day.date].prayers.some(p => p.prayerName === prayer)) {
+                        $prayerHistoryStore.pendingByDate[day.date].prayers.push({
+                          prayerName: prayer,
+                          time: prayerTime
+                        });
+                      }
                     }
                   }
                 }
@@ -728,8 +792,11 @@
             </div>
             {#each row.days as day}
               {@const isPending = $prayerHistoryStore.pendingByDate[day.date]?.prayers.some(p => p.prayerName === row.name)}
+              {@const isDisabled = day.status === 'none' || day.status === 'excused'}
+              {@const isToday = day.date === new Date().toLocaleDateString('en-CA')}
+              {@const canMark = !isDisabled || (isToday && day.status === 'pending')}
               <div 
-                class="status-cell"
+                class="status-cell {!canMark ? 'disabled' : ''}"
                 on:click={() => handleTap({ name: row.name }, day)}
               >
                 <div class="status-dot {day.status} {day.status === 'pending' && isPending ? 'has-notification' : ''}"></div>
@@ -906,8 +973,17 @@
     transition: transform 0.1s ease;
   }
 
+  .status-cell.disabled {
+    cursor: not-allowed;
+    opacity: 0.7;
+  }
+
   .status-cell:active {
     transform: scale(0.95);
+  }
+
+  .status-cell.disabled:active {
+    transform: none;
   }
 
   .status-dot {
