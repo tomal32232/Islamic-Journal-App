@@ -563,20 +563,20 @@
     // Get prayer times
     const prayerTimes = $prayerTimesStore as PrayerTimesStore;
     const fajrPrayer = prayerTimes.find(p => p.name === 'Fajr');
-    const ishaPrayer = prayerTimes.find(p => p.name === 'Isha');
+    const maghribPrayer = prayerTimes.find(p => p.name === 'Maghrib');
     const dhuhrPrayer = prayerTimes.find(p => p.name === 'Dhuhr');
 
-    if (!fajrPrayer || !ishaPrayer || !dhuhrPrayer) return;
+    if (!fajrPrayer || !maghribPrayer || !dhuhrPrayer) return;
 
     const fajrTime = new Date(fajrPrayer.timestamp);
-    const ishaTime = new Date(ishaPrayer.timestamp);
+    const maghribTime = new Date(maghribPrayer.timestamp);
     const dhuhrTime = new Date(dhuhrPrayer.timestamp);
 
     // Check if we're in the morning window (after Fajr, before Dhuhr)
     const isMorningWindow = now >= fajrTime && now < dhuhrTime;
     
-    // Check if we're in the evening window (after Isha, before midnight)
-    const isEveningWindow = now >= ishaTime && now.getHours() < 24;
+    // Check if we're in the evening window (after Maghrib, before midnight)
+    const isEveningWindow = now >= maghribTime && now.getHours() < 24;
 
     // Show popup for morning if:
     // 1. It's after Fajr and before Dhuhr
@@ -588,7 +588,7 @@
     }
 
     // Show popup for evening if:
-    // 1. It's after Isha and before midnight
+    // 1. It's after Maghrib and before midnight
     // 2. We haven't recorded evening mood yet
     if (isEveningWindow && !todayMoods.evening) {
       currentMoodPeriod = 'evening';
@@ -883,6 +883,12 @@
     currentMoodPeriod = currentMoodPeriod === 'morning' ? 'evening' : 'morning';
     showMoodPopup = true;
   }
+
+  // Add this function to handle manual mood tracking
+  function handleManualMoodTracking(period) {
+    currentMoodPeriod = period;
+    showMoodPopup = true;
+  }
 </script>
 
 <div class="home-container">
@@ -978,6 +984,33 @@
                           {@html eveningMood.icon}
                         </button>
                       {/if}
+                    {/if}
+                  </div>
+                {/if}
+                
+                {#if isToday}
+                  <div class="mood-add-buttons">
+                    {#if !weekMoods[fullDate]?.morning}
+                      <button 
+                        class="mood-add-button morning" 
+                        on:click={() => handleManualMoodTracking('morning')}
+                        title="Add morning mood"
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <path d="M12 5v14M5 12h14" />
+                        </svg>
+                      </button>
+                    {/if}
+                    {#if !weekMoods[fullDate]?.evening}
+                      <button 
+                        class="mood-add-button evening" 
+                        on:click={() => handleManualMoodTracking('evening')}
+                        title="Add evening mood"
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <path d="M12 5v14M5 12h14" />
+                        </svg>
+                      </button>
                     {/if}
                   </div>
                 {/if}
@@ -2101,6 +2134,46 @@
     right: 0;
     z-index: 100;
     gap: 1rem;
+  }
+
+  .mood-add-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 0.25rem;
+    margin-top: 0.25rem;
+  }
+
+  .mood-add-button {
+    width: 1.25rem;
+    height: 1.25rem;
+    border-radius: 50%;
+    border: none;
+    background: #f0f4f5;
+    color: #216974;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .mood-add-button:hover {
+    background: #e0eaec;
+    transform: scale(1.1);
+  }
+
+  .mood-add-button svg {
+    width: 0.75rem;
+    height: 0.75rem;
+  }
+
+  .mood-add-button.morning {
+    border: 1px solid rgba(255, 166, 0, 0.3);
+  }
+
+  .mood-add-button.evening {
+    border: 1px solid rgba(70, 130, 180, 0.3);
   }
 </style>
 
