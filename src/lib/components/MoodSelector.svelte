@@ -10,17 +10,25 @@
     selectedMood = mood;
   }
 
-  function handleModalClose(guidance) {
+  function handleModalClose() {
     dispatch('select', {
       value: selectedMood.value,
       name: selectedMood.name,
       description: selectedMood.description,
-      icon: selectedMood.icon,
-      guidance: guidance
+      icon: selectedMood.icon
     });
     selectedMood = null;
     showSelector = false;
   }
+
+  function handleNextClick() {
+    if (selectedMood) {
+      // Open the guidance modal
+      showGuidanceModal = true;
+    }
+  }
+
+  let showGuidanceModal = false;
 
   const moods = [
     { 
@@ -92,115 +100,235 @@
 
 {#if showSelector}
   <div class="mood-selector">
-    <h3 class="mood-title">How are you feeling today?</h3>
-    <div class="mood-options">
-      {#each moods as mood}
-        <button 
-          class="mood-button" 
-          on:click={() => handleMoodClick(mood)}
-          title={mood.description}
-        >
-          <div class="mood-icon">
-            {@html mood.icon}
+    <div class="selected-mood-display">
+      {#if selectedMood}
+        <div class="selected-mood">
+          <div class="selected-mood-icon">
+            {@html selectedMood.icon}
           </div>
-          <span class="mood-name">{mood.name}</span>
-          <span class="mood-description">{mood.description}</span>
+          <div class="selected-mood-text">
+            <span class="selected-mood-name">{selectedMood.name}</span>
+            <span class="selected-mood-description">{selectedMood.description}</span>
+          </div>
+        </div>
+        <button class="next-button" on:click={handleNextClick}>
+          Next
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9 18l6-6-6-6" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
         </button>
-      {/each}
+      {:else}
+        <div class="mood-prompt">
+          <h3>How are you feeling today?</h3>
+          <p>Select a mood below</p>
+        </div>
+      {/if}
+    </div>
+    
+    <div class="mood-carousel">
+      <div class="mood-options">
+        {#each moods as mood}
+          <button 
+            class="mood-button {selectedMood && selectedMood.value === mood.value ? 'selected' : ''}" 
+            on:click={() => handleMoodClick(mood)}
+            title={mood.description}
+          >
+            <div class="mood-icon">
+              {@html mood.icon}
+            </div>
+            <span class="mood-name">{mood.name}</span>
+          </button>
+        {/each}
+      </div>
     </div>
   </div>
 {/if}
 
-<MoodGuidanceModal 
-  mood={selectedMood} 
-  onClose={handleModalClose}
-/>
+<!-- Hidden button to trigger the modal -->
+<button id="mood-guidance-trigger" style="display: none;" on:click={() => {}}></button>
+
+{#if showGuidanceModal}
+  <MoodGuidanceModal 
+    mood={selectedMood} 
+    onClose={handleModalClose}
+  />
+{/if}
 
 <style>
   .mood-selector {
-    background: white;
-    border-radius: 12px;
-    padding: 1rem;
-    margin-bottom: 0.5rem;
-    border: 1px solid transparent;
-    background-image: linear-gradient(white, white), 
-                     linear-gradient(to bottom, 
-                       rgba(0, 0, 0, 0.01) 0%,
-                       rgba(0, 0, 0, 0.1) 100%);
-    background-origin: border-box;
-    background-clip: padding-box, border-box;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    width: 100%;
   }
 
-  .mood-title {
-    font-size: 0.875rem;
-    color: #666;
-    margin-bottom: 1rem;
+  .selected-mood-display {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 2rem 1rem;
+    min-height: 200px;
+  }
+
+  .mood-prompt {
     text-align: center;
-    font-weight: normal;
+  }
+
+  .mood-prompt h3 {
+    font-size: 1.25rem;
+    color: #216974;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+  }
+
+  .mood-prompt p {
+    color: #718096;
+    font-size: 0.875rem;
+    margin: 0;
+  }
+
+  .selected-mood {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .selected-mood-icon {
+    width: 5rem;
+    height: 5rem;
+    color: #216974;
+    background: rgba(33, 105, 116, 0.1);
+    padding: 1.5rem;
+    border-radius: 50%;
+    transition: all 0.3s;
+  }
+
+  .selected-mood-text {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  .selected-mood-name {
+    font-size: 1.25rem;
+    color: #2D3748;
+    font-weight: 500;
+  }
+
+  .selected-mood-description {
+    font-size: 0.875rem;
+    color: #718096;
+  }
+
+  .next-button {
+    background: #216974;
+    color: white;
+    border: none;
+    border-radius: 12px;
+    padding: 0.75rem 1.5rem;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.2s;
+    margin-top: 1rem;
+  }
+
+  .next-button:hover {
+    background: #184f58;
+    transform: translateY(-2px);
+  }
+
+  .next-button svg {
+    width: 1rem;
+    height: 1rem;
+  }
+
+  .mood-carousel {
+    padding: 1rem 0;
+    background: #f8f9fa;
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.05);
   }
 
   .mood-options {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    grid-template-rows: repeat(2, 1fr);
-    gap: 0.5rem;
-    padding: 0.25rem;
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    gap: 1rem;
+    padding: 0.5rem 1rem;
+    -ms-overflow-style: none;  /* Hide scrollbar for IE and Edge */
+    scrollbar-width: none;  /* Hide scrollbar for Firefox */
+  }
+
+  .mood-options::-webkit-scrollbar {
+    display: none; /* Hide scrollbar for Chrome, Safari and Opera */
   }
 
   .mood-button {
-    background: none;
-    border: 1px solid transparent;
-    padding: 1.25rem 0.5rem;
+    background: white;
+    border: 1px solid #E2E8F0;
+    padding: 0.75rem;
     cursor: pointer;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.75rem;
+    gap: 0.5rem;
     transition: all 0.2s;
     border-radius: 12px;
-    width: 100%;
+    min-width: 80px;
+    scroll-snap-align: center;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
   }
 
-  .mood-button:hover {
-    background-color: #F7FAFC;
-    border-color: #E2E8F0;
+  .mood-button:hover, .mood-button.selected {
+    border-color: #216974;
     transform: translateY(-2px);
   }
 
+  .mood-button.selected {
+    background-color: rgba(33, 105, 116, 0.05);
+  }
+
   .mood-icon {
-    width: 3rem;
-    height: 3rem;
+    width: 2.5rem;
+    height: 2.5rem;
     color: #216974;
     background: rgba(33, 105, 116, 0.1);
-    padding: 1rem;
-    border-radius: 20px;
+    padding: 0.75rem;
+    border-radius: 50%;
     transition: all 0.2s;
   }
 
-  .mood-button:hover .mood-icon {
+  .mood-button:hover .mood-icon, .mood-button.selected .mood-icon {
     background: rgba(33, 105, 116, 0.15);
-    transform: scale(1.05);
   }
 
   .mood-name {
-    font-size: 0.875rem;
+    font-size: 0.75rem;
     color: #2D3748;
     font-weight: 500;
     text-align: center;
   }
 
-  .mood-description {
-    font-size: 0.75rem;
-    color: #718096;
-    font-weight: normal;
-    text-align: center;
-  }
-
   @media (max-width: 360px) {
+    .selected-mood-icon {
+      width: 4rem;
+      height: 4rem;
+      padding: 1.25rem;
+    }
+    
     .mood-icon {
-      width: 2.5rem;
-      height: 2.5rem;
-      padding: 0.875rem;
+      width: 2rem;
+      height: 2rem;
+      padding: 0.625rem;
     }
   }
 </style> 

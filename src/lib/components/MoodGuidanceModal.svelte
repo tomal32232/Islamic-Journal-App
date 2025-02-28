@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { fade } from 'svelte/transition';
   import { db } from '../services/firebase';
   import { collection, query, where, getDocs } from 'firebase/firestore';
   import { onMount } from 'svelte';
@@ -55,7 +54,7 @@
   }
 
   function handleClose() {
-    onClose(guidance);
+    onClose();
   }
 
   $: if (mood) {
@@ -70,9 +69,19 @@
 </script>
 
 {#if mood}
-  <div class="modal-backdrop" on:click={handleClose} transition:fade>
+  <div class="modal-backdrop" on:click={handleClose}>
     <div class="modal-content" on:click|stopPropagation>
-      <button class="close-button" on:click={handleClose}>×</button>
+      <button class="close-button" on:click={handleClose}>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 6L6 18M6 6l12 12" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </button>
+      
+      <div class="mood-icon-container">
+        <div class="mood-icon">
+          {@html mood.icon}
+        </div>
+      </div>
       
       <h2 class="title">
         {#if mood.value === 'grateful'}
@@ -91,7 +100,10 @@
       </h2>
 
       {#if loading}
-        <div class="loading">Loading...</div>
+        <div class="loading">
+          <div class="loading-spinner"></div>
+          <span>Loading guidance...</span>
+        </div>
       {:else if guidance}
         <div class="guidance-content">
           <div class="arabic-text">{guidance.arabicVerse}</div>
@@ -108,6 +120,10 @@
       {:else}
         <div class="no-content">No guidance available at the moment.</div>
       {/if}
+      
+      <button class="done-button" on:click={handleClose}>
+        Done
+      </button>
     </div>
   </div>
 {/if}
@@ -124,39 +140,66 @@
     justify-content: center;
     align-items: center;
     z-index: 1000;
+    padding: 0;
+    box-sizing: border-box;
   }
 
   .modal-content {
     background: white;
-    border-radius: 12px;
-    padding: 1.5rem;
-    width: 90%;
-    max-width: 500px;
-    max-height: 80vh;
+    border-radius: 24px 24px 0 0;
+    padding: 2rem 1.5rem;
+    width: 100%;
+    max-width: 100%;
+    height: 90vh;
     overflow-y: auto;
-    position: relative;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    position: absolute;
+    bottom: 0;
+    box-shadow: 0 -10px 25px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
   }
 
   .close-button {
     position: absolute;
-    top: 1rem;
-    right: 1rem;
+    top: 1.5rem;
+    right: 1.5rem;
     background: none;
     border: none;
-    font-size: 1.5rem;
     cursor: pointer;
-    color: #666;
-    padding: 0.25rem 0.5rem;
-    border-radius: 4px;
+    color: #718096;
+    padding: 0.5rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .close-button svg {
+    width: 1.25rem;
+    height: 1.25rem;
   }
 
   .close-button:hover {
     background: rgba(0, 0, 0, 0.05);
   }
 
+  .mood-icon-container {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 1.5rem;
+  }
+
+  .mood-icon {
+    width: 4rem;
+    height: 4rem;
+    color: #216974;
+    background: rgba(33, 105, 116, 0.1);
+    padding: 1.25rem;
+    border-radius: 50%;
+  }
+
   .title {
-    font-size: 1.25rem;
+    font-size: 1.5rem;
     color: #216974;
     margin-bottom: 1.5rem;
     text-align: center;
@@ -164,15 +207,34 @@
   }
 
   .loading {
-    text-align: center;
-    color: #666;
-    padding: 2rem 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem 0;
+    gap: 1rem;
+    color: #718096;
+  }
+
+  .loading-spinner {
+    width: 2rem;
+    height: 2rem;
+    border: 3px solid rgba(33, 105, 116, 0.1);
+    border-top-color: #216974;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
   }
 
   .guidance-content {
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
+    flex: 1;
+    overflow-y: auto;
   }
 
   .arabic-text {
@@ -222,14 +284,40 @@
 
   .no-content {
     text-align: center;
-    color: #666;
+    color: #718096;
     padding: 2rem 0;
+  }
+
+  .done-button {
+    background: #216974;
+    color: white;
+    border: none;
+    border-radius: 12px;
+    padding: 0.75rem;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-top: 2rem;
+  }
+
+  .done-button:hover {
+    background: #184f58;
+  }
+
+  @media (min-width: 768px) {
+    .modal-content {
+      max-width: 500px;
+      height: auto;
+      max-height: 90vh;
+      border-radius: 24px;
+      bottom: auto;
+    }
   }
 
   @media (max-width: 480px) {
     .modal-content {
-      width: 95%;
-      padding: 1rem;
+      padding: 1.5rem 1rem;
     }
 
     .arabic-text {
