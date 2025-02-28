@@ -98,34 +98,88 @@ async function throttledUpdate(updateFn) {
 
 // Add this function to ensure prayers are initialized
 export async function ensurePrayerData() {
-  const user = auth.currentUser;
-  if (!user) return;
-
-  // Get the last check timestamp from localStorage
-  const lastCheck = localStorage.getItem('lastPrayerDataCheck');
-  const today = new Date().toLocaleDateString('en-CA');
-  
-  // If we haven't checked today, initialize prayers
-  if (lastCheck !== today) {
-    // console.log('Initializing prayer data for the next 7 days');
-    const prayers = [
-      { name: 'Fajr', time: '', icon: 'SunDim', weight: 'regular' },
-      { name: 'Dhuhr', time: '', icon: 'Sun', weight: 'fill' },
-      { name: 'Asr', time: '', icon: 'CloudSun', weight: 'regular' },
-      { name: 'Maghrib', time: '', icon: 'SunHorizon', weight: 'regular' },
-      { name: 'Isha', time: '', icon: 'MoonStars', weight: 'regular' }
-    ];
-
-    // Get current prayer times
-    const prayerTimes = get(prayerTimesStore);
-    if (prayerTimes && prayerTimes.length > 0) {
-      prayers.forEach((prayer, index) => {
-        prayer.time = prayerTimes[index]?.time || '';
-      });
+  try {
+    const user = auth.currentUser;
+    if (!user) {
+      console.log('No authenticated user, skipping prayer data initialization');
+      return false;
     }
 
-    await initializeTodaysPrayers();
-    localStorage.setItem('lastPrayerDataCheck', today);
+    // Get the last check timestamp from localStorage
+    const lastCheck = localStorage.getItem('lastPrayerDataCheck');
+    const today = new Date().toLocaleDateString('en-CA');
+    
+    // If we haven't checked today, initialize prayers
+    if (lastCheck !== today) {
+      console.log('Initializing prayer data for the next 7 days');
+      
+      // First ensure we have prayer times
+      let prayerTimes = get(prayerTimesStore);
+      if (!prayerTimes || prayerTimes.length === 0) {
+        console.log('No prayer times available, fetching them first');
+        try {
+          // Try to fetch prayer times with retries
+          let retryCount = 0;
+          const MAX_RETRIES = 3;
+          
+          while ((!prayerTimes || prayerTimes.length === 0) && retryCount < MAX_RETRIES) {
+            try {
+              await fetchPrayerTimes();
+              prayerTimes = get(prayerTimesStore);
+              if (prayerTimes && prayerTimes.length > 0) {
+                console.log('Successfully fetched prayer times');
+                break;
+              }
+            } catch (error) {
+              console.error(`Error fetching prayer times (attempt ${retryCount + 1}/${MAX_RETRIES}):`, error);
+              retryCount++;
+              if (retryCount < MAX_RETRIES) {
+                // Wait before retrying with exponential backoff
+                await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, retryCount)));
+              }
+            }
+          }
+          
+          if (!prayerTimes || prayerTimes.length === 0) {
+            throw new Error('Failed to fetch prayer times after multiple attempts');
+          }
+        } catch (error) {
+          console.error('Failed to fetch prayer times:', error);
+          // Continue with initialization even if prayer times fetch fails
+          // We'll use empty times and update them later when available
+        }
+      }
+      
+      const prayers = [
+        { name: 'Fajr', time: '', icon: 'SunDim', weight: 'regular' },
+        { name: 'Dhuhr', time: '', icon: 'Sun', weight: 'fill' },
+        { name: 'Asr', time: '', icon: 'CloudSun', weight: 'regular' },
+        { name: 'Maghrib', time: '', icon: 'SunHorizon', weight: 'regular' },
+        { name: 'Isha', time: '', icon: 'MoonStars', weight: 'regular' }
+      ];
+
+      // Get current prayer times
+      if (prayerTimes && prayerTimes.length > 0) {
+        prayers.forEach((prayer, index) => {
+          prayer.time = prayerTimes[index]?.time || '';
+        });
+      }
+
+      try {
+        await initializeTodaysPrayers();
+        localStorage.setItem('lastPrayerDataCheck', today);
+        return true;
+      } catch (error) {
+        console.error('Error initializing today\'s prayers:', error);
+        // Don't update lastPrayerDataCheck so we'll try again next time
+        return false;
+      }
+    }
+    
+    return true; // Already checked today
+  } catch (error) {
+    console.error('Error in ensurePrayerData:', error);
+    return false;
   }
 }
 
@@ -520,76 +574,135 @@ export function convertPrayerTimeToDate(timeStr) {
 export async function getPrayerHistory() {
   return throttledUpdate(async () => {
     const user = auth.currentUser;
-    if (!user) return;
+    if (!user) {
+      console.log('No authenticated user, skipping prayer history fetch');
+      return { history: [], pendingByDate: {}, missedByDate: {} };
+    }
 
     // Use cache if available and not expired
     if (cache.prayerHistory && cache.lastFetched && 
         Date.now() - cache.lastFetched < CACHE_DURATION) {
+      console.log('Using cached prayer history data');
       const currentHash = getDataHash(cache.prayerHistory);
       if (currentHash === lastKnownDataHash) {
-        return; // No actual changes
+        return cache.prayerHistory; // Return cached data
       }
       lastKnownDataHash = currentHash;
       prayerHistoryStore.set(cache.prayerHistory);
-      return;
+      return cache.prayerHistory;
     }
 
-    try {
-      const sevenDaysAgo = new Date();
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-      const sevenDaysAgoStr = sevenDaysAgo.toLocaleDateString('en-CA');
-      
-      // Query prayer_history collection
-      const prayerHistoryRef = collection(db, 'prayer_history');
-      
-      let querySnapshot;
-      
-      // Try the indexed query first
+    // Implement retry logic
+    let retryCount = 0;
+    const MAX_RETRIES = 3;
+    let lastError = null;
+
+    while (retryCount < MAX_RETRIES) {
       try {
-        const q = query(
-          prayerHistoryRef,
-          where('userId', '==', user.uid),
-          where('date', '>=', sevenDaysAgoStr),
-          orderBy('date', 'desc')
-        );
+        console.log(`Fetching prayer history (attempt ${retryCount + 1}/${MAX_RETRIES})...`);
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        const sevenDaysAgoStr = sevenDaysAgo.toLocaleDateString('en-CA');
         
-        querySnapshot = await getDocs(q);
-      } catch (indexError) {
-        const q = query(
-          prayerHistoryRef,
-          where('userId', '==', user.uid)
-        );
+        // Query prayer_history collection
+        const prayerHistoryRef = collection(db, 'prayer_history');
         
-        const snapshot = await getDocs(q);
-        const filteredDocs = snapshot.docs.filter(doc => {
-          const data = doc.data();
-          return data.date >= sevenDaysAgoStr;
-        }).sort((a, b) => b.data().date.localeCompare(a.data().date));
+        let querySnapshot;
         
-        querySnapshot = { docs: filteredDocs };
-      }
+        // Try the indexed query first
+        try {
+          const q = query(
+            prayerHistoryRef,
+            where('userId', '==', user.uid),
+            where('date', '>=', sevenDaysAgoStr),
+            orderBy('date', 'desc')
+          );
+          
+          querySnapshot = await getDocs(q);
+          console.log(`Retrieved ${querySnapshot.docs.length} prayer records`);
+        } catch (indexError) {
+          console.warn('Indexed query failed, falling back to client-side filtering:', indexError);
+          const q = query(
+            prayerHistoryRef,
+            where('userId', '==', user.uid)
+          );
+          
+          const snapshot = await getDocs(q);
+          console.log(`Retrieved ${snapshot.docs.length} total prayer records, filtering for last 7 days`);
+          
+          const filteredDocs = snapshot.docs.filter(doc => {
+            const data = doc.data();
+            return data.date >= sevenDaysAgoStr;
+          }).sort((a, b) => b.data().date.localeCompare(a.data().date));
+          
+          querySnapshot = { docs: filteredDocs };
+          console.log(`Filtered to ${filteredDocs.length} prayer records within last 7 days`);
+        }
 
-      const result = processQueryResults(querySnapshot);
-      
-      // Check if data has actually changed
-      const newHash = getDataHash(result);
-      if (newHash === lastKnownDataHash) {
-        return; // No actual changes
+        const result = processQueryResults(querySnapshot);
+        
+        // Check if data has actually changed
+        const newHash = getDataHash(result);
+        if (newHash === lastKnownDataHash) {
+          console.log('Prayer history data unchanged');
+          return cache.prayerHistory || result; // Return existing cache or new result
+        }
+        
+        // Update cache and store only if there are actual changes
+        console.log('Prayer history data changed, updating store');
+        lastKnownDataHash = newHash;
+        cache.prayerHistory = result;
+        cache.lastFetched = Date.now();
+        
+        // Save to localStorage for offline access
+        try {
+          localStorage.setItem('prayerHistoryCache', JSON.stringify({
+            data: result,
+            timestamp: cache.lastFetched
+          }));
+        } catch (storageError) {
+          console.warn('Failed to save prayer history to localStorage:', storageError);
+        }
+        
+        prayerHistoryStore.set(result);
+        return result;
+      } catch (error) {
+        console.error(`Error fetching prayer history (attempt ${retryCount + 1}/${MAX_RETRIES}):`, error);
+        lastError = error;
+        retryCount++;
+        
+        if (retryCount < MAX_RETRIES) {
+          // Wait before retrying with exponential backoff
+          const delay = 1000 * Math.pow(2, retryCount);
+          console.log(`Retrying in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
       }
-      
-      // Update cache and store only if there are actual changes
-      lastKnownDataHash = newHash;
-      cache.prayerHistory = result;
-      cache.lastFetched = Date.now();
-      prayerHistoryStore.set(result);
-      
-      return result;
-    } catch (error) {
-      console.error('Error fetching prayer history:', error);
-      const emptyResult = { history: [], pendingByDate: {}, missedByDate: {} };
-      prayerHistoryStore.set(emptyResult);
-      return emptyResult;
     }
+
+    console.error('Failed to fetch prayer history after multiple attempts');
+    
+    // Try to load from localStorage as a last resort
+    try {
+      const storedCache = localStorage.getItem('prayerHistoryCache');
+      if (storedCache) {
+        const parsedCache = JSON.parse(storedCache);
+        if (parsedCache && parsedCache.data) {
+          console.log('Using prayer history from localStorage after failed fetch');
+          cache.prayerHistory = parsedCache.data;
+          cache.lastFetched = parsedCache.timestamp || Date.now();
+          prayerHistoryStore.set(parsedCache.data);
+          return parsedCache.data;
+        }
+      }
+    } catch (storageError) {
+      console.error('Error loading prayer history from localStorage:', storageError);
+    }
+    
+    // If all else fails, return empty result
+    const emptyResult = { history: [], pendingByDate: {}, missedByDate: {} };
+    prayerHistoryStore.set(emptyResult);
+    return emptyResult;
   });
 }
 
@@ -633,23 +746,72 @@ function processQueryResults(querySnapshot) {
 export function getPrayerDateTime(dateStr, timeStr, timezoneOffset = null) {
   if (!dateStr || !timeStr) return new Date();
   
-  const [hours, minutes] = timeStr.split(':').map(Number);
-  const [year, month, day] = dateStr.split('-').map(Number);
+  // Handle 12-hour format (e.g., "6:30 AM" or "7:45 PM")
+  let hours = 0;
+  let minutes = 0;
   
-  const date = new Date(year, month - 1, day, hours, minutes);
-  
-  // If we have timezone offset information, adjust the date
-  if (timezoneOffset !== null) {
-    const currentOffset = new Date().getTimezoneOffset();
-    const offsetDiff = currentOffset - timezoneOffset; // Difference in minutes
+  if (timeStr.includes('AM') || timeStr.includes('PM')) {
+    // Parse 12-hour format
+    const [timePart, period] = timeStr.split(' ');
+    const [hourStr, minuteStr] = timePart.split(':');
     
-    if (offsetDiff !== 0) {
-      date.setMinutes(date.getMinutes() + offsetDiff);
-      console.log(`Adjusted prayer time by ${offsetDiff} minutes for timezone difference`);
+    hours = parseInt(hourStr, 10);
+    minutes = parseInt(minuteStr, 10);
+    
+    // Convert to 24-hour format
+    if (period === 'PM' && hours < 12) {
+      hours += 12;
+    } else if (period === 'AM' && hours === 12) {
+      hours = 0;
     }
+  } else {
+    // Parse 24-hour format
+    const [hourStr, minuteStr] = timeStr.split(':');
+    hours = parseInt(hourStr, 10);
+    minutes = parseInt(minuteStr, 10);
   }
   
-  return date;
+  // Validate hours and minutes to prevent invalid time values
+  if (isNaN(hours) || hours < 0 || hours > 23) {
+    console.error(`Invalid hours value in time string: "${timeStr}"`);
+    hours = 0;
+  }
+  
+  if (isNaN(minutes) || minutes < 0 || minutes > 59) {
+    console.error(`Invalid minutes value in time string: "${timeStr}"`);
+    minutes = 0;
+  }
+  
+  const [year, month, day] = dateStr.split('-').map(Number);
+  
+  // Validate date components
+  if (isNaN(year) || isNaN(month) || isNaN(day) || 
+      year < 2000 || year > 2100 || 
+      month < 1 || month > 12 || 
+      day < 1 || day > 31) {
+    console.error(`Invalid date string: "${dateStr}"`);
+    return new Date(); // Return current date/time as fallback
+  }
+  
+  try {
+    const date = new Date(year, month - 1, day, hours, minutes);
+    
+    // If we have timezone offset information, adjust the date
+    if (timezoneOffset !== null) {
+      const currentOffset = new Date().getTimezoneOffset();
+      const offsetDiff = currentOffset - timezoneOffset; // Difference in minutes
+      
+      if (offsetDiff !== 0) {
+        date.setMinutes(date.getMinutes() + offsetDiff);
+        console.log(`Adjusted prayer time by ${offsetDiff} minutes for timezone difference`);
+      }
+    }
+    
+    return date;
+  } catch (error) {
+    console.error(`Error creating date from: ${dateStr} ${timeStr}`, error);
+    return new Date(); // Return current date/time as fallback
+  }
 }
 
 // Update function to save excused period with prayer-specific timing

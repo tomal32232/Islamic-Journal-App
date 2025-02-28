@@ -11,24 +11,84 @@
   import { iconMap } from '../utils/icons';
   import { auth } from '../firebase';
 
+  // Add loading and error states
+  let isLoading = true;
+  let loadingError = null;
+  let retryCount = 0;
+  const MAX_RETRIES = 3;
+
   // Preload data as soon as the component is created
   let preloadPromise = preloadData();
 
   async function preloadData() {
     try {
+      isLoading = true;
+      loadingError = null;
+      
       // Load cache from localStorage first
       loadCacheFromStorage();
       
+      // If we have cached data, show it immediately while we fetch fresh data
+      if (gridCache.data && gridCache.data.grid && gridCache.data.grid.length > 0) {
+        weeklyGrid = gridCache.data.grid;
+        weeklyStats = gridCache.data.weeklyStats || { ontime: 0, late: 0, missed: 0, excused: 0 };
+        // Keep loading state true to show overlay while we fetch fresh data
+      }
+      
       // Fetch prayer history and times in parallel if needed
       if (!$prayerHistoryStore.history || $prayerHistoryStore.history.length === 0) {
-        await Promise.all([
-          getPrayerHistory(),
-          fetchPrayerTimes()
-        ]);
+        await Promise.allSettled([
+          getPrayerHistory().catch(error => {
+            console.error('Error fetching prayer history:', error);
+            throw new Error('Failed to load prayer history');
+          }),
+          fetchPrayerTimes().catch(error => {
+            console.error('Error fetching prayer times:', error);
+            throw new Error('Failed to load prayer times');
+          })
+        ]).then(results => {
+          // Check if any promises were rejected
+          const errors = results
+            .filter(r => r.status === 'rejected')
+            .map(r => r.reason.message);
+          
+          if (errors.length > 0) {
+            throw new Error(errors.join(', '));
+          }
+        });
       }
+      
+      // Generate grid with available data
+      await updateGrid();
+      
+      isLoading = false;
     } catch (error) {
       console.error('Error preloading data:', error);
+      loadingError = error.message || 'Failed to load prayer data';
+      
+      // Implement retry logic
+      if (retryCount < MAX_RETRIES) {
+        retryCount++;
+        console.log(`Retrying data load (${retryCount}/${MAX_RETRIES})...`);
+        setTimeout(() => {
+          preloadPromise = preloadData();
+        }, 2000 * retryCount); // Exponential backoff
+      } else {
+        isLoading = false;
+        // Try to use cached data even if there was an error
+        if (gridCache.data) {
+          console.log('Using cached data after failed retries');
+          weeklyGrid = gridCache.data.grid || [];
+          weeklyStats = gridCache.data.weeklyStats || { ontime: 0, late: 0, missed: 0, excused: 0 };
+        }
+      }
     }
+  }
+
+  // Function to manually retry loading
+  async function retryLoading() {
+    retryCount = 0;
+    preloadPromise = preloadData();
   }
 
   let weeklyGrid = [];
@@ -179,27 +239,40 @@
     return history.map(p => `${p.date}-${p.prayerName}-${p.status}`).join('|');
   }
 
-  // Load cache from localStorage on initialization
+  // Improve cache loading from localStorage
   function loadCacheFromStorage() {
     try {
       const storedCache = localStorage.getItem('weeklyGridCache');
       if (storedCache) {
         const parsedCache = JSON.parse(storedCache);
-        // Only use cache if it's less than 1 hour old
-        if (parsedCache && Date.now() - parsedCache.timestamp < 60 * 60 * 1000) {
+        // Extend cache validity to 2 hours for initial loads
+        if (parsedCache && Date.now() - parsedCache.timestamp < 2 * 60 * 60 * 1000) {
           console.log('Loading grid cache from localStorage');
           gridCache = parsedCache;
+          
+          // Immediately populate the grid with cached data for faster rendering
+          if (gridCache.data) {
+            weeklyGrid = gridCache.data.grid || [];
+            weeklyStats = gridCache.data.weeklyStats || { ontime: 0, late: 0, missed: 0, excused: 0 };
+            // Still mark as loading until we verify the data
+            isLoading = true;
+          }
         }
       }
     } catch (error) {
       console.error('Error loading cache from localStorage:', error);
+      // Don't set an error state here, just log it
     }
   }
 
-  // Save cache to localStorage
+  // Save cache to localStorage with improved error handling
   function saveCacheToStorage() {
     try {
-      localStorage.setItem('weeklyGridCache', JSON.stringify(gridCache));
+      // Only save valid cache data
+      if (gridCache.data && gridCache.data.grid && gridCache.data.grid.length > 0) {
+        localStorage.setItem('weeklyGridCache', JSON.stringify(gridCache));
+        console.log('Saved grid cache to localStorage');
+      }
     } catch (error) {
       console.error('Error saving cache to localStorage:', error);
     }
@@ -235,14 +308,31 @@
 
   // Add a more robust function to check if a prayer is in the future
   function isPrayerInFuture(dateStr, timeStr, timezoneOffset = null) {
-    const now = new Date();
-    const prayerDateTime = getPrayerDateTime(dateStr, timeStr, timezoneOffset);
-    
-    // Add debug logging
-    console.log(`Comparing prayer time: ${prayerDateTime.toISOString()} with current time: ${now.toISOString()}`);
-    console.log(`Is prayer in future: ${prayerDateTime > now}`);
-    
-    return prayerDateTime > now;
+    try {
+      if (!dateStr || !timeStr) {
+        console.error('Missing date or time in isPrayerInFuture:', { dateStr, timeStr });
+        return false;
+      }
+      
+      const now = new Date();
+      
+      try {
+        const prayerDateTime = getPrayerDateTime(dateStr, timeStr, timezoneOffset);
+        
+        // Add debug logging
+        console.log(`isPrayerInFuture: Date=${dateStr}, Time=${timeStr}, TZ Offset=${timezoneOffset}`);
+        console.log(`Comparing prayer time: ${prayerDateTime.toISOString()} with current time: ${now.toISOString()}`);
+        console.log(`Is prayer in future: ${prayerDateTime > now}`);
+        
+        return prayerDateTime > now;
+      } catch (dateError) {
+        console.error('Error creating prayer date/time:', dateError, { dateStr, timeStr });
+        return false;
+      }
+    } catch (error) {
+      console.error('Error in isPrayerInFuture:', error, { dateStr, timeStr });
+      return false;
+    }
   }
 
   // Add a more robust function to check if a date is today
@@ -262,167 +352,232 @@
   }
 
   async function generatePrayerGrid() {
-    // Get current week start date
-    const currentWeekStart = getWeekStartDate();
-    
-    // Check if we can use cached data
-    const currentHistoryHash = getPrayerHistoryHash($prayerHistoryStore.history);
-    
-    // Improved caching: Check cache first before generating days
-    if (gridCache.data && 
-        gridCache.historyHash === currentHistoryHash && 
-        gridCache.weekStartDate === currentWeekStart &&
-        Date.now() - gridCache.timestamp < 30 * 60 * 1000) { // Cache valid for 30 minutes
-      console.log('Using cached grid data');
-      return gridCache.data.grid;
-    }
-    
-    console.log('Generating new grid data');
-    
-    const days = getCurrentWeekDays();
-    const prayers = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
-    const grid = [];
-    
-    // Reset weekly stats
-    weeklyStats = {
-      ontime: 0,
-      late: 0,
-      missed: 0,
-      excused: 0
-    };
-
-    // Get the date range for the last 7 days
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const sevenDaysAgo = new Date(today);
-    sevenDaysAgo.setDate(today.getDate() - 6);
-
-    // Get user's account creation date
-    const user = auth.currentUser;
-    const accountCreationDateTime = new Date(user.metadata.creationTime);
-
-    for (const prayer of prayers) {
-      const row = {
-        name: prayer,
-        icon: $prayerTimesStore.find(p => p.name === prayer)?.icon || 'Sun',
-        weight: $prayerTimesStore.find(p => p.name === prayer)?.weight || 'regular',
-        days: []
+    try {
+      // Get current week start date
+      const currentWeekStart = getWeekStartDate();
+      
+      // Check if we can use cached data
+      const currentHistoryHash = getPrayerHistoryHash($prayerHistoryStore.history);
+      
+      // Improved caching: Check cache first before generating days
+      if (gridCache.data && 
+          gridCache.historyHash === currentHistoryHash && 
+          gridCache.weekStartDate === currentWeekStart &&
+          Date.now() - gridCache.timestamp < 30 * 60 * 1000) { // Cache valid for 30 minutes
+        console.log('Using cached grid data');
+        return gridCache.data;
+      }
+      
+      console.log('Generating new grid data');
+      
+      const days = getCurrentWeekDays();
+      const prayers = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
+      const grid = [];
+      
+      // Reset weekly stats
+      weeklyStats = {
+        ontime: 0,
+        late: 0,
+        missed: 0,
+        excused: 0
       };
 
-      for (const day of days) {
-        let status = 'none'; // Default status
-        const prayerDate = new Date(day.date);
-        prayerDate.setHours(0, 0, 0, 0);
-        const now = new Date();
-        const todayStr = new Date().toLocaleDateString('en-CA');
-        const prayerTime = $prayerTimesStore.find(p => p.name === prayer)?.time || '00:00 AM';
-        const prayerDateTime = getPrayerDateTime(day.date, prayerTime);
-        
-        // First check if we already have a record for this prayer
-        const prayerRecord = $prayerHistoryStore.history.find(
-          h => h.date === day.date && h.prayerName === prayer
-        );
+      // Get the date range for the last 7 days
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const sevenDaysAgo = new Date(today);
+      sevenDaysAgo.setDate(today.getDate() - 6);
 
-        if (prayerRecord) {
-          // If we have a record, use its status
-          status = prayerRecord.status;
-          
-          // Update weekly stats if this prayer is within the last 7 days
-          if (prayerDate >= sevenDaysAgo && prayerDate <= today) {
-            if (status === 'ontime') weeklyStats.ontime++;
-            else if (status === 'late') weeklyStats.late++;
-            else if (status === 'missed') weeklyStats.missed++;
-            else if (status === 'excused') weeklyStats.excused++;
-          }
-        } else {
-          // No record exists, determine status based on date/time
-          
-          // Check if prayer should be excused
-          const isExcused = await shouldMarkPrayerExcused(day.date, prayer);
-          if (isExcused) {
-            status = 'excused';
-            if (prayerDate >= sevenDaysAgo && prayerDate <= today) {
-              weeklyStats.excused++;
-            }
-          } 
-          // Future date - always 'none'
-          else if (isFutureDate(day.date)) {
-            status = 'none';
-            console.log(`Future prayer: ${prayer} on ${day.date} marked as ${status}`);
-          }
-          // Today's prayers
-          else if (isToday(day.date)) {
-            // If prayer time is in the future, mark as 'none'
-            // Get timezone offset if available
-            const timezoneOffset = prayerRecord?.timezoneOffset || null;
-            
-            if (isPrayerInFuture(day.date, prayerTime, timezoneOffset)) {
-              status = 'none';
-              console.log(`Today's upcoming prayer: ${prayer} at ${prayerTime} marked as ${status}`);
-            } 
-            // Prayer time has passed but not marked - pending
-            else {
-              status = 'pending';
-              console.log(`Today's passed prayer: ${prayer} at ${prayerTime} marked as ${status}`);
-              // Add to pending prayers list
-              if (!$prayerHistoryStore.pendingByDate[day.date]) {
-                $prayerHistoryStore.pendingByDate[day.date] = { prayers: [] };
+      // Get user's account creation date
+      const user = auth.currentUser;
+      const accountCreationDateTime = user ? new Date(user.metadata.creationTime) : new Date();
+
+      for (const prayer of prayers) {
+        try {
+          const row = {
+            name: prayer,
+            icon: $prayerTimesStore.find(p => p.name === prayer)?.icon || 'Sun',
+            weight: $prayerTimesStore.find(p => p.name === prayer)?.weight || 'regular',
+            days: []
+          };
+
+          for (const day of days) {
+            try {
+              let status = 'none'; // Default status
+              const prayerDate = new Date(day.date);
+              prayerDate.setHours(0, 0, 0, 0);
+              const now = new Date();
+              const todayStr = new Date().toLocaleDateString('en-CA');
+              const prayerTime = $prayerTimesStore.find(p => p.name === prayer)?.time || '00:00 AM';
+              
+              // Log the prayer time for debugging
+              console.log(`Prayer time for ${prayer} on ${day.date}: ${prayerTime}`);
+              
+              let prayerDateTime;
+              try {
+                prayerDateTime = getPrayerDateTime(day.date, prayerTime);
+                console.log(`Created prayer date time: ${prayerDateTime.toISOString()}`);
+              } catch (dateTimeError) {
+                console.error(`Error creating prayer date time for ${prayer} on ${day.date}:`, dateTimeError);
+                prayerDateTime = new Date(); // Fallback to current time
               }
-              if (!$prayerHistoryStore.pendingByDate[day.date].prayers.some(p => p.prayerName === prayer)) {
-                $prayerHistoryStore.pendingByDate[day.date].prayers.push({
-                  prayerName: prayer,
-                  time: prayerTime
-                });
+              
+              // First check if we already have a record for this prayer
+              const prayerRecord = $prayerHistoryStore.history.find(
+                h => h.date === day.date && h.prayerName === prayer
+              );
+
+              if (prayerRecord) {
+                // If we have a record, use its status
+                status = prayerRecord.status;
+                
+                // Update weekly stats if this prayer is within the last 7 days
+                if (prayerDate >= sevenDaysAgo && prayerDate <= today) {
+                  if (status === 'ontime') weeklyStats.ontime++;
+                  else if (status === 'late') weeklyStats.late++;
+                  else if (status === 'missed') weeklyStats.missed++;
+                  else if (status === 'excused') weeklyStats.excused++;
+                }
+              } else {
+                // No record exists, determine status based on date/time
+                
+                // Check if prayer should be excused
+                let isExcused = false;
+                try {
+                  isExcused = await shouldMarkPrayerExcused(day.date, prayer);
+                } catch (excusedError) {
+                  console.error(`Error checking if prayer should be excused for ${prayer} on ${day.date}:`, excusedError);
+                }
+                
+                if (isExcused) {
+                  status = 'excused';
+                  if (prayerDate >= sevenDaysAgo && prayerDate <= today) {
+                    weeklyStats.excused++;
+                  }
+                } 
+                // Future date - always 'none'
+                else if (isFutureDate(day.date)) {
+                  status = 'none';
+                  console.log(`Future prayer: ${prayer} on ${day.date} marked as ${status}`);
+                }
+                // Today's prayers
+                else if (isToday(day.date)) {
+                  // If prayer time is in the future, mark as 'none'
+                  // Get timezone offset if available
+                  const timezoneOffset = prayerRecord?.timezoneOffset || null;
+                  
+                  let isPrayerFuture = false;
+                  try {
+                    isPrayerFuture = isPrayerInFuture(day.date, prayerTime, timezoneOffset);
+                  } catch (futureError) {
+                    console.error(`Error checking if prayer is in future for ${prayer} on ${day.date}:`, futureError);
+                    // Default to false if there's an error
+                    isPrayerFuture = false;
+                  }
+                  
+                  if (isPrayerFuture) {
+                    status = 'none';
+                    console.log(`Today's upcoming prayer: ${prayer} at ${prayerTime} marked as ${status}`);
+                  } 
+                  // Prayer time has passed but not marked - pending
+                  else {
+                    status = 'pending';
+                    console.log(`Today's passed prayer: ${prayer} at ${prayerTime} marked as ${status}`);
+                    // Add to pending prayers list
+                    if (!$prayerHistoryStore.pendingByDate[day.date]) {
+                      $prayerHistoryStore.pendingByDate[day.date] = { prayers: [] };
+                    }
+                    if (!$prayerHistoryStore.pendingByDate[day.date].prayers.some(p => p.prayerName === prayer)) {
+                      $prayerHistoryStore.pendingByDate[day.date].prayers.push({
+                        prayerName: prayer,
+                        time: prayerTime
+                      });
+                    }
+                  }
+                }
+                // Past days' prayers
+                else {
+                  // Only mark as missed if the prayer was after account creation
+                  if (prayerDateTime >= accountCreationDateTime) {
+                    status = 'missed';
+                    console.log(`Past prayer: ${prayer} on ${day.date} marked as ${status}`);
+                    if (prayerDate >= sevenDaysAgo) {
+                      weeklyStats.missed++;
+                    }
+                  } else {
+                    status = 'none';
+                    console.log(`Prayer before account creation: ${prayer} on ${day.date} marked as ${status}`);
+                  }
+                }
               }
+
+              row.days.push({
+                date: day.date,
+                status,
+                isToday: day.isToday
+              });
+            } catch (dayError) {
+              console.error(`Error processing day ${day.date} for prayer ${prayer}:`, dayError);
+              // Add a placeholder day with error status
+              row.days.push({
+                date: day.date,
+                status: 'none',
+                isToday: day.isToday,
+                hasError: true
+              });
             }
           }
-          // Past days' prayers
-          else {
-            // Only mark as missed if the prayer was after account creation
-            if (prayerDateTime >= accountCreationDateTime) {
-              status = 'missed';
-              console.log(`Past prayer: ${prayer} on ${day.date} marked as ${status}`);
-              if (prayerDate >= sevenDaysAgo) {
-                weeklyStats.missed++;
-              }
-            } else {
-              status = 'none';
-              console.log(`Prayer before account creation: ${prayer} on ${day.date} marked as ${status}`);
-            }
-          }
+          grid.push(row);
+        } catch (prayerError) {
+          console.error(`Error processing prayer ${prayer}:`, prayerError);
+          // Add a placeholder row for this prayer
+          grid.push({
+            name: prayer,
+            icon: 'Sun',
+            weight: 'regular',
+            days: days.map(day => ({
+              date: day.date,
+              status: 'none',
+              isToday: day.isToday,
+              hasError: true
+            }))
+          });
         }
-
-        row.days.push({
-          date: day.date,
-          status,
-          isToday: day.isToday
-        });
       }
-      grid.push(row);
+
+      // Update cache with new data and week start date
+      gridCache = {
+        data: { days, grid, weeklyStats },
+        timestamp: Date.now(),
+        historyHash: currentHistoryHash,
+        weekStartDate: currentWeekStart
+      };
+      
+      // Save to localStorage for persistence
+      saveCacheToStorage();
+
+      return { days, grid, weeklyStats };
+    } catch (error) {
+      console.error('Error generating prayer grid:', error);
+      // Return a minimal valid structure in case of error
+      return {
+        days: getCurrentWeekDays(),
+        grid: [],
+        weeklyStats: { ontime: 0, late: 0, missed: 0, excused: 0 }
+      };
     }
-
-    // Update cache with new data and week start date
-    gridCache = {
-      data: { days, grid, weeklyStats },
-      timestamp: Date.now(),
-      historyHash: currentHistoryHash,
-      weekStartDate: currentWeekStart
-    };
-    
-    // Save to localStorage for persistence
-    saveCacheToStorage();
-
-    return { days, grid, weeklyStats };
   }
 
   onMount(async () => {
     console.log('WeeklyPrayerHistory Mounted');
     
     // Wait for preload to complete
-    await preloadPromise;
-    
-    // Generate grid with data that should now be available
-    await updateGrid();
+    try {
+      await preloadPromise;
+    } catch (error) {
+      console.error('Error in preload promise:', error);
+      // Error is already handled in preloadData
+    }
   });
 
   let isUpdating = false;
@@ -448,9 +603,36 @@
         }
         
         // Otherwise generate new grid data
-        const gridData = await generatePrayerGrid();
-        weeklyGrid = gridData.grid;
-        weeklyStats = gridData.weeklyStats;
+        console.log('Generating new grid data in updateGrid');
+        try {
+          const gridData = await generatePrayerGrid();
+          weeklyGrid = gridData.grid;
+          weeklyStats = gridData.weeklyStats;
+          console.log('Grid data generated successfully');
+        } catch (gridError) {
+          console.error('Error generating prayer grid:', gridError);
+          loadingError = 'Failed to generate prayer grid. Please try again.';
+          
+          // Try to use cached data as fallback
+          if (gridCache.data) {
+            console.log('Using cached data as fallback after grid generation error');
+            weeklyGrid = gridCache.data.grid || [];
+            weeklyStats = gridCache.data.weeklyStats || { ontime: 0, late: 0, missed: 0, excused: 0 };
+          }
+        }
+      } else {
+        console.log('No prayer history data available for grid update');
+        loadingError = 'No prayer history data available';
+      }
+    } catch (error) {
+      console.error('Error updating grid:', error);
+      loadingError = 'Failed to update prayer grid';
+      
+      // Try to use cached data as fallback
+      if (gridCache.data) {
+        console.log('Using cached data as fallback after update error');
+        weeklyGrid = gridCache.data.grid || [];
+        weeklyStats = gridCache.data.weeklyStats || { ontime: 0, late: 0, missed: 0, excused: 0 };
       }
     } finally {
       isUpdating = false;
@@ -481,54 +663,76 @@
   <div class="instructions">
     <p>Tap once to mark prayer as on time, double tap to mark as late</p>
   </div>
-  <div class="history-grid">
-    <div class="header-row">
-      <div class="prayer-label"></div>
-      {#each weeklyGrid.length > 0 ? getCurrentWeekDays() : getCurrentWeekDays() as day}
-        <div class="day-column {day.isToday ? 'today' : ''}">
-          <span class="day-name">{day.dayName}</span>
-          <span class="day-number">{day.dayNumber}</span>
+  
+  <!-- Only show grid when not loading and no errors, or if we have cached data -->
+  {#if (!isLoading && !loadingError) || (weeklyGrid.length > 0)}
+    <div class="history-grid-container">
+      <!-- Add loading overlay -->
+      {#if isLoading}
+        <div class="loading-overlay">
+          <div class="loading-spinner"></div>
+          <p>Loading prayer history...</p>
         </div>
-      {/each}
-    </div>
+      {/if}
+      
+      <div class="history-grid">
+        <div class="header-row">
+          <div class="prayer-label"></div>
+          {#each weeklyGrid.length > 0 ? getCurrentWeekDays() : getCurrentWeekDays() as day}
+            <div class="day-column {day.isToday ? 'today' : ''}">
+              <span class="day-name">{day.dayName}</span>
+              <span class="day-number">{day.dayNumber}</span>
+            </div>
+          {/each}
+        </div>
 
-    {#each weeklyGrid as row}
-      <div class="prayer-row">
-        <div class="prayer-label">
-          <svelte:component this={iconMap[row.icon]} size={16} weight={row.weight} />
-          <span>{row.name}</span>
-        </div>
-        {#each row.days as day}
-          {@const isPending = $prayerHistoryStore.pendingByDate[day.date]?.prayers.some(p => p.prayerName === row.name)}
-          <div 
-            class="status-cell"
-            on:click={() => handleTap({ name: row.name }, day)}
-          >
-            <div class="status-dot {day.status} {day.status === 'pending' && isPending ? 'has-notification' : ''}"></div>
+        {#each weeklyGrid as row}
+          <div class="prayer-row">
+            <div class="prayer-label">
+              <svelte:component this={iconMap[row.icon]} size={16} weight={row.weight} />
+              <span>{row.name}</span>
+            </div>
+            {#each row.days as day}
+              {@const isPending = $prayerHistoryStore.pendingByDate[day.date]?.prayers.some(p => p.prayerName === row.name)}
+              <div 
+                class="status-cell"
+                on:click={() => handleTap({ name: row.name }, day)}
+              >
+                <div class="status-dot {day.status} {day.status === 'pending' && isPending ? 'has-notification' : ''}"></div>
+              </div>
+            {/each}
           </div>
         {/each}
       </div>
-    {/each}
-  </div>
 
-  <div class="weekly-stats">
-    <div class="stat">
-      <span class="label">On Time</span>
-      <span class="value ontime">{weeklyStats.ontime}</span>
+      <div class="weekly-stats">
+        <div class="stat">
+          <span class="label">On Time</span>
+          <span class="value ontime">{weeklyStats.ontime}</span>
+        </div>
+        <div class="stat">
+          <span class="label">Late</span>
+          <span class="value late">{weeklyStats.late}</span>
+        </div>
+        <div class="stat">
+          <span class="label">Missed</span>
+          <span class="value missed">{weeklyStats.missed}</span>
+        </div>
+        <div class="stat">
+          <span class="label">Excused</span>
+          <span class="value excused">{weeklyStats.excused}</span>
+        </div>
+      </div>
     </div>
-    <div class="stat">
-      <span class="label">Late</span>
-      <span class="value late">{weeklyStats.late}</span>
+  {/if}
+
+  <!-- Add error state -->
+  {#if loadingError && !isLoading && weeklyGrid.length === 0}
+    <div class="error-container">
+      <p class="error-message">{loadingError}</p>
+      <button class="retry-button" on:click={retryLoading}>Retry</button>
     </div>
-    <div class="stat">
-      <span class="label">Missed</span>
-      <span class="value missed">{weeklyStats.missed}</span>
-    </div>
-    <div class="stat">
-      <span class="label">Excused</span>
-      <span class="value excused">{weeklyStats.excused}</span>
-    </div>
-  </div>
+  {/if}
 </div>
 
 <style>
@@ -540,6 +744,76 @@
     background: white;
     border-radius: 0.5rem;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    min-height: 300px; /* Ensure consistent height even when loading */
+  }
+
+  /* Add loading overlay styles */
+  .history-grid-container {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.8);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    border-radius: 0.5rem;
+    backdrop-filter: blur(2px);
+  }
+
+  .loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #216974;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+
+  /* Add error styles */
+  .error-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    gap: 1rem;
+    text-align: center;
+  }
+
+  .error-message {
+    color: #ef4444;
+    font-weight: 500;
+  }
+
+  .retry-button {
+    background-color: #216974;
+    color: white;
+    border: none;
+    border-radius: 0.25rem;
+    padding: 0.5rem 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s;
+  }
+
+  .retry-button:hover {
+    background-color: #184f57;
   }
 
   .history-grid {
