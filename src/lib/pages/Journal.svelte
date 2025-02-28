@@ -637,16 +637,16 @@
           </div>
         {:else if selectedReflection === 'freeWrite'}
           <!-- Free Write input mode -->
-          <div class="modal-body">
+          <div class="modal-body free-write-body">
             <form on:submit|preventDefault={saveFreeWrite}>
-              <div class="question-content">
-                <div class="auto-expand-container">
+              <div class="question-content full-width">
+                <div class="auto-expand-container full-width">
                   <textarea 
                     bind:value={freeWriteContent}
                     placeholder="Express your thoughts freely..."
                     maxlength="500"
                     autofocus
-                    class="auto-expand"
+                    class="auto-expand free-write-textarea"
                     on:input={autoExpand}
                   ></textarea>
                   <div class="character-count">
@@ -1574,5 +1574,18 @@
     font-size: 0.75rem;
     color: #999;
     padding: 2px 0;
+  }
+
+  .full-width {
+    width: 100%;
+    padding: 0 1rem;
+  }
+
+  .free-write-textarea {
+    min-height: 180px;
+  }
+
+  .free-write-body {
+    padding: 1.5rem 0;
   }
 </style> 
