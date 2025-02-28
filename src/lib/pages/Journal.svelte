@@ -307,7 +307,10 @@
 
   let isSubmitting = false;
 
-  async function handleSubmit() {
+  async function handleSubmit(event) {
+    // Prevent default only if it's a form submission
+    if (event) event.preventDefault();
+    
     if (isLastQuestion) {
       isSubmitting = true;
       try {
@@ -415,7 +418,14 @@
     console.log('Saving deen reflection...');
     isSubmitting = true;
     try {
-      await journalStore.saveDeenReflection(deenReflections);
+      // Ensure all fields exist even if they're empty
+      const completeDeenReflections = {
+        duas: deenReflections.duas || '',
+        surahs: deenReflections.surahs || '',
+        quranQuotes: deenReflections.quranQuotes || '',
+        gratitude: deenReflections.gratitude || ''
+      };
+      await journalStore.saveDeenReflection(completeDeenReflections);
       deenReflections = { duas: '', surahs: '', quranQuotes: '', gratitude: '' };
       selectedReflection = null;
       console.log('Checking achievements after deen reflection...');
@@ -455,6 +465,10 @@
     if (container) {
       container.addEventListener('scroll', handleScroll);
     }
+    
+    // Initialize textarea heights
+    initTextareaHeights();
+    
     // ... rest of onMount code ...
 
     return () => {
@@ -462,6 +476,32 @@
       container?.removeEventListener('scroll', handleScroll);
     };
   });
+
+  function autoExpand(event) {
+    const textarea = event.target;
+    // Reset height to auto first to handle text deletion
+    textarea.style.height = 'auto';
+    // Set height based on scroll height (content height)
+    textarea.style.height = `${textarea.scrollHeight}px`;
+  }
+
+  // Function to initialize textarea heights after they're rendered
+  function initTextareaHeights() {
+    setTimeout(() => {
+      const textareas = document.querySelectorAll('.auto-expand');
+      textareas.forEach(textarea => {
+        if (textarea instanceof HTMLTextAreaElement) {
+          textarea.style.height = 'auto';
+          textarea.style.height = `${textarea.scrollHeight}px`;
+        }
+      });
+    }, 0);
+  }
+  
+  // Call initTextareaHeights when currentQuestion changes
+  $: if (currentQuestion) {
+    initTextareaHeights();
+  }
 </script>
 
 <div class="journal-container">
@@ -600,13 +640,19 @@
           <div class="modal-body">
             <form on:submit|preventDefault={saveFreeWrite}>
               <div class="question-content">
-                <textarea 
-                  bind:value={freeWriteContent}
-                  placeholder="Express your thoughts freely..."
-                  rows="8"
-                  autofocus
-                  required
-                ></textarea>
+                <div class="auto-expand-container">
+                  <textarea 
+                    bind:value={freeWriteContent}
+                    placeholder="Express your thoughts freely..."
+                    maxlength="500"
+                    autofocus
+                    class="auto-expand"
+                    on:input={autoExpand}
+                  ></textarea>
+                  <div class="character-count">
+                    {freeWriteContent ? freeWriteContent.length : 0}/500
+                  </div>
+                </div>
               </div>
 
               <div class="modal-footer">
@@ -632,16 +678,22 @@
           </div>
 
           <div class="modal-body">
-            <form on:submit|preventDefault={handleSubmit}>
+            <form on:submit={handleSubmit}>
               <div class="question-content">
                 <label>{currentQuestion.question}</label>
-                <textarea 
-                  bind:value={currentReflectionValue.value}
-                  placeholder={currentQuestion.placeholder}
-                  rows={currentQuestion.rows}
-                  autofocus
-                  required
-                ></textarea>
+                <div class="auto-expand-container">
+                  <textarea 
+                    bind:value={currentReflectionValue.value}
+                    placeholder={currentQuestion.placeholder}
+                    maxlength="500"
+                    autofocus
+                    class="auto-expand"
+                    on:input={autoExpand}
+                  ></textarea>
+                  <div class="character-count">
+                    {currentReflectionValue.value ? currentReflectionValue.value.length : 0}/500
+                  </div>
+                </div>
               </div>
 
               <div class="modal-footer">
@@ -1042,17 +1094,21 @@
   }
 
   textarea {
-    width: 90%;
+    width: 100%;
     padding: 1rem;
     border: 1px solid #e0e0e0;
     border-radius: 16px;
     background: white;
     color: #333;
-    resize: none;
     font-family: inherit;
     font-size: 1rem;
     line-height: 1.5;
     min-height: 120px;
+  }
+  
+  textarea::placeholder {
+    font-size: 0.85rem;
+    opacity: 0.7;
   }
 
   textarea:focus {
@@ -1066,22 +1122,23 @@
     justify-content: center;
     margin-top: 2rem;
     width: 100%;
+    padding: 0 1rem;
   }
 
   .submit-btn {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    padding: 1rem 2rem;
+    padding: 0.75rem 1.5rem;
     border: none;
     border-radius: 100px;
     background: #216974;
     color: white;
     font-weight: 500;
-    font-size: 1.125rem;
+    font-size: 1rem;
     cursor: pointer;
     transition: all 0.2s;
-    min-width: 200px;
+    min-width: 120px;
     justify-content: center;
   }
 
@@ -1098,13 +1155,13 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    padding: 0.75rem 1.5rem;
+    padding: 0.6rem 1rem;
     border: none;
     border-radius: 100px;
     background: #f5f5f5;
     color: #666;
     font-weight: 500;
-    font-size: 1rem;
+    font-size: 0.9rem;
     cursor: pointer;
     transition: all 0.2s;
   }
@@ -1484,5 +1541,38 @@
 
   .deen-question:last-child {
     margin-bottom: 0;
+  }
+
+  .auto-expand-container {
+    position: relative;
+    width: 90%;
+    margin-bottom: 1.5rem;
+  }
+  
+  .auto-expand {
+    resize: none;
+    overflow: hidden;
+    min-height: 120px;
+    transition: height 0.1s ease;
+  }
+  
+  .auto-expand::placeholder {
+    font-size: 0.85rem;
+    opacity: 0.7;
+  }
+
+  .auto-expand:focus {
+    outline: none;
+    border-color: #216974;
+    box-shadow: 0 0 0 2px rgba(33, 105, 116, 0.1);
+  }
+
+  .character-count {
+    position: absolute;
+    bottom: -20px;
+    right: 0;
+    font-size: 0.75rem;
+    color: #999;
+    padding: 2px 0;
   }
 </style> 

@@ -25,11 +25,16 @@
       isLoading = true;
       loadingError = null;
       
-      // Load cache from localStorage first
-      loadCacheFromStorage();
+      try {
+        // Load cache from localStorage first
+        loadCacheFromStorage();
+      } catch (cacheError) {
+        console.error('Error loading cache:', cacheError);
+        // Continue with initialization even if cache loading fails
+      }
       
       // If we have cached data, show it immediately while we fetch fresh data
-      if (gridCache.data && gridCache.data.grid && gridCache.data.grid.length > 0) {
+      if (gridCache && gridCache.data && gridCache.data.grid && gridCache.data.grid.length > 0) {
         weeklyGrid = gridCache.data.grid;
         weeklyStats = gridCache.data.weeklyStats || { ontime: 0, late: 0, missed: 0, excused: 0 };
         // Keep loading state true to show overlay while we fetch fresh data
@@ -76,7 +81,7 @@
       } else {
         isLoading = false;
         // Try to use cached data even if there was an error
-        if (gridCache.data) {
+        if (gridCache && gridCache.data) {
           console.log('Using cached data after failed retries');
           weeklyGrid = gridCache.data.grid || [];
           weeklyStats = gridCache.data.weeklyStats || { ontime: 0, late: 0, missed: 0, excused: 0 };
@@ -277,19 +282,41 @@
     try {
       const storedCache = localStorage.getItem('weeklyGridCache');
       if (storedCache) {
-        const parsedCache = JSON.parse(storedCache);
-        // Extend cache validity to 2 hours for initial loads
-        if (parsedCache && Date.now() - parsedCache.timestamp < 2 * 60 * 60 * 1000) {
-          console.log('Loading grid cache from localStorage');
-          gridCache = parsedCache;
-          
-          // Immediately populate the grid with cached data for faster rendering
-          if (gridCache.data) {
-            weeklyGrid = gridCache.data.grid || [];
-            weeklyStats = gridCache.data.weeklyStats || { ontime: 0, late: 0, missed: 0, excused: 0 };
-            // Still mark as loading until we verify the data
-            isLoading = true;
+        try {
+          const parsedCache = JSON.parse(storedCache);
+          // Extend cache validity to 2 hours for initial loads
+          if (parsedCache && Date.now() - parsedCache.timestamp < 2 * 60 * 60 * 1000) {
+            console.log('Loading grid cache from localStorage');
+            
+            // Ensure all required properties exist in the cache before assigning
+            if (parsedCache.data && 
+                parsedCache.timestamp && 
+                parsedCache.historyHash !== undefined && 
+                parsedCache.weekStartDate !== undefined) {
+              
+              // Make sure grid data structure is valid
+              if (parsedCache.data.grid && 
+                  parsedCache.data.weeklyStats && 
+                  parsedCache.data.days) {
+                
+                gridCache = parsedCache;
+                
+                // Immediately populate the grid with cached data for faster rendering
+                weeklyGrid = gridCache.data.grid || [];
+                weeklyStats = gridCache.data.weeklyStats || { ontime: 0, late: 0, missed: 0, excused: 0 };
+                // Still mark as loading until we verify the data
+                isLoading = true;
+              } else {
+                console.log('Invalid grid data structure in cache');
+              }
+            } else {
+              console.log('Missing required properties in cache');
+            }
+          } else {
+            console.log('Cache expired or invalid timestamp');
           }
+        } catch (parseError) {
+          console.error('Error parsing cache JSON:', parseError);
         }
       }
     } catch (error) {
@@ -302,9 +329,30 @@
   function saveCacheToStorage() {
     try {
       // Only save valid cache data
-      if (gridCache.data && gridCache.data.grid && gridCache.data.grid.length > 0) {
-        localStorage.setItem('weeklyGridCache', JSON.stringify(gridCache));
+      if (gridCache && 
+          gridCache.data && 
+          gridCache.data.grid && 
+          gridCache.data.grid.length > 0 &&
+          gridCache.timestamp &&
+          gridCache.historyHash !== undefined &&
+          gridCache.weekStartDate !== undefined) {
+        
+        // Create a clean copy of the data to avoid circular references
+        const cacheToSave = {
+          data: {
+            grid: gridCache.data.grid,
+            days: gridCache.data.days,
+            weeklyStats: gridCache.data.weeklyStats
+          },
+          timestamp: gridCache.timestamp,
+          historyHash: gridCache.historyHash,
+          weekStartDate: gridCache.weekStartDate
+        };
+        
+        localStorage.setItem('weeklyGridCache', JSON.stringify(cacheToSave));
         console.log('Saved grid cache to localStorage');
+      } else {
+        console.log('Invalid cache data, not saving to localStorage');
       }
     } catch (error) {
       console.error('Error saving cache to localStorage:', error);
@@ -718,7 +766,8 @@
         const currentHistoryHash = getPrayerHistoryHash($prayerHistoryStore.history);
         
         // Skip update if we already have valid cached data
-        if (gridCache.data && 
+        if (gridCache && 
+            gridCache.data && 
             gridCache.historyHash === currentHistoryHash && 
             gridCache.weekStartDate === currentWeekStart &&
             Date.now() - gridCache.timestamp < 30 * 60 * 1000) {
@@ -740,7 +789,7 @@
           loadingError = 'Failed to generate prayer grid. Please try again.';
           
           // Try to use cached data as fallback
-          if (gridCache.data) {
+          if (gridCache && gridCache.data) {
             console.log('Using cached data as fallback after grid generation error');
             weeklyGrid = gridCache.data.grid || [];
             weeklyStats = gridCache.data.weeklyStats || { ontime: 0, late: 0, missed: 0, excused: 0 };
@@ -755,7 +804,7 @@
       loadingError = 'Failed to update prayer grid';
       
       // Try to use cached data as fallback
-      if (gridCache.data) {
+      if (gridCache && gridCache.data) {
         console.log('Using cached data as fallback after update error');
         weeklyGrid = gridCache.data.grid || [];
         weeklyStats = gridCache.data.weeklyStats || { ontime: 0, late: 0, missed: 0, excused: 0 };
