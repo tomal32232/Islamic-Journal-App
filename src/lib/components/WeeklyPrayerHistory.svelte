@@ -115,6 +115,15 @@
     // Only allow tracking for today and past prayers
     if (day.date > todayStr) return;
 
+    // Get the prayer time for this prayer
+    const prayerTime = $prayerTimesStore.find(p => p.name === prayer.name)?.time || '00:00 AM';
+    
+    // Check if this is an upcoming prayer for today
+    if (day.date === todayStr && isPrayerInFuture(day.date, prayerTime)) {
+      console.log('Cannot mark upcoming prayer:', prayer.name);
+      return;
+    }
+
     // Determine the new status based on single or double tap
     const newStatus = lastTappedCell === `${day.date}-${prayer.name}` ? 'late' : 'ontime';
     
@@ -157,6 +166,17 @@
 
   // Helper function to update UI immediately
   function updateUIForPrayer(prayerName, date, newStatus) {
+    // Check if the prayer is within the current week for stats
+    const today = new Date();
+    const sevenDaysAgo = new Date(today);
+    sevenDaysAgo.setDate(today.getDate() - 6);
+    
+    const sevenDaysAgoStr = sevenDaysAgo.toLocaleDateString('en-CA');
+    const todayStr = today.toLocaleDateString('en-CA');
+    const isInCurrentWeek = date >= sevenDaysAgoStr && date <= todayStr;
+    
+    console.log(`Updating UI for prayer: ${prayerName} on ${date} to ${newStatus}, in current week: ${isInCurrentWeek}`);
+    
     // Update the grid data in memory - use direct mutation for better performance
     for (let i = 0; i < weeklyGrid.length; i++) {
       if (weeklyGrid[i].name === prayerName) {
@@ -168,13 +188,21 @@
             // Update the status
             weeklyGrid[i].days[j].status = newStatus;
             
-            // Update weekly stats if needed
-            if (oldStatus && weeklyStats[oldStatus] !== undefined) {
-              weeklyStats[oldStatus]--;
-            }
-            
-            if (weeklyStats[newStatus] !== undefined) {
-              weeklyStats[newStatus]++;
+            // Update weekly stats if needed and if the prayer is within the current week
+            if (isInCurrentWeek) {
+              // Decrement old status count if it was a countable status
+              if (oldStatus && ['ontime', 'late', 'missed', 'excused'].includes(oldStatus)) {
+                if (weeklyStats[oldStatus] !== undefined) {
+                  weeklyStats[oldStatus]--;
+                }
+              }
+              
+              // Increment new status count if it's a countable status
+              if (['ontime', 'late', 'missed', 'excused'].includes(newStatus)) {
+                if (weeklyStats[newStatus] !== undefined) {
+                  weeklyStats[newStatus]++;
+                }
+              }
             }
             
             // Force Svelte to recognize the change
@@ -387,6 +415,12 @@
       today.setHours(0, 0, 0, 0);
       const sevenDaysAgo = new Date(today);
       sevenDaysAgo.setDate(today.getDate() - 6);
+      
+      // Convert to string format for easier comparison
+      const sevenDaysAgoStr = sevenDaysAgo.toLocaleDateString('en-CA');
+      const todayStr = today.toLocaleDateString('en-CA');
+      
+      console.log(`Date range for stats: ${sevenDaysAgoStr} to ${todayStr}`);
 
       // Get user's account creation date
       const user = auth.currentUser;
@@ -432,7 +466,7 @@
                 status = prayerRecord.status;
                 
                 // Update weekly stats if this prayer is within the last 7 days
-                if (prayerDate >= sevenDaysAgo && prayerDate <= today) {
+                if (day.date >= sevenDaysAgoStr && day.date <= todayStr) {
                   if (status === 'ontime') weeklyStats.ontime++;
                   else if (status === 'late') weeklyStats.late++;
                   else if (status === 'missed') weeklyStats.missed++;
@@ -451,7 +485,7 @@
                 
                 if (isExcused) {
                   status = 'excused';
-                  if (prayerDate >= sevenDaysAgo && prayerDate <= today) {
+                  if (day.date >= sevenDaysAgoStr && day.date <= todayStr) {
                     weeklyStats.excused++;
                   }
                 } 
@@ -501,7 +535,7 @@
                   if (prayerDateTime >= accountCreationDateTime) {
                     status = 'missed';
                     console.log(`Past prayer: ${prayer} on ${day.date} marked as ${status}`);
-                    if (prayerDate >= sevenDaysAgo) {
+                    if (day.date >= sevenDaysAgoStr && day.date <= todayStr) {
                       weeklyStats.missed++;
                     }
                   } else {
