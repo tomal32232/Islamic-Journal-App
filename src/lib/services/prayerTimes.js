@@ -186,18 +186,63 @@ export async function fetchPrayerTimes() {
       );
       if (geocodeResponse.ok) {
         const locationData = await geocodeResponse.json();
-        const locality = locationData.locality || locationData.city;
+        
+        // Add detailed logging of the entire location data
+        console.log('LOCATION DATA RECEIVED:', JSON.stringify(locationData, null, 2));
+        
+        // Try to get the most specific location name available
+        let locality = locationData.locality || locationData.city;
+        const district = locationData.localityInfo?.administrative?.find(a => a.adminLevel === 2)?.name;
+        const state = locationData.principalSubdivision;
         const country = locationData.countryName;
+        
+        // Log individual fields we're using
+        console.log('Locality/City:', locality);
+        console.log('District:', district);
+        console.log('State/Province:', state);
+        console.log('Country:', country);
+        
+        // If locality contains "District", use state/province instead
+        if (locality && locality.toLowerCase().includes('district') && state) {
+          console.log('Replacing district with state/province');
+          locality = state;
+        }
+        // If locality is empty but we have district, use that instead
+        else if (!locality && district) {
+          locality = district;
+        }
         
         let locationString = '';
         if (locality) {
           locationString = locality;
           if (country) {
-            locationString += `, ${country}`;
+            // Simplify country name if it has parentheses
+            let displayCountry = country;
+            if (country.includes('(')) {
+              displayCountry = country.split('(')[0].trim();
+            }
+            locationString += `, ${displayCountry}`;
+          }
+        } else if (state) {
+          locationString = state;
+          if (country) {
+            // Simplify country name if it has parentheses
+            let displayCountry = country;
+            if (country.includes('(')) {
+              displayCountry = country.split('(')[0].trim();
+            }
+            locationString += `, ${displayCountry}`;
           }
         } else if (country) {
-          locationString = country;
+          // Simplify country name if it has parentheses
+          let displayCountry = country;
+          if (country.includes('(')) {
+            displayCountry = country.split('(')[0].trim();
+          }
+          locationString = displayCountry;
         }
+        
+        console.log('Final location string:', locationString);
         
         if (locationString) {
           locationStore.set(locationString);
