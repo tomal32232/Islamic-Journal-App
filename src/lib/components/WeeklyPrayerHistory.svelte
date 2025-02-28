@@ -147,6 +147,34 @@
     return days;
   }
 
+  // Add a more robust function to check if a prayer is in the future
+  function isPrayerInFuture(dateStr, timeStr) {
+    const now = new Date();
+    const prayerDateTime = getPrayerDateTime(dateStr, timeStr);
+    
+    // Add debug logging
+    console.log(`Comparing prayer time: ${prayerDateTime.toISOString()} with current time: ${now.toISOString()}`);
+    console.log(`Is prayer in future: ${prayerDateTime > now}`);
+    
+    return prayerDateTime > now;
+  }
+
+  // Add a more robust function to check if a date is today
+  function isToday(dateStr) {
+    const today = new Date();
+    const todayStr = today.toLocaleDateString('en-CA');
+    return dateStr === todayStr;
+  }
+
+  // Add a more robust function to check if a date is in the future
+  function isFutureDate(dateStr) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const date = new Date(dateStr);
+    date.setHours(0, 0, 0, 0);
+    return date > today;
+  }
+
   async function generatePrayerGrid() {
     // Get current week start date
     const currentWeekStart = getWeekStartDate();
@@ -196,22 +224,24 @@
       };
 
       for (const day of days) {
-        const prayerRecord = $prayerHistoryStore.history.find(
-          h => h.date === day.date && h.prayerName === prayer
-        );
-
+        let status = 'none'; // Default status
+        const prayerDate = new Date(day.date);
+        prayerDate.setHours(0, 0, 0, 0);
         const now = new Date();
         const todayStr = new Date().toLocaleDateString('en-CA');
         const prayerTime = $prayerTimesStore.find(p => p.name === prayer)?.time || '00:00 AM';
         const prayerDateTime = getPrayerDateTime(day.date, prayerTime);
         
-        let status = 'pending';
-        const prayerDate = new Date(day.date);
-        prayerDate.setHours(0, 0, 0, 0);
+        // First check if we already have a record for this prayer
+        const prayerRecord = $prayerHistoryStore.history.find(
+          h => h.date === day.date && h.prayerName === prayer
+        );
 
         if (prayerRecord) {
+          // If we have a record, use its status
           status = prayerRecord.status;
           
+          // Update weekly stats if this prayer is within the last 7 days
           if (prayerDate >= sevenDaysAgo && prayerDate <= today) {
             if (status === 'ontime') weeklyStats.ontime++;
             else if (status === 'late') weeklyStats.late++;
@@ -219,46 +249,57 @@
             else if (status === 'excused') weeklyStats.excused++;
           }
         } else {
-          const isExcused = await shouldMarkPrayerExcused(day.date, prayer);
+          // No record exists, determine status based on date/time
           
+          // Check if prayer should be excused
+          const isExcused = await shouldMarkPrayerExcused(day.date, prayer);
           if (isExcused) {
             status = 'excused';
             if (prayerDate >= sevenDaysAgo && prayerDate <= today) {
               weeklyStats.excused++;
             }
-          } else if (day.date === todayStr) {
-            const currentTime = new Date();
-            const prayerData = $prayerTimesStore.find(p => p.name === prayer);
-            
-            if (!prayerData || !prayerData.time) {
+          } 
+          // Future date - always 'none'
+          else if (isFutureDate(day.date)) {
+            status = 'none';
+            console.log(`Future prayer: ${prayer} on ${day.date} marked as ${status}`);
+          }
+          // Today's prayers
+          else if (isToday(day.date)) {
+            // If prayer time is in the future, mark as 'none'
+            if (isPrayerInFuture(day.date, prayerTime)) {
               status = 'none';
-            } else {
-              if (currentTime > prayerDateTime) {
-                status = 'pending';
-                if (!$prayerHistoryStore.pendingByDate[day.date]) {
-                  $prayerHistoryStore.pendingByDate[day.date] = { prayers: [] };
-                }
-                if (!$prayerHistoryStore.pendingByDate[day.date].prayers.some(p => p.prayerName === prayer)) {
-                  $prayerHistoryStore.pendingByDate[day.date].prayers.push({
-                    prayerName: prayer,
-                    time: prayerTime
-                  });
-                }
-              } else {
-                status = 'none';
+              console.log(`Today's upcoming prayer: ${prayer} at ${prayerTime} marked as ${status}`);
+            } 
+            // Prayer time has passed but not marked - pending
+            else {
+              status = 'pending';
+              console.log(`Today's passed prayer: ${prayer} at ${prayerTime} marked as ${status}`);
+              // Add to pending prayers list
+              if (!$prayerHistoryStore.pendingByDate[day.date]) {
+                $prayerHistoryStore.pendingByDate[day.date] = { prayers: [] };
+              }
+              if (!$prayerHistoryStore.pendingByDate[day.date].prayers.some(p => p.prayerName === prayer)) {
+                $prayerHistoryStore.pendingByDate[day.date].prayers.push({
+                  prayerName: prayer,
+                  time: prayerTime
+                });
               }
             }
-          } else if (day.date < todayStr) {
+          }
+          // Past days' prayers
+          else {
+            // Only mark as missed if the prayer was after account creation
             if (prayerDateTime >= accountCreationDateTime) {
               status = 'missed';
+              console.log(`Past prayer: ${prayer} on ${day.date} marked as ${status}`);
               if (prayerDate >= sevenDaysAgo) {
                 weeklyStats.missed++;
               }
             } else {
               status = 'none';
+              console.log(`Prayer before account creation: ${prayer} on ${day.date} marked as ${status}`);
             }
-          } else {
-            status = 'none';
           }
         }
 
