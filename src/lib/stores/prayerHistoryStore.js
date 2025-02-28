@@ -469,30 +469,13 @@ export async function savePrayerStatus(prayerData) {
   const prayerName = prayerData.prayerName || prayerData.name;
 
   try {
-    const prayerId = `${prayerData.date}-${prayerName.toLowerCase()}`;
+    const prayerId = `${prayerData.date}_${prayerName}`;
     
-    // Query to find the existing prayer document
-    const prayerQuery = query(
-      collection(db, 'prayer_history'),
-      where('userId', '==', user.uid),
-      where('prayerId', '==', prayerId)
-    );
-
-    const querySnapshot = await getDocs(prayerQuery);
-    let prayerRef;
-
-    if (!querySnapshot.empty) {
-      // Update existing document
-      prayerRef = querySnapshot.docs[0].ref;
-      console.log('Updating existing prayer document:', prayerId);
-    } else {
-      // Create new document only if it doesn't exist
-      prayerRef = doc(collection(db, 'prayer_history'));
-      console.log('Creating new prayer document:', prayerId);
-    }
-
     // Get current timezone offset in minutes
     const timezoneOffset = new Date().getTimezoneOffset();
+    
+    // Create a document reference with a predictable ID
+    const prayerRef = doc(db, 'prayer_history', `${user.uid}_${prayerId}`);
     
     // Save to Firestore with timezone information
     await setDoc(prayerRef, {
@@ -502,56 +485,19 @@ export async function savePrayerStatus(prayerData) {
       time: prayerData.time || '',
       status: prayerData.status,
       date: prayerData.date,
-      timezoneOffset: timezoneOffset, // Store the timezone offset
+      timezoneOffset: timezoneOffset,
       timestamp: Timestamp.now()
     }, { merge: true });
 
     // Invalidate cache after updating
     invalidatePrayerHistoryCache();
-
-    // Update local store
-    const store = get(prayerHistoryStore);
     
-    // Update history
-    const historyIndex = store.history.findIndex(
-      p => p.date === prayerData.date && p.prayerName === prayerName
-    );
+    // Update badges if needed - do this in the background
+    Promise.resolve().then(() => updatePrayerProgress()).catch(error => {
+      console.error('Error updating prayer progress:', error);
+    });
     
-    if (historyIndex >= 0) {
-      store.history[historyIndex] = {
-        ...store.history[historyIndex],
-        ...prayerData,
-        prayerName: prayerName,
-        timezoneOffset: timezoneOffset
-      };
-    } else {
-      store.history.push({
-        ...prayerData,
-        prayerName: prayerName,
-        timezoneOffset: timezoneOffset
-      });
-    }
-
-    // Remove from pendingByDate if status is final
-    if (['ontime', 'late', 'missed', 'excused'].includes(prayerData.status)) {
-      if (store.pendingByDate[prayerData.date]) {
-        store.pendingByDate[prayerData.date].prayers = 
-          store.pendingByDate[prayerData.date].prayers.filter(
-            p => p.prayerName !== prayerName
-          );
-        
-        // Remove the date if no prayers left
-        if (store.pendingByDate[prayerData.date].prayers.length === 0) {
-          delete store.pendingByDate[prayerData.date];
-        }
-      }
-    }
-
-    prayerHistoryStore.set(store);
-    
-    // Update badges if needed
-    await updatePrayerProgress();
-    
+    return true;
   } catch (error) {
     console.error('Error saving prayer status:', error);
     throw error;

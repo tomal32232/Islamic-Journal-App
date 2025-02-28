@@ -55,28 +55,114 @@
     // Only allow tracking for today and past prayers
     if (day.date > todayStr) return;
 
+    // Determine the new status based on single or double tap
+    const newStatus = lastTappedCell === `${day.date}-${prayer.name}` ? 'late' : 'ontime';
+    
     const prayerData = {
       prayerName: prayer.name,
       date: day.date,
-      status: lastTappedCell === `${day.date}-${prayer.name}` ? 'late' : 'ontime'
+      status: newStatus
     };
     console.log('Saving prayer data:', prayerData);
+
+    // Update UI immediately
+    updateUIForPrayer(prayer.name, day.date, newStatus);
 
     if (lastTappedCell === `${day.date}-${prayer.name}`) {
       // Double tap detected - mark as late
       clearTimeout(tapTimeout);
       lastTappedCell = null;
-      await savePrayerStatus(prayerData);
+      // Save to database in the background
+      savePrayerStatus(prayerData).catch(error => {
+        console.error('Error saving prayer status:', error);
+        // Revert UI if save fails
+        updateUIForPrayer(prayer.name, day.date, day.status);
+      });
     } else {
       // First tap - set timeout for potential double tap
       lastTappedCell = `${day.date}-${prayer.name}`;
       clearTimeout(tapTimeout);
       tapTimeout = setTimeout(async () => {
         // Single tap - mark as on time
-        await savePrayerStatus(prayerData);
+        // Save to database in the background
+        savePrayerStatus(prayerData).catch(error => {
+          console.error('Error saving prayer status:', error);
+          // Revert UI if save fails
+          updateUIForPrayer(prayer.name, day.date, day.status);
+        });
         lastTappedCell = null;
       }, 300); // 300ms window for double tap
     }
+  }
+
+  // Helper function to update UI immediately
+  function updateUIForPrayer(prayerName, date, newStatus) {
+    // Update the grid data in memory - use direct mutation for better performance
+    for (let i = 0; i < weeklyGrid.length; i++) {
+      if (weeklyGrid[i].name === prayerName) {
+        for (let j = 0; j < weeklyGrid[i].days.length; j++) {
+          if (weeklyGrid[i].days[j].date === date) {
+            // Get the old status before updating
+            const oldStatus = weeklyGrid[i].days[j].status;
+            
+            // Update the status
+            weeklyGrid[i].days[j].status = newStatus;
+            
+            // Update weekly stats if needed
+            if (oldStatus && weeklyStats[oldStatus] !== undefined) {
+              weeklyStats[oldStatus]--;
+            }
+            
+            if (weeklyStats[newStatus] !== undefined) {
+              weeklyStats[newStatus]++;
+            }
+            
+            // Force Svelte to recognize the change
+            weeklyGrid = [...weeklyGrid];
+            weeklyStats = {...weeklyStats};
+            
+            break;
+          }
+        }
+        break;
+      }
+    }
+
+    // Also update the local store for immediate consistency
+    prayerHistoryStore.update(store => {
+      const history = store.history || [];
+      const index = history.findIndex(
+        p => p.date === date && p.prayerName === prayerName
+      );
+      
+      if (index !== -1) {
+        history[index] = { ...history[index], status: newStatus };
+      } else {
+        history.push({
+          date,
+          prayerName,
+          status: newStatus,
+          time: $prayerTimesStore.find(p => p.name === prayerName)?.time || '00:00'
+        });
+      }
+      
+      // Remove from pendingByDate if status is final
+      if (['ontime', 'late', 'missed', 'excused'].includes(newStatus)) {
+        if (store.pendingByDate[date]) {
+          store.pendingByDate[date].prayers = 
+            store.pendingByDate[date].prayers.filter(
+              p => p.prayerName !== prayerName
+            );
+          
+          // Remove the date if no prayers left
+          if (store.pendingByDate[date].prayers.length === 0) {
+            delete store.pendingByDate[date];
+          }
+        }
+      }
+      
+      return { ...store, history };
+    });
   }
 
   // Add cache for grid data
