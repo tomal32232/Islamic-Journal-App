@@ -104,92 +104,68 @@
 
   // Handle tap on prayer cell
   async function handleTap(prayer, day) {
-    console.log('Tapped prayer:', prayer);
-    console.log('Tapped day:', day);
-    
-    if (!day.date || day.status === 'none' || day.status === 'excused') return;
-    
-    const now = new Date();
-    const todayStr = now.toLocaleDateString('en-CA');
-    
-    // Only allow tracking for today and past prayers
-    if (day.date > todayStr) return;
-
-    // Get the prayer time for this prayer
-    const prayerTime = $prayerTimesStore.find(p => p.name === prayer.name)?.time || '00:00 AM';
-    
-    // Check if this is an upcoming prayer for today
-    if (day.date === todayStr && isPrayerInFuture(day.date, prayerTime)) {
-      console.log('Cannot mark upcoming prayer:', prayer.name);
-      return;
-    }
-    
-    // Check if this prayer is out of order (marking a later prayer before an earlier one)
-    if (day.date === todayStr) {
-      const prayerOrder = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
-      const currentPrayerIndex = prayerOrder.indexOf(prayer.name);
+    try {
+      console.log('Tapped prayer:', prayer);
+      console.log('Tapped day:', day);
       
-      // Check all prayers that come before this one
-      for (let i = 0; i < currentPrayerIndex; i++) {
-        const earlierPrayer = prayerOrder[i];
-        const earlierPrayerTime = $prayerTimesStore.find(p => p.name === earlierPrayer)?.time || '00:00 AM';
-        
-        // Skip if the earlier prayer is still in the future
-        if (isPrayerInFuture(day.date, earlierPrayerTime)) {
-          continue;
-        }
-        
-        // Check if the earlier prayer has been marked
-        const earlierPrayerRecord = $prayerHistoryStore.history.find(
-          h => h.date === day.date && h.prayerName === earlierPrayer
-        );
-        
-        // If an earlier prayer hasn't been marked yet, don't allow marking this one
-        if (!earlierPrayerRecord || !['ontime', 'late', 'missed', 'excused'].includes(earlierPrayerRecord.status)) {
-          console.log(`Cannot mark ${prayer.name} before marking ${earlierPrayer}`);
-          alert(`Please mark ${earlierPrayer} before marking ${prayer.name}`);
-          return;
-        }
+      // Get the actual prayer time from the store
+      const prayerTimeFromStore = $prayerTimesStore.find(p => p.name === prayer.name)?.time || '00:00 AM';
+      const prayerTime = prayer.time || prayerTimeFromStore;
+      
+      // Check if prayer is in the future
+      const isFuture = await isPrayerInFuture(day.date, prayerTime, prayer.timezoneOffset);
+      console.log(`Checking if ${prayer.name} is in future:`, isFuture);
+      
+      // Don't allow marking future prayers
+      if (isFuture) {
+        console.log(`Cannot mark future prayer: ${prayer.name} on ${day.date}`);
+        return;
       }
-    }
-
-    // Determine the new status based on single or double tap
-    const newStatus = lastTappedCell === `${day.date}-${prayer.name}` ? 'late' : 'ontime';
-    
-    const prayerData = {
-      prayerName: prayer.name,
-      date: day.date,
-      status: newStatus
-    };
-    console.log('Saving prayer data:', prayerData);
-
-    // Update UI immediately
-    updateUIForPrayer(prayer.name, day.date, newStatus);
-
-    if (lastTappedCell === `${day.date}-${prayer.name}`) {
-      // Double tap detected - mark as late
-      clearTimeout(tapTimeout);
-      lastTappedCell = null;
-      // Save to database in the background
-      savePrayerStatus(prayerData).catch(error => {
-        console.error('Error saving prayer status:', error);
-        // Revert UI if save fails
-        updateUIForPrayer(prayer.name, day.date, day.status);
-      });
-    } else {
-      // First tap - set timeout for potential double tap
-      lastTappedCell = `${day.date}-${prayer.name}`;
-      clearTimeout(tapTimeout);
-      tapTimeout = setTimeout(async () => {
-        // Single tap - mark as on time
-        // Save to database in the background
-        savePrayerStatus(prayerData).catch(error => {
-          console.error('Error saving prayer status:', error);
-          // Revert UI if save fails
-          updateUIForPrayer(prayer.name, day.date, day.status);
-        });
-        lastTappedCell = null;
-      }, 300); // 300ms window for double tap
+      
+      // Check if prayer is excused
+      const isExcused = await shouldMarkPrayerExcused(day.date, prayer.name);
+      if (isExcused) {
+        console.log(`Prayer ${prayer.name} on ${day.date} is excused`);
+        return;
+      }
+      
+      // Get the current status
+      const currentStatus = prayer.status || 'none';
+      
+      // Determine the next status
+      let nextStatus;
+      if (currentStatus === 'none') {
+        nextStatus = 'ontime';
+      } else if (currentStatus === 'ontime') {
+        nextStatus = 'late';
+      } else if (currentStatus === 'late') {
+        nextStatus = 'missed';
+      } else if (currentStatus === 'missed') {
+        nextStatus = 'none';
+      } else {
+        nextStatus = 'none';
+      }
+      
+      // Save the prayer data
+      const prayerData = {
+        prayerName: prayer.name,
+        date: day.date,
+        status: nextStatus,
+        time: prayerTime,
+        timezoneOffset: prayer.timezoneOffset || new Date().getTimezoneOffset()
+      };
+      
+      console.log('Saving prayer data:', prayerData);
+      await savePrayerStatus(prayerData);
+      
+      // Update UI
+      console.log(`Updating UI for prayer: ${prayer.name} on ${day.date} to ${nextStatus}, in current week: ${isCurrentWeek(day.date)}`);
+      
+      // Update the grid
+      updateGrid();
+      
+    } catch (error) {
+      console.error('Error handling prayer tap:', error);
     }
   }
 
@@ -363,6 +339,18 @@
     return days;
   }
 
+  // Add a function to check if a date is within the current week
+  function isCurrentWeek(dateStr) {
+    const today = new Date();
+    const sevenDaysAgo = new Date(today);
+    sevenDaysAgo.setDate(today.getDate() - 6);
+    
+    const sevenDaysAgoStr = sevenDaysAgo.toLocaleDateString('en-CA');
+    const todayStr = today.toLocaleDateString('en-CA');
+    
+    return dateStr >= sevenDaysAgoStr && dateStr <= todayStr;
+  }
+
   // Add a more robust function to check if a prayer is in the future
   function isPrayerInFuture(dateStr, timeStr, timezoneOffset = null) {
     try {
@@ -371,17 +359,27 @@
         return false;
       }
       
+      // Get current time with milliseconds for more precise comparison
       const now = new Date();
       
+      // Log the raw inputs for debugging
+      console.log(`isPrayerInFuture raw inputs: Date=${dateStr}, Time=${timeStr}, TZ Offset=${timezoneOffset}`);
+      
       try {
+        // Parse the prayer time
         const prayerDateTime = getPrayerDateTime(dateStr, timeStr, timezoneOffset);
         
         // Add debug logging
         console.log(`isPrayerInFuture: Date=${dateStr}, Time=${timeStr}, TZ Offset=${timezoneOffset}`);
         console.log(`Comparing prayer time: ${prayerDateTime.toISOString()} with current time: ${now.toISOString()}`);
-        console.log(`Is prayer in future: ${prayerDateTime > now}`);
+        console.log(`Prayer time hours: ${prayerDateTime.getHours()}, minutes: ${prayerDateTime.getMinutes()}`);
+        console.log(`Current time hours: ${now.getHours()}, minutes: ${now.getMinutes()}`);
         
-        return prayerDateTime > now;
+        // Add a small buffer (1 minute) to account for slight time differences
+        const isInFuture = prayerDateTime.getTime() > (now.getTime() + 60000);
+        console.log(`Is prayer in future (with 1-minute buffer): ${isInFuture}`);
+        
+        return isInFuture;
       } catch (dateError) {
         console.error('Error creating prayer date/time:', dateError, { dateStr, timeStr });
         return false;
@@ -455,12 +453,31 @@
       const user = auth.currentUser;
       const accountCreationDateTime = user ? new Date(user.metadata.creationTime) : new Date();
 
+      // Make sure we have prayer times
+      if ($prayerTimesStore.length === 0) {
+        console.log('No prayer times available, fetching...');
+        try {
+          await fetchPrayerTimes();
+        } catch (error) {
+          console.error('Error fetching prayer times:', error);
+        }
+      }
+
+      // Log available prayer times for debugging
+      console.log('Available prayer times:', JSON.stringify($prayerTimesStore));
+
       for (const prayer of prayers) {
         try {
+          // Get the prayer time from the store
+          const prayerTimeObj = $prayerTimesStore.find(p => p.name === prayer);
+          const prayerTime = prayerTimeObj ? prayerTimeObj.time : '00:00 AM';
+          
+          console.log(`Using prayer time for ${prayer}: ${prayerTime}`);
+          
           const row = {
             name: prayer,
-            icon: $prayerTimesStore.find(p => p.name === prayer)?.icon || 'Sun',
-            weight: $prayerTimesStore.find(p => p.name === prayer)?.weight || 'regular',
+            icon: prayerTimeObj?.icon || 'Sun',
+            weight: prayerTimeObj?.weight || 'regular',
             days: []
           };
 
@@ -471,7 +488,6 @@
               prayerDate.setHours(0, 0, 0, 0);
               const now = new Date();
               const todayStr = new Date().toLocaleDateString('en-CA');
-              const prayerTime = $prayerTimesStore.find(p => p.name === prayer)?.time || '00:00 AM';
               
               // Log the prayer time for debugging
               console.log(`Prayer time for ${prayer} on ${day.date}: ${prayerTime}`);
@@ -531,7 +547,9 @@
                   
                   let isPrayerFuture = false;
                   try {
+                    // Force a fresh check each time
                     isPrayerFuture = isPrayerInFuture(day.date, prayerTime, timezoneOffset);
+                    console.log(`Grid generation: Is ${prayer} in future: ${isPrayerFuture}`);
                   } catch (futureError) {
                     console.error(`Error checking if prayer is in future for ${prayer} on ${day.date}:`, futureError);
                     // Default to false if there's an error
@@ -552,7 +570,8 @@
                     // Check all prayers that come before this one
                     for (let i = 0; i < currentPrayerIndex; i++) {
                       const earlierPrayer = prayerOrder[i];
-                      const earlierPrayerTime = $prayerTimesStore.find(p => p.name === earlierPrayer)?.time || '00:00 AM';
+                      const earlierPrayerObj = $prayerTimesStore.find(p => p.name === earlierPrayer);
+                      const earlierPrayerTime = earlierPrayerObj ? earlierPrayerObj.time : '00:00 AM';
                       
                       // If an earlier prayer is in the future, this one should be too
                       if (isPrayerInFuture(day.date, earlierPrayerTime, timezoneOffset)) {
@@ -612,7 +631,8 @@
               row.days.push({
                 date: day.date,
                 status,
-                isToday: day.isToday
+                isToday: day.isToday,
+                time: prayerTime // Store the prayer time with the day
               });
             } catch (dayError) {
               console.error(`Error processing day ${day.date} for prayer ${prayer}:`, dayError);
@@ -666,16 +686,24 @@
     }
   }
 
-  onMount(async () => {
+  onMount(() => {
     console.log('WeeklyPrayerHistory Mounted');
     
     // Wait for preload to complete
-    try {
-      await preloadPromise;
-    } catch (error) {
+    preloadPromise.catch(error => {
       console.error('Error in preload promise:', error);
       // Error is already handled in preloadData
-    }
+    });
+    
+    // Set up a timer to refresh the grid every minute to update future prayer status
+    const refreshInterval = setInterval(() => {
+      console.log('Periodic grid refresh to update future prayer status');
+      updateGrid();
+    }, 60000); // Check every minute
+    
+    return () => {
+      clearInterval(refreshInterval);
+    };
   });
 
   let isUpdating = false;
@@ -759,7 +787,7 @@
 
 <div class="prayer-history">
   <div class="instructions">
-    <p>Tap once to mark prayer as on time, double tap to mark as late</p>
+    <p>Tap once to mark prayer as on time, double tap to mark as late. Only past prayers can be marked.</p>
   </div>
   
   <!-- Only show grid when not loading and no errors, or if we have cached data -->
@@ -794,12 +822,19 @@
               {@const isPending = $prayerHistoryStore.pendingByDate[day.date]?.prayers.some(p => p.prayerName === row.name)}
               {@const isDisabled = day.status === 'none' || day.status === 'excused'}
               {@const isToday = day.date === new Date().toLocaleDateString('en-CA')}
-              {@const canMark = !isDisabled || (isToday && day.status === 'pending')}
+              {@const prayerTime = day.time || $prayerTimesStore.find(p => p.name === row.name)?.time || '00:00 AM'}
+              {@const isFuturePrayer = isToday && isPrayerInFuture(day.date, prayerTime)}
+              
+              <!-- Force refresh of isFuturePrayer calculation on each render -->
+              {@const now = new Date().getTime()}
+              {@const canMark = (!isDisabled || (isToday && day.status === 'pending')) && !isFuturePrayer}
+              
               <div 
-                class="status-cell {!canMark ? 'disabled' : ''}"
-                on:click={() => handleTap({ name: row.name }, day)}
+                class="status-cell {!canMark ? 'disabled' : ''} {isFuturePrayer ? 'future-prayer' : ''}"
+                on:click={() => handleTap({ name: row.name, time: prayerTime, status: day.status, timezoneOffset: new Date().getTimezoneOffset() }, day)}
+                title={isFuturePrayer ? `${row.name} prayer hasn't occurred yet` : ''}
               >
-                <div class="status-dot {day.status} {day.status === 'pending' && isPending ? 'has-notification' : ''}"></div>
+                <div class="status-dot {day.status} {day.status === 'pending' && isPending ? 'has-notification' : ''} {isFuturePrayer ? 'future' : ''}"></div>
               </div>
             {/each}
           </div>
@@ -978,11 +1013,18 @@
     opacity: 0.7;
   }
 
+  .status-cell.future-prayer {
+    cursor: not-allowed;
+    background-color: rgba(240, 240, 240, 0.5);
+    border-radius: 4px;
+  }
+
   .status-cell:active {
     transform: scale(0.95);
   }
 
-  .status-cell.disabled:active {
+  .status-cell.disabled:active,
+  .status-cell.future-prayer:active {
     transform: none;
   }
 
@@ -1016,6 +1058,21 @@
 
   .status-dot.has-notification {
     animation: pulse 2s infinite;
+  }
+
+  .status-dot.future {
+    background: #f0f0f0;
+    border: 1px dashed #a0a0a0;
+    position: relative;
+  }
+
+  .status-dot.future::after {
+    content: '⏱️';
+    font-size: 0.5rem;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
   }
 
   .weekly-stats {
