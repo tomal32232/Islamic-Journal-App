@@ -19,6 +19,12 @@
 
 <div class="popup-backdrop" transition:fade={{ duration: 300 }}>
   <div class="popup-content" transition:fly={{ y: 50, duration: 300, delay: 150 }}>
+    <button class="close-button" on:click={onSkip}>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M18 6L6 18M6 6l12 12" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
+    </button>
+    
     <div class="popup-header">
       <h2>{titles[period]}</h2>
       <p class="subtitle">{subtitles[period]}</p>
@@ -62,6 +68,30 @@
     position: absolute;
     bottom: 0;
     box-shadow: 0 -10px 25px rgba(0, 0, 0, 0.1);
+  }
+
+  .close-button {
+    position: absolute;
+    top: 1.5rem;
+    right: 1.5rem;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #718096;
+    padding: 0.5rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .close-button svg {
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+
+  .close-button:hover {
+    background: rgba(0, 0, 0, 0.05);
   }
 
   .popup-header {
