@@ -123,7 +123,7 @@
       
       // Don't allow marking future prayers
       if (isFuture) {
-        console.log(`Cannot mark future prayer: ${prayer.name} on ${day.date}`);
+        console.log(`Cannot mark future prayer: ${prayer.name} on ${day.date} - Only past prayers can be marked.`);
         return;
       }
       
@@ -134,40 +134,56 @@
         return;
       }
       
-      // Get the current status
-      const currentStatus = prayer.status || 'none';
+      // Create a unique identifier for this cell
+      const cellId = `${prayer.name}-${day.date}`;
       
-      // Determine the next status
-      let nextStatus;
-      if (currentStatus === 'none') {
-        nextStatus = 'ontime';
-      } else if (currentStatus === 'ontime') {
-        nextStatus = 'late';
-      } else if (currentStatus === 'late') {
-        nextStatus = 'missed';
-      } else if (currentStatus === 'missed') {
-        nextStatus = 'none';
+      // Handle double tap logic
+      if (lastTappedCell === cellId && tapTimeout) {
+        // This is a double tap
+        clearTimeout(tapTimeout);
+        tapTimeout = null;
+        lastTappedCell = null;
+        
+        // Mark as late on double tap
+        const prayerData = {
+          prayerName: prayer.name,
+          date: day.date,
+          status: 'late',
+          time: prayerTime,
+          timezoneOffset: prayer.timezoneOffset || new Date().getTimezoneOffset()
+        };
+        
+        console.log('Double tap - Saving prayer data as late:', prayerData);
+        await savePrayerStatus(prayerData);
+        
+        // Update the grid after double tap
+        updateGrid();
       } else {
-        nextStatus = 'none';
+        // This is a single tap - set a timeout to detect if a double tap follows
+        lastTappedCell = cellId;
+        
+        clearTimeout(tapTimeout);
+        tapTimeout = setTimeout(async () => {
+          // Single tap confirmed - mark as on time
+          const prayerData = {
+            prayerName: prayer.name,
+            date: day.date,
+            status: 'ontime',
+            time: prayerTime,
+            timezoneOffset: prayer.timezoneOffset || new Date().getTimezoneOffset()
+          };
+          
+          console.log('Single tap - Saving prayer data as on time:', prayerData);
+          await savePrayerStatus(prayerData);
+          
+          // Reset for next tap
+          tapTimeout = null;
+          lastTappedCell = null;
+          
+          // Update the grid
+          updateGrid();
+        }, 300); // 300ms is a common double-tap detection threshold
       }
-      
-      // Save the prayer data
-      const prayerData = {
-        prayerName: prayer.name,
-        date: day.date,
-        status: nextStatus,
-        time: prayerTime,
-        timezoneOffset: prayer.timezoneOffset || new Date().getTimezoneOffset()
-      };
-      
-      console.log('Saving prayer data:', prayerData);
-      await savePrayerStatus(prayerData);
-      
-      // Update UI
-      console.log(`Updating UI for prayer: ${prayer.name} on ${day.date} to ${nextStatus}, in current week: ${isCurrentWeek(day.date)}`);
-      
-      // Update the grid
-      updateGrid();
       
     } catch (error) {
       console.error('Error handling prayer tap:', error);
@@ -831,6 +847,7 @@
 
   onDestroy(() => {
     clearTimeout(updateTimeout);
+    clearTimeout(tapTimeout); // Clear tap timeout to prevent memory leaks
   });
 </script>
 
