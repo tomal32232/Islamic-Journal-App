@@ -144,7 +144,10 @@
         tapTimeout = null;
         lastTappedCell = null;
         
-        // Mark as late on double tap
+        // Immediately update UI to show 'late' status
+        updateUIForPrayer(prayer.name, day.date, 'late');
+        
+        // Mark as late on double tap (in the background)
         const prayerData = {
           prayerName: prayer.name,
           date: day.date,
@@ -154,17 +157,33 @@
         };
         
         console.log('Double tap - Saving prayer data as late:', prayerData);
-        await savePrayerStatus(prayerData);
-        
-        // Update the grid after double tap
-        updateGrid();
+        // Don't await this - let it happen in the background
+        savePrayerStatus(prayerData).catch(error => {
+          console.error('Error saving prayer status:', error);
+        });
       } else {
         // This is a single tap - set a timeout to detect if a double tap follows
         lastTappedCell = cellId;
         
+        // Show visual feedback immediately that something was tapped
+        // We'll use a temporary "pending" visual state
+        const tempCell = weeklyGrid.find(row => row.name === prayer.name)?.days.find(d => d.date === day.date);
+        if (tempCell) {
+          const oldStatus = tempCell.status;
+          // Only update the visual if it's not already marked
+          if (oldStatus !== 'ontime' && oldStatus !== 'late') {
+            tempCell.status = 'pending';
+            // Force a UI update
+            weeklyGrid = [...weeklyGrid];
+          }
+        }
+        
         clearTimeout(tapTimeout);
         tapTimeout = setTimeout(async () => {
-          // Single tap confirmed - mark as on time
+          // Immediately update UI to show 'ontime' status
+          updateUIForPrayer(prayer.name, day.date, 'ontime');
+          
+          // Single tap confirmed - mark as on time (in the background)
           const prayerData = {
             prayerName: prayer.name,
             date: day.date,
@@ -174,14 +193,14 @@
           };
           
           console.log('Single tap - Saving prayer data as on time:', prayerData);
-          await savePrayerStatus(prayerData);
+          // Don't await this - let it happen in the background
+          savePrayerStatus(prayerData).catch(error => {
+            console.error('Error saving prayer status:', error);
+          });
           
           // Reset for next tap
           tapTimeout = null;
           lastTappedCell = null;
-          
-          // Update the grid
-          updateGrid();
         }, 300); // 300ms is a common double-tap detection threshold
       }
       
@@ -204,6 +223,7 @@
     console.log(`Updating UI for prayer: ${prayerName} on ${date} to ${newStatus}, in current week: ${isInCurrentWeek}`);
     
     // Update the grid data in memory - use direct mutation for better performance
+    let updated = false;
     for (let i = 0; i < weeklyGrid.length; i++) {
       if (weeklyGrid[i].name === prayerName) {
         for (let j = 0; j < weeklyGrid[i].days.length; j++) {
@@ -213,6 +233,7 @@
             
             // Update the status
             weeklyGrid[i].days[j].status = newStatus;
+            updated = true;
             
             // Update weekly stats if needed and if the prayer is within the current week
             if (isInCurrentWeek) {
@@ -231,14 +252,14 @@
               }
             }
             
-            // Force Svelte to recognize the change
+            // Force Svelte to recognize the change by creating new references
             weeklyGrid = [...weeklyGrid];
             weeklyStats = {...weeklyStats};
             
             break;
           }
         }
-        break;
+        if (updated) break;
       }
     }
 
@@ -276,6 +297,14 @@
       }
       
       return { ...store, history };
+    });
+    
+    // Force a UI update by triggering a tick
+    Promise.resolve().then(() => {
+      // This creates a microtask that will run after the current task,
+      // ensuring the UI updates immediately
+      weeklyGrid = [...weeklyGrid];
+      weeklyStats = {...weeklyStats};
     });
   }
 
