@@ -36,6 +36,11 @@
   let showOnboarding = true;
   let isLoading = true;
   let showWelcomePopup = false;
+  let initializationError = null;
+  
+  // Debug mode - set to false to enable normal initialization
+  const DEBUG_MODE = false;
+  const INITIALIZATION_TIMEOUT = 15000; // 15 seconds timeout
 
   // Subscribe to subscription and trial status
   $: isSubscribed = $subscriptionStore?.isSubscribed || false;
@@ -48,6 +53,22 @@
   }
 
   onMount(() => {
+    // Set a timeout to prevent infinite loading
+    const timeoutId = setTimeout(() => {
+      console.log('Initialization timeout reached, forcing app to load');
+      isLoading = false;
+      initializationError = 'Initialization timed out';
+    }, INITIALIZATION_TIMEOUT);
+    
+    // Skip initialization in debug mode, but still check onboarding status
+    if (DEBUG_MODE) {
+      console.log('DEBUG MODE: Skipping initialization steps');
+      checkOnboardingStatus();
+      isLoading = false;
+      clearTimeout(timeoutId);
+      return;
+    }
+    
     // Initialize RevenueCat
     initializeRevenueCat().catch(error => {
       console.error('Failed to initialize RevenueCat:', error);
@@ -94,6 +115,7 @@
           await ensurePrayerData();
         } catch (error) {
           console.error('Error during initialization:', error);
+          initializationError = error.message;
         }
       } else {
         // Cleanup when user logs out
@@ -101,6 +123,7 @@
         achievementStore.cleanup();
       }
       isLoading = false;
+      clearTimeout(timeoutId);
     });
 
     // Subscribe to onboarding status
@@ -113,10 +136,13 @@
       unsubscribeOnboarding();
       badgeStore.cleanup();
       achievementStore.cleanup();
+      clearTimeout(timeoutId);
     };
   });
 
   onMount(async () => {
+    if (DEBUG_MODE) return;
+    
     try {
       await setupNotifications();
     } catch (error) {
@@ -153,14 +179,17 @@
 {#if isLoading}
   <div class="loading-container">
     <img src="/Logo.png" alt="Deen Reflections Logo" class="loading-logo" />
+    {#if initializationError}
+      <p class="error-message">Error: {initializationError}</p>
+    {/if}
   </div>
 {:else if showOnboarding}
   <Onboarding />
-{:else if user}
+{:else if user || DEBUG_MODE}
   <div class="app-container">
     {#if showWelcomePopup}
       <WelcomePopup 
-        userId={user.uid}
+        userId={user?.uid}
         showPopup={showWelcomePopup}
         on:close={handleWelcomeClose}
         on:subscribe={handleSubscribe}
@@ -226,12 +255,21 @@
     background: #fff;
     overflow: hidden;
     box-sizing: border-box;
+    flex-direction: column;
   }
 
   .loading-logo {
     width: auto;
     height: 120px;
     animation: pulse 2s infinite;
+    margin-bottom: 20px;
+  }
+  
+  .error-message {
+    color: #e53935;
+    text-align: center;
+    max-width: 80%;
+    font-size: 14px;
   }
 
   @keyframes pulse {

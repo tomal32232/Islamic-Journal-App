@@ -170,7 +170,25 @@
       if (currentSlide < totalSlides - 1) {
         currentSlide++;
       } else {
+        finishOnboarding();
+      }
+    }
+    
+    function finishOnboarding() {
+      console.log('Finishing onboarding...');
+      try {
         completeOnboarding();
+        console.log('Onboarding completed successfully');
+      } catch (error) {
+        console.error('Error completing onboarding:', error);
+        // Fallback: try to set localStorage directly
+        try {
+          localStorage.setItem('onboardingComplete', 'true');
+          onboardingComplete.set(true);
+          console.log('Onboarding completed via fallback method');
+        } catch (fallbackError) {
+          console.error('Fallback method also failed:', fallbackError);
+        }
       }
     }
   
@@ -327,7 +345,7 @@
             Next
           </button>
         {:else}
-          <button on:click={nextSlide} class="nav-button get-started">Get Started</button>
+          <button on:click={finishOnboarding} class="nav-button get-started">Get Started</button>
         {/if}
       </div>
     </div>

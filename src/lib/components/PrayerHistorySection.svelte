@@ -1,13 +1,127 @@
 <script>
-  import { prayerHistoryStore } from '../stores/prayerHistoryStore';
+  import { prayerHistoryStore, getPrayerHistory, updatePrayerStatuses } from '../stores/prayerHistoryStore';
   import { iconMap } from '../utils/icons';
+  import { onMount } from 'svelte';
+  import { ArrowClockwise } from 'phosphor-svelte';
   
   let selectedFilter = '7'; // Default to 7 days
+  let isRefreshing = false;
+  let previousFilter = '7';
+  
+  $: {
+    // If the filter changes, refresh the prayer history
+    if (selectedFilter !== previousFilter) {
+      console.log(`Filter changed from ${previousFilter} to ${selectedFilter}, refreshing prayer history`);
+      previousFilter = selectedFilter;
+      refreshPrayerHistory();
+    }
+  }
   
   $: filteredHistory = filterPrayerHistory($prayerHistoryStore.history, selectedFilter);
   $: groupedHistory = groupHistoryByDate(filteredHistory);
   $: summary = calculateSummary(filteredHistory);
   $: prayerPatterns = analyzePrayerPatterns(filteredHistory);
+
+  // Refresh prayer history data when the component is mounted
+  onMount(async () => {
+    console.log('PrayerHistorySection mounted, refreshing prayer history data');
+    await refreshPrayerHistory();
+    
+    // After refreshing, check today's prayers directly from the store
+    checkTodaysPrayers();
+  });
+  
+  async function refreshPrayerHistory() {
+    if (isRefreshing) return;
+    
+    isRefreshing = true;
+    try {
+      console.log('Starting prayer history refresh...');
+      
+      // First update prayer statuses to ensure today's prayers are properly marked
+      console.log('Updating prayer statuses...');
+      await updatePrayerStatuses();
+      
+      // Clear the cache to force a fresh fetch
+      console.log('Clearing prayer history cache...');
+      prayerHistoryStore.update(store => {
+        console.log('Forcing prayer history refresh');
+        // Force a complete refresh by clearing the history
+        return { 
+          ...store,
+          history: [] // Clear the history to force a complete refresh
+        };
+      });
+      
+      // Then fetch fresh data
+      console.log('Fetching fresh prayer history data...');
+      await getPrayerHistory();
+      
+      // After fetching, check today's prayers directly
+      checkTodaysPrayers();
+      
+      console.log('Prayer history refresh complete');
+    } catch (error) {
+      console.error('Error refreshing prayer history:', error);
+    } finally {
+      isRefreshing = false;
+    }
+  }
+
+  // Function to check today's prayers directly from the store
+  function checkTodaysPrayers() {
+    const today = new Date().toISOString().split('T')[0];
+    const todaysPrayers = $prayerHistoryStore.history.filter(prayer => prayer.date === today);
+    
+    console.log('DIRECT CHECK - Today\'s prayers from store:', 
+      todaysPrayers.map(p => `${p.prayerName}: ${p.status} (${p.time || 'no time'})`));
+    
+    // Check if we have any non-upcoming prayers for today
+    const nonUpcomingPrayers = todaysPrayers.filter(p => p.status !== 'upcoming' && p.status !== 'none');
+    console.log('DIRECT CHECK - Non-upcoming prayers for today:', 
+      nonUpcomingPrayers.map(p => `${p.prayerName}: ${p.status}`));
+    
+    // If we have non-upcoming prayers but they're not showing correctly, force a refresh
+    if (nonUpcomingPrayers.length > 0) {
+      console.log('Found non-upcoming prayers for today, checking if they\'re displayed correctly');
+      
+      // Check the grouped history to see if today's prayers are displayed correctly
+      const todayInGrouped = groupedHistory.find(day => day.date === today);
+      if (todayInGrouped) {
+        console.log('Today\'s prayers in grouped history:', todayInGrouped.prayers);
+        
+        // Check if any non-upcoming prayers are not displayed correctly
+        let needsRefresh = false;
+        nonUpcomingPrayers.forEach(prayer => {
+          const displayedStatus = todayInGrouped.prayers[prayer.prayerName];
+          if (displayedStatus !== prayer.status) {
+            console.log(`Prayer ${prayer.prayerName} has status ${prayer.status} but is displayed as ${displayedStatus}`);
+            needsRefresh = true;
+          }
+        });
+        
+        if (needsRefresh) {
+          console.log('Detected inconsistency in displayed prayer statuses, forcing UI update');
+          // Force a UI update by updating the store
+          prayerHistoryStore.update(store => ({ ...store }));
+        }
+      }
+    }
+    
+    // Also check for prayers with status 'none' that should be updated
+    const nonePrayers = todaysPrayers.filter(p => p.status === 'none');
+    if (nonePrayers.length > 0) {
+      console.log('Found prayers with status "none" for today, these should be updated:', 
+        nonePrayers.map(p => `${p.prayerName}: ${p.time || 'no time'}`));
+      
+      // Force an update of prayer statuses
+      updatePrayerStatuses().then(() => {
+        console.log('Forced update of prayer statuses for prayers with status "none"');
+        // Refresh the UI after updating
+        prayerHistoryStore.update(store => ({ ...store }));
+      });
+    }
+  }
 
   function filterPrayerHistory(history, days) {
     const today = new Date();
@@ -17,18 +131,14 @@
     filterDate.setDate(filterDate.getDate() - parseInt(days));
     filterDate.setHours(0, 0, 0, 0);
     
-    const now = new Date();
+    // Format today's date in the same format as prayer.date (YYYY-MM-DD)
+    const todayFormatted = today.toISOString().split('T')[0];
     
+    // First, get all prayers within the date range
     return history
       .filter(prayer => {
         const prayerDate = new Date(prayer.date);
-        const prayerDateTime = new Date(prayer.date + ' ' + prayer.time);
-        
-        // Include all prayers from the filter date up to today, including today's prayers
-        // regardless of whether they've passed or not, but exclude 'upcoming' status prayers
-        return prayerDate >= filterDate && 
-               prayerDate <= today && 
-               prayer.status !== 'upcoming';
+        return prayerDate >= filterDate && prayerDate <= today;
       })
       .sort((a, b) => {
         const dateA = new Date(a.date).getTime();
@@ -39,6 +149,20 @@
 
   function groupHistoryByDate(history) {
     const groups = {};
+    
+    // Get today's date in YYYY-MM-DD format
+    const today = new Date().toISOString().split('T')[0];
+    const now = new Date();
+    
+    console.log('Today\'s date:', today);
+    console.log('Current time:', now.toISOString());
+    console.log('All prayers in history:', history.map(p => `${p.date} ${p.prayerName}: ${p.status} (${p.time || 'no time'})`));
+    
+    // Get today's prayers for debugging
+    const todaysPrayers = history.filter(prayer => prayer.date === today);
+    console.log('Today\'s prayers from history:', todaysPrayers.map(p => `${p.prayerName}: ${p.status} (${p.time || 'no time'})`));
+    
+    // First, process all prayers from history to ensure we capture all statuses
     history.forEach(prayer => {
       if (!groups[prayer.date]) {
         groups[prayer.date] = {
@@ -52,9 +176,130 @@
           }
         };
       }
+      
+      // Always update the prayer status regardless of whether it's null
+      // This ensures we capture all statuses
       groups[prayer.date].prayers[prayer.prayerName] = prayer.status;
     });
+    
+    // Make sure today exists in the groups
+    if (!groups[today]) {
+      groups[today] = {
+        date: today,
+        prayers: {
+          Fajr: null,
+          Dhuhr: null,
+          Asr: null,
+          Maghrib: null,
+          Isha: null
+        }
+      };
+    }
+    
+    // Log the prayer statuses for today
+    console.log('Today\'s prayer statuses after initial processing:', groups[today].prayers);
+    
+    // For today's prayers, make sure we're showing the correct status
+    // Look for any prayers with today's date in the original history
+    if (groups[today]) {
+      // Update the status for each prayer found
+      todaysPrayers.forEach(prayer => {
+        console.log(`Processing today's prayer: ${prayer.prayerName}, status: ${prayer.status}, time: ${prayer.time || 'no time'}`);
+        
+        // Always update the status, even if it's null
+        groups[today].prayers[prayer.prayerName] = prayer.status;
+        
+        // Special handling for upcoming prayers
+        if (prayer.status === 'upcoming' || prayer.status === 'none') {
+          const prayerTime = prayer.time;
+          if (prayerTime) {
+            try {
+              const prayerDateTime = getPrayerDateTime(prayer.date, prayerTime);
+              console.log(`Prayer ${prayer.prayerName} time: ${prayerTime}, datetime: ${prayerDateTime.toISOString()}, now: ${now.toISOString()}`);
+              
+              if (prayerDateTime < now) {
+                // Prayer time has passed, show as pending
+                console.log(`Prayer ${prayer.prayerName} time has passed, marking as pending`);
+                groups[today].prayers[prayer.prayerName] = 'pending';
+              } else {
+                // Prayer time is still in the future
+                console.log(`Prayer ${prayer.prayerName} time is in the future, keeping as upcoming`);
+                groups[today].prayers[prayer.prayerName] = 'upcoming';
+              }
+            } catch (error) {
+              console.error(`Error processing prayer time for ${prayer.prayerName}:`, error);
+              // Default to pending if we can't determine the time
+              groups[today].prayers[prayer.prayerName] = 'pending';
+            }
+          } else {
+            // No time available, default to pending for today's prayers
+            console.log(`No time available for ${prayer.prayerName}, defaulting to pending`);
+            groups[today].prayers[prayer.prayerName] = 'pending';
+          }
+        }
+      });
+      
+      // Log today's prayers for debugging
+      console.log('Final today\'s prayer statuses:', groups[today].prayers);
+    }
+    
     return Object.values(groups);
+  }
+  
+  // Helper function to convert prayer time to Date object
+  function getPrayerDateTime(dateStr, timeStr) {
+    if (!dateStr || !timeStr) return new Date();
+    
+    // Handle invalid time "00:00 AM" which appears in the logs
+    if (timeStr === "00:00 AM") {
+      console.log(`Detected invalid prayer time: ${timeStr}, using default time`);
+      // For invalid times, use a reasonable default time for each prayer
+      const date = new Date(dateStr);
+      // Return the date at noon as a reasonable default
+      date.setHours(12, 0, 0, 0);
+      return date;
+    }
+    
+    // Handle 12-hour format (e.g., "6:30 AM" or "7:45 PM")
+    let hours = 0;
+    let minutes = 0;
+    
+    const timeParts = timeStr.split(' ');
+    if (timeParts.length === 2) {
+      const [time, period] = timeParts;
+      const [h, m] = time.split(':');
+      
+      hours = parseInt(h);
+      minutes = parseInt(m);
+      
+      // Convert to 24-hour format
+      if (period === 'PM' && hours < 12) {
+        hours += 12;
+      } else if (period === 'AM' && hours === 12) {
+        hours = 0;
+      }
+    } else {
+      // Handle 24-hour format
+      const [h, m] = timeStr.split(':');
+      hours = parseInt(h);
+      minutes = parseInt(m);
+    }
+    
+    // Validate hours and minutes
+    if (isNaN(hours) || hours < 0 || hours > 23) {
+      console.error(`Invalid hours in time: ${timeStr}`);
+      hours = 12; // Default to noon
+    }
+    
+    if (isNaN(minutes) || minutes < 0 || minutes > 59) {
+      console.error(`Invalid minutes in time: ${timeStr}`);
+      minutes = 0;
+    }
+    
+    const date = new Date(dateStr);
+    date.setHours(hours, minutes, 0, 0);
+    
+    return date;
   }
 
   function formatDate(dateStr) {
@@ -66,11 +311,14 @@
   }
 
   function calculateSummary(history) {
-    const total = history.length;
-    const ontime = history.filter(p => p.status === 'ontime').length;
-    const late = history.filter(p => p.status === 'late').length;
-    const missed = history.filter(p => p.status === 'missed').length;
-    const pending = history.filter(p => p.status === 'pending').length;
+    // Filter out upcoming prayers for the summary calculation
+    const completedHistory = history.filter(p => p.status !== 'upcoming');
+    
+    const total = completedHistory.length;
+    const ontime = completedHistory.filter(p => p.status === 'ontime').length;
+    const late = completedHistory.filter(p => p.status === 'late').length;
+    const missed = completedHistory.filter(p => p.status === 'missed').length;
+    const pending = completedHistory.filter(p => p.status === 'pending').length;
 
     return {
       total,
@@ -85,6 +333,9 @@
   }
 
   function analyzePrayerPatterns(history) {
+    // Filter out upcoming prayers for pattern analysis
+    const completedHistory = history.filter(p => p.status !== 'upcoming');
+    
     const patterns = {
       missed: {},
       late: {}
@@ -97,7 +348,7 @@
     });
 
     // Count missed and late prayers
-    history.forEach(prayer => {
+    completedHistory.forEach(prayer => {
       if (prayer.status === 'missed') {
         patterns.missed[prayer.prayerName]++;
       } else if (prayer.status === 'late') {
@@ -128,13 +379,30 @@
 <div class="prayer-history-section">
   <div class="header">
     <h2>Prayer History</h2>
-    <select 
-      bind:value={selectedFilter}
-      class="filter-select"
-    >
-      <option value="7">Last 7 days</option>
-      <option value="30">Last 30 days</option>
-    </select>
+    <div class="header-actions">
+      <select 
+        bind:value={selectedFilter}
+        class="filter-select"
+      >
+        <option value="7">Last 7 days</option>
+        <option value="30">Last 30 days</option>
+      </select>
+      <button 
+        on:click={refreshPrayerHistory}
+        class="refresh-button"
+        disabled={isRefreshing}
+        title="Refresh prayer history"
+      >
+        <ArrowClockwise size={18} class={isRefreshing ? 'spinning' : ''} />
+      </button>
+      <button 
+        on:click={checkTodaysPrayers}
+        class="check-button"
+        title="Check today's prayers"
+      >
+        Check Today
+      </button>
+    </div>
   </div>
 
   {#if filteredHistory.length === 0}
@@ -178,6 +446,10 @@
       <div class="legend-item">
         <div class="legend-dot missed"></div>
         <span>Missed</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot upcoming"></div>
+        <span>Upcoming</span>
       </div>
     </div>
 
@@ -343,6 +615,10 @@
     background: #eee;
   }
 
+  .status-cell.upcoming .status-dot {
+    background: #90CAF9; /* Light blue color for upcoming prayers */
+  }
+
   .legend {
     display: flex;
     gap: 1rem;
@@ -374,6 +650,10 @@
 
   .legend-dot.missed {
     background: #EF4444;
+  }
+
+  .legend-dot.upcoming {
+    background: #90CAF9;
   }
 
   .empty-state {
@@ -480,6 +760,47 @@
     color: #E09453;
   }
 
+  .prayer-stat.upcoming {
+    background: rgba(144, 202, 249, 0.1);
+    color: #1976D2;
+  }
+
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .refresh-button {
+    background: none;
+    border: none;
+    padding: 0.25rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #216974;
+    border-radius: 4px;
+  }
+
+  .refresh-button:hover {
+    background: rgba(33, 105, 116, 0.1);
+  }
+
+  .refresh-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .spinning {
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
   @media (max-width: 640px) {
     .prayer-history-section {
       padding: 0.75rem;
@@ -540,5 +861,20 @@
       font-size: 0.75rem;
       padding: 0.25rem 0.5rem;
     }
+  }
+
+  .check-button {
+    background: #f0f9fa;
+    border: 1px solid #216974;
+    color: #216974;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .check-button:hover {
+    background: #e0f2f4;
   }
 </style> 
