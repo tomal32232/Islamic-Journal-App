@@ -199,6 +199,12 @@ export async function getWeeklyStats() {
     const startDate = new Date(today);
     startDate.setDate(today.getDate() - 6); // Go back 6 days to get last 7 days including today
 
+    // Calculate total days since account creation, capped at 7 days for weekly view
+    const userCreationTime = new Date(user.metadata.creationTime);
+    userCreationTime.setHours(0, 0, 0, 0);
+    const daysSinceCreation = Math.floor((today.getTime() - userCreationTime.getTime()) / (24 * 60 * 60 * 1000)) + 1; // +1 to include today
+    stats.totalDays = Math.min(daysSinceCreation, 7); // Cap at 7 days for weekly view
+
     const sessionsQuery = query(
       collection(db, 'tasbih_sessions'),
       where('userId', '==', user.uid),
@@ -294,6 +300,7 @@ export async function getWeeklyStats() {
     
     // Update badge progress with today's count
     updateDhikrProgress(todayCount);
+    updateDhikrStreak(daysWithDhikr);
     
     // Update the store
     weeklyStatsStore.set(stats);

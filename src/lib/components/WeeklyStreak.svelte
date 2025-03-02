@@ -58,7 +58,9 @@
       maxCount = Math.max(...dailyCounts.map(d => d.count));
       weeklyStatsStore.set({
         dailyCounts: weeklyStats.dailyCounts,
-        streak: weeklyStats.currentStreak
+        streak: weeklyStats.currentStreak,
+        todayCompleted: weeklyStats.todayCompleted,
+        totalDays: weeklyStats.totalDays
       });
     }
   }
@@ -86,6 +88,7 @@
     if ($weeklyStatsStore.dailyCounts) {
       dailyCounts = $weeklyStatsStore.dailyCounts;
       stats.currentStreak = $weeklyStatsStore.streak;
+      stats.totalDays = $weeklyStatsStore.totalDays;
       maxCount = Math.max(...dailyCounts.map(d => d.count));
     }
   }
@@ -94,8 +97,8 @@
 <div class="streak-card">
   <div class="streak-header">
     <div class="streak-stats">
-      <span class="streak-count">{$weeklyStatsStore.todayCompleted || 0}/{$weeklyStatsStore.totalDays || 1} Days</span>
-      <span class="streak-subtitle">{($weeklyStatsStore.totalDays || 1) - ($weeklyStatsStore.todayCompleted || 0)} Days Missed</span>
+      <span class="streak-count">{stats.currentStreak}/{stats.totalDays} Days</span>
+      <span class="streak-subtitle">{stats.totalDays - stats.currentStreak} Days Missed</span>
     </div>
   </div>
 
