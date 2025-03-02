@@ -15,6 +15,7 @@
   import { saveTasbihSession, getWeeklyStats, weeklyStatsStore, ensureAccurateDailyCount } from '../stores/tasbihStore';
   import { fade, slide } from 'svelte/transition';
   import { auth } from '../firebase';
+  import PrayerHistorySection from '../components/PrayerHistorySection.svelte';
 
   let timeInterval;
   let currentPrayer = null;
@@ -543,6 +544,9 @@
           </div>
         {/if}
       </div>
+      
+      <!-- Add Prayer History Section -->
+      <PrayerHistorySection />
     </div>
   {:else if activeTab === 'tasbih'}
     {#if !isCounterMode}
@@ -842,6 +846,7 @@
     background: white;
     border-radius: 12px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-bottom: 1rem;
   }
 
   .header {
