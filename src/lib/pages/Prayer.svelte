@@ -12,8 +12,9 @@
   import { nearbyMosquesStore, mosqueLoadingStore, fetchNearbyMosques } from '../services/mosqueService';
   import QuranReading from '../components/QuranReading.svelte';
   import { Mosque, Book, HandsPraying, Check, Clock } from 'phosphor-svelte';
-  import { saveTasbihSession, getWeeklyStats, weeklyStatsStore } from '../stores/tasbihStore';
+  import { saveTasbihSession, getWeeklyStats, weeklyStatsStore, ensureAccurateDailyCount } from '../stores/tasbihStore';
   import { fade, slide } from 'svelte/transition';
+  import { auth } from '../firebase';
 
   let timeInterval;
   let currentPrayer = null;
@@ -118,6 +119,13 @@
     $prayerTimesStore = [...$prayerTimesStore];
   }
 
+  // Add a reactive statement to recalculate the daily count when the user navigates to the tasbih tab
+  $: if (activeTab === 'tasbih' && auth.currentUser) {
+    ensureAccurateDailyCount().catch(error => {
+      console.error('Error ensuring accurate daily count:', error);
+    });
+  }
+
   onMount(() => {
     const container = document.querySelector('.prayer-container');
     if (container) {
@@ -175,6 +183,13 @@
       weeklyStreak = stats?.streak || 0;
     });
 
+    // Ensure the daily count is accurate
+    if (auth.currentUser) {
+      ensureAccurateDailyCount().catch(error => {
+        console.error('Error ensuring accurate daily count:', error);
+      });
+    }
+
     return () => {
       if (timeInterval) clearInterval(timeInterval);
       if (container) {
@@ -206,39 +221,29 @@
     document.body.classList.add('counter-active');
   }
 
-  async function saveSession() {
-    if (totalCount > 0) {
-      isLoadingPrayerData = true;
-      try {
-        for (const dhikr of selectedDhikrs) {
-          await saveTasbihSession({
-            dhikr,
-            count,
-            sets,
-            totalCount: Math.floor(totalCount / selectedDhikrs.length) // Distribute count evenly
-          });
-        }
-        const stats = await getWeeklyStats();
-        weeklyStreak = stats?.streak || 0;
-      } catch (error) {
-        console.error('Error saving dhikr session:', error);
-      } finally {
-        isLoadingPrayerData = false;
-      }
-    }
-  }
-
   async function exitCounter() {
     if (totalCount > 0) {
       isLoadingPrayerData = true;
+      console.log(`Saving session: totalCount=${totalCount}, dhikrs selected=${selectedDhikrs.length}`);
       try {
-        for (const dhikr of selectedDhikrs) {
+        // Flag to indicate if we're in a multi-dhikr session
+        const isMultiDhikr = selectedDhikrs.length > 1;
+        
+        // Save each dhikr as a separate session, but only count the first one
+        for (let i = 0; i < selectedDhikrs.length; i++) {
+          const dhikr = selectedDhikrs[i];
+          const isFirstDhikr = i === 0; // Only the first dhikr will contribute to the total count
+          
+          console.log(`Saving dhikr: ${dhikr.latin}, totalCount=${isFirstDhikr ? totalCount : 0}, isFirstDhikr=${isFirstDhikr}`);
           await saveTasbihSession({
             dhikr,
             count,
             sets,
-            totalCount,
-            isManualEntry: dhikr.isCustom
+            // Only pass the totalCount for the first dhikr to prevent double counting
+            totalCount: isFirstDhikr ? totalCount : 0,
+            isManualEntry: dhikr.isCustom,
+            isMultiDhikr,
+            isFirstDhikr
           });
         }
         const stats = await getWeeklyStats();
@@ -257,6 +262,12 @@
   function increment() {
     count++;
     totalCount++;
+    console.log(`Increment: count=${count}, totalCount=${totalCount}, dhikrs selected=${selectedDhikrs.length}`);
+    
+    // No need to recalculate after each tap - we'll do it when saving
+    // This was causing unnecessary database operations
+    // The recalculation will happen when the session is saved
+    
     if (count === selectedTarget) {
       if ('vibrate' in navigator) {
         navigator.vibrate(200);
@@ -270,6 +281,7 @@
     count = 0;
     sets = 0;
     totalCount = 0;
+    console.log('Counter reset: all counts set to 0');
   }
 
   function setTarget(value) {
@@ -432,6 +444,10 @@
     } else {
       selectedDhikrs = selectedDhikrs.filter(d => d.latin !== dhikr.latin);
     }
+  }
+
+  function saveSession() {
+    return exitCounter();
   }
 </script>
 

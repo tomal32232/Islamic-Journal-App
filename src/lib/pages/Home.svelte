@@ -24,7 +24,7 @@
   import { createEventDispatcher } from 'svelte';
   import Journal from './Journal.svelte';
   import { getTodayReadingTime, formatReadingTime } from '../services/readingTimeService';
-  import { weeklyStatsStore, getWeeklyStats } from '../stores/tasbihStore';
+  import { weeklyStatsStore, getWeeklyStats, initializeTasbihStore, ensureAccurateDailyCount } from '../stores/tasbihStore';
   import { quoteStore, getRandomQuote, syncQuotes } from '../services/quoteService';
   import MoodSelector from '../components/MoodSelector.svelte';
   import { moodHistoryStore, saveMood, getMoodHistory, getMoodForDate, shouldShowMoodSelector } from '../stores/moodStore';
@@ -176,6 +176,24 @@
     checkMoodPopup();
     const moodCheckInterval = setInterval(checkMoodPopup, 60000);
 
+    // Initialize the tasbih store to ensure accurate daily count
+    if (auth.currentUser) {
+      try {
+        await initializeTasbihStore();
+        // After initialization, ensure we have the most accurate count
+        await ensureAccurateDailyCount();
+        // Update the UI with the latest count from the store
+        const latestStats = await getWeeklyStats();
+        if (latestStats?.dailyCounts) {
+          const todayCount = latestStats.dailyCounts.find(day => day.isToday);
+          todayTasbihCount = todayCount ? todayCount.count : 0;
+          console.log('Home: Updated today\'s tasbih count to', todayTasbihCount);
+        }
+      } catch (error) {
+        console.error('Error initializing tasbih store:', error);
+      }
+    }
+
     return () => {
       cleanup();
       clearInterval(prayerInterval);
@@ -189,6 +207,31 @@
   function navigateTo(page) {
     currentPage = page;
     dispatch('navigate', page);
+  }
+
+  // Function to refresh the dhikr count
+  async function refreshDhikrCount() {
+    if (!auth.currentUser) return;
+    
+    try {
+      // Ensure we have the most accurate count
+      await ensureAccurateDailyCount();
+      
+      // Update the UI with the latest count from the store
+      const latestStats = await getWeeklyStats();
+      if (latestStats?.dailyCounts) {
+        const todayCount = latestStats.dailyCounts.find(day => day.isToday);
+        todayTasbihCount = todayCount ? todayCount.count : 0;
+        console.log('Home: Refreshed today\'s tasbih count to', todayTasbihCount);
+      }
+    } catch (error) {
+      console.error('Error refreshing dhikr count:', error);
+    }
+  }
+
+  // Refresh the dhikr count when the component becomes visible
+  $: if (currentPage === 'home' && auth.currentUser) {
+    refreshDhikrCount();
   }
 
   function handleTabChange(event) {
@@ -920,6 +963,15 @@
   function handleManualMoodTracking(period) {
     currentMoodPeriod = period;
     showMoodPopup = true;
+  }
+
+  // Update today's tasbih count whenever the weeklyStatsStore changes
+  $: if ($weeklyStatsStore?.dailyCounts) {
+    const todayCount = $weeklyStatsStore.dailyCounts.find(day => day.isToday);
+    if (todayCount) {
+      todayTasbihCount = todayCount.count;
+      console.log('Home: Updated today\'s tasbih count from store to', todayTasbihCount);
+    }
   }
 </script>
 

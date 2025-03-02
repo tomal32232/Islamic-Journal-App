@@ -37,6 +37,84 @@ async function checkAndResetDailyCount(userId) {
   return false; // Indicates no reset was needed
 }
 
+// Add this function after checkAndResetDailyCount
+async function recalculateTodayCount(userId) {
+  console.log('Recalculating today count to ensure accuracy');
+  
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  const sessionsQuery = query(
+    collection(db, 'tasbih_sessions'),
+    where('userId', '==', userId),
+  );
+
+  const querySnapshot = await getDocs(sessionsQuery);
+  const sessions = [];
+  querySnapshot.forEach(doc => {
+    sessions.push({ id: doc.id, ...doc.data() });
+  });
+  
+  // Get all sessions for today
+  const todaySessions = sessions.filter(session => {
+    const sessionDate = session.timestamp.toDate();
+    sessionDate.setHours(0, 0, 0, 0);
+    return sessionDate.getTime() === today.getTime();
+  });
+  
+  // Group sessions by timestamp to identify multi-dhikr sessions
+  const sessionsByTimestamp = {};
+  todaySessions.forEach(session => {
+    const timestamp = session.timestamp.seconds;
+    if (!sessionsByTimestamp[timestamp]) {
+      sessionsByTimestamp[timestamp] = [];
+    }
+    sessionsByTimestamp[timestamp].push(session);
+  });
+  
+  // Calculate the correct count
+  let todayCount = 0;
+  
+  // For each group of sessions with the same timestamp
+  Object.values(sessionsByTimestamp).forEach(sessionsGroup => {
+    // Check if this is a multi-dhikr session
+    const isMultiDhikrSession = sessionsGroup.some(s => s.isMultiDhikr === true);
+    
+    if (isMultiDhikrSession) {
+      // This is a multi-dhikr session - only count the first dhikr
+      // First try to find a session explicitly marked as the first dhikr
+      const firstDhikr = sessionsGroup.find(s => s.isFirstDhikr === true);
+      if (firstDhikr) {
+        todayCount += firstDhikr.totalCount;
+        console.log(`Found first dhikr in group: ${firstDhikr.dhikr.latin}, count=${firstDhikr.totalCount}`);
+      } else {
+        // If no session is explicitly marked as first, find one that's not marked as part of a multi-dhikr session
+        const singleDhikr = sessionsGroup.find(s => !s.isMultiDhikr);
+        if (singleDhikr) {
+          todayCount += singleDhikr.totalCount;
+          console.log(`Found single dhikr in group: ${singleDhikr.dhikr.latin}, count=${singleDhikr.totalCount}`);
+        } else if (sessionsGroup.length > 0) {
+          // Fallback: just use the first session in the group
+          todayCount += sessionsGroup[0].totalCount;
+          console.log(`Using fallback first dhikr in group: ${sessionsGroup[0].dhikr.latin}, count=${sessionsGroup[0].totalCount}`);
+        }
+      }
+    } else if (sessionsGroup.length === 1) {
+      // Single dhikr session
+      todayCount += sessionsGroup[0].totalCount;
+      console.log(`Single session: ${sessionsGroup[0].dhikr.latin}, count=${sessionsGroup[0].totalCount}`);
+    } else {
+      // Multiple sessions with same timestamp but not marked as multi-dhikr
+      // This is likely an error case, but we'll handle it by just taking the first one
+      todayCount += sessionsGroup[0].totalCount;
+      console.log(`Warning: Multiple sessions with same timestamp but not marked as multi-dhikr. Using first: ${sessionsGroup[0].dhikr.latin}, count=${sessionsGroup[0].totalCount}`);
+    }
+  });
+  
+  console.log(`Recalculated today's count: ${todayCount}`);
+  return todayCount;
+}
+
 export async function saveTasbihSession(sessionData) {
   const user = auth.currentUser;
   if (!user) return;
@@ -47,6 +125,8 @@ export async function saveTasbihSession(sessionData) {
     const wasReset = await checkAndResetDailyCount(user.uid);
   }
 
+  console.log(`DB Save: dhikr=${sessionData.dhikr.latin}, totalCount=${sessionData.totalCount}, sets=${sessionData.sets}, isMultiDhikr=${sessionData.isMultiDhikr}, isFirstDhikr=${sessionData.isFirstDhikr}`);
+
   // Save the individual session
   const sessionRef = doc(collection(db, 'tasbih_sessions'));
   await setDoc(sessionRef, {
@@ -56,32 +136,36 @@ export async function saveTasbihSession(sessionData) {
     sets: sessionData.sets,
     totalCount: sessionData.totalCount,
     isManualEntry: sessionData.isManualEntry || false,
+    isMultiDhikr: sessionData.isMultiDhikr || false,
+    isFirstDhikr: sessionData.isFirstDhikr || false,
     timestamp: Timestamp.now()
   });
 
-  // Get weekly stats first
-  const stats = await getWeeklyStats();
-  
-  // Find today's count from stats and add the current session
-  const todayStats = stats.dailyCounts.find(day => day.isToday);
-  const previousCount = todayStats ? todayStats.count : 0;
-  const newTotalCount = previousCount + sessionData.totalCount;
-
-  // Update the dailyCounts with the new total
-  const updatedDailyCounts = stats.dailyCounts.map(day => 
-    day.isToday ? { ...day, count: newTotalCount } : day
-  );
-
-  // Update badge progress with the new total
-  console.log('Updating daily dhikr progress with new total:', newTotalCount);
-  updateDhikrProgress(newTotalCount);
-  updateDhikrStreak(stats.currentStreak);
-
-  // Update store with the new counts
-  weeklyStatsStore.set({
-    dailyCounts: updatedDailyCounts,
-    streak: stats.currentStreak
-  });
+  // Only update the daily count if this is not part of a multi-dhikr session
+  // or if it is the first dhikr in a multi-dhikr session
+  if (!sessionData.isMultiDhikr || sessionData.isFirstDhikr) {
+    console.log(`Processing first dhikr in session: ${sessionData.dhikr.latin}`);
+    
+    // Instead of adding to the previous count, just recalculate immediately
+    // to ensure we have the correct count
+    const recalculatedCount = await recalculateTodayCount(user.uid);
+    console.log(`Immediately recalculated count: ${recalculatedCount}`);
+    
+    // Update badge progress with the recalculated count
+    updateDhikrProgress(recalculatedCount);
+    updateDhikrStreak(0); // We'll get the streak from getWeeklyStats
+    
+    // Get weekly stats to update the streak
+    const stats = await getWeeklyStats();
+    
+    // Update store with the recalculated counts
+    weeklyStatsStore.set({
+      dailyCounts: stats.dailyCounts,
+      streak: stats.streak
+    });
+  } else {
+    console.log(`Skipping daily count update for non-first dhikr in multi-dhikr session: ${sessionData.dhikr.latin}`);
+  }
 }
 
 export async function getWeeklyStats() {
@@ -110,7 +194,9 @@ export async function getWeeklyStats() {
   // Process daily counts
   const dailyCounts = [];
   let daysWithDhikr = 0;
-  let todayCount = 0;
+  
+  // Get today's count using the recalculate function
+  const todayCount = await recalculateTodayCount(user.uid);
 
   for (let i = 6; i >= 0; i--) {
     const date = new Date(today);
@@ -120,38 +206,141 @@ export async function getWeeklyStats() {
     const dayStr = date.toLocaleDateString('en-US', { weekday: 'short' });
     const dateStr = date.getDate();
     
-    // Get all sessions for this day
-    const dayCount = sessions
-      .filter(session => {
-        const sessionDate = session.timestamp.toDate();
-        sessionDate.setHours(0, 0, 0, 0);
-        return sessionDate.getTime() === date.getTime();
-      })
-      .reduce((sum, session) => sum + session.totalCount, 0);
+    // For today, use the recalculated count
+    if (i === 0) {
+      if (todayCount > 0) {
+        daysWithDhikr++;
+      }
+      
+      dailyCounts.push({
+        day: dayStr,
+        date: dateStr,
+        count: todayCount,
+        isToday: true
+      });
+      
+      continue; // Skip the rest of the loop for today
+    }
+    
+    // For other days, calculate as before
+    const daySessionsAll = sessions.filter(session => {
+      const sessionDate = session.timestamp.toDate();
+      sessionDate.setHours(0, 0, 0, 0);
+      return sessionDate.getTime() === date.getTime();
+    });
+    
+    // Calculate the day count properly accounting for multi-dhikr sessions
+    let dayCount = 0;
+    
+    // Group sessions by timestamp to identify multi-dhikr sessions
+    const sessionsByTimestamp = {};
+    daySessionsAll.forEach(session => {
+      const timestamp = session.timestamp.seconds;
+      if (!sessionsByTimestamp[timestamp]) {
+        sessionsByTimestamp[timestamp] = [];
+      }
+      sessionsByTimestamp[timestamp].push(session);
+    });
+    
+    // For each group of sessions with the same timestamp
+    Object.values(sessionsByTimestamp).forEach(sessionsGroup => {
+      if (sessionsGroup.length > 1) {
+        // This is a multi-dhikr session - only count the first one
+        // First try to find a session explicitly marked as the first dhikr
+        const firstDhikr = sessionsGroup.find(s => s.isFirstDhikr === true);
+        if (firstDhikr) {
+          dayCount += firstDhikr.totalCount;
+        } else {
+          // If no session is explicitly marked as first, find one that's not marked as part of a multi-dhikr session
+          const singleDhikr = sessionsGroup.find(s => !s.isMultiDhikr);
+          if (singleDhikr) {
+            dayCount += singleDhikr.totalCount;
+          } else if (sessionsGroup.length > 0) {
+            // Fallback: just use the first session in the group
+            dayCount += sessionsGroup[0].totalCount;
+          }
+        }
+      } else if (sessionsGroup.length === 1) {
+        // Single dhikr session
+        dayCount += sessionsGroup[0].totalCount;
+      }
+    });
 
     if (dayCount > 0) {
       daysWithDhikr++;
-    }
-
-    // Store today's count
-    if (i === 0) {
-      todayCount = dayCount;
     }
 
     dailyCounts.push({
       day: dayStr,
       date: dateStr,
       count: dayCount,
-      isToday: i === 0
+      isToday: false
     });
   }
 
+  console.log(`getWeeklyStats: Today's count calculated as ${todayCount}`);
+
   // Update badge progress with today's count
   updateDhikrProgress(todayCount);
-
-  return {
+  
+  // Create the stats object
+  const stats = {
     dailyCounts,
-    currentStreak: daysWithDhikr,
-    totalDays: 7 // Always 7 days for weekly view
+    streak: daysWithDhikr,
+    totalSessions: sessions.length
   };
+  
+  // Update the store
+  weeklyStatsStore.set(stats);
+  console.log('Updated weeklyStatsStore with new stats:', stats);
+
+  return stats;
+}
+
+// Add this function to ensure the daily count is always accurate
+export async function ensureAccurateDailyCount() {
+  const user = auth.currentUser;
+  if (!user) {
+    console.log('Cannot ensure accurate daily count: No user logged in');
+    return 0;
+  }
+  
+  console.log('Ensuring accurate daily count');
+  const recalculatedCount = await recalculateTodayCount(user.uid);
+  console.log(`ensureAccurateDailyCount: Recalculated count is ${recalculatedCount}`);
+  
+  // Update badge progress with the recalculated count
+  updateDhikrProgress(recalculatedCount);
+  
+  // Update the store with the recalculated count
+  weeklyStatsStore.update(store => {
+    if (!store || !store.dailyCounts) {
+      console.log('weeklyStatsStore is not initialized yet');
+      return store;
+    }
+    
+    const updatedCounts = store.dailyCounts.map(day => 
+      day.isToday ? { ...day, count: recalculatedCount } : day
+    );
+    
+    console.log(`Updated weeklyStatsStore with recalculated count: ${recalculatedCount}`);
+    return {
+      ...store,
+      dailyCounts: updatedCounts
+    };
+  });
+  
+  return recalculatedCount;
+}
+
+// Call this function when the app starts to ensure the count is accurate
+export async function initializeTasbihStore() {
+  const user = auth.currentUser;
+  if (!user) return;
+  
+  // Get weekly stats to initialize the store
+  await getWeeklyStats();
+  
+  // Ensure the daily count is accurate
+  await ensureAccurateDailyCount();
 } 
