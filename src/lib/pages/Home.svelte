@@ -876,19 +876,14 @@
 
   // Function to get the next prayer
   function getNextPrayer() {
-    // console.log('pppp getNextPrayer called');
     if (!$prayerTimesStore || $prayerTimesStore.length === 0) {
-      // console.log('pppp No prayer times in store, returning null');
       return null;
     }
     
     const now = new Date();
     const currentTime = Number(now.getHours()) * 60 + Number(now.getMinutes());
-    // console.log('pppp Current time (minutes since midnight):', currentTime);
-    // console.log('pppp Current date/time:', now.toLocaleString());
     
     for (const prayer of $prayerTimesStore) {
-      // console.log('pppp Checking prayer:', prayer.name, prayer.time);
       const [time, period] = prayer.time.split(' ');
       const [hours, minutes] = time.split(':');
       let prayerHours = Number(parseInt(hours));
@@ -901,17 +896,25 @@
       }
       
       const prayerTime = prayerHours * 60 + Number(parseInt(minutes));
-      // console.log('pppp Prayer time (minutes since midnight):', prayerTime);
       
       if (prayerTime > currentTime) {
-        // console.log('pppp Found next prayer:', prayer.name);
         return prayer;
       }
     }
     
-    // If no prayer is found for today, return the first prayer of tomorrow
-    // console.log('pppp No upcoming prayers today, returning first prayer for tomorrow:', $prayerTimesStore[0].name);
-    return $prayerTimesStore[0];
+    // If no prayer is found for today, only return Fajr if it's after midnight
+    const fajr = $prayerTimesStore[0]; // Fajr is always the first prayer
+    const [fajrTime, fajrPeriod] = fajr.time.split(' ');
+    const [fajrHours] = fajrTime.split(':');
+    let fajrHour = parseInt(fajrHours);
+    if (fajrPeriod === 'AM' && fajrHour === 12) fajrHour = 0;
+    
+    // Only show Fajr as next prayer if current time is after midnight and before Fajr
+    if (now.getHours() >= 0 && now.getHours() < fajrHour) {
+      return fajr;
+    }
+    
+    return null; // No next prayer to show
   }
 
   // Function to test notification

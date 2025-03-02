@@ -57,16 +57,12 @@
   let manualDhikrText = '';
 
   function getNextPrayer(prayers) {
-    // console.log('tttt prayers:', prayers);
-    
     if (!prayers || prayers.length === 0) {
-      // console.log('tttt No prayers available');
       return null;
     }
     
     const now = new Date();
     const currentTime = now.getHours() * 60 + now.getMinutes();
-    // console.log('tttt currentTime in minutes:', currentTime);
 
     // Convert prayer times to minutes for comparison
     const prayerMinutes = prayers.map(prayer => {
@@ -77,7 +73,6 @@
       if (period === 'AM' && hour === 12) hour = 0;
       
       const totalMinutes = hour * 60 + parseInt(minutes);
-      // console.log(`tttt Prayer ${prayer.name}: ${prayer.time} -> ${totalMinutes} minutes`);
       
       return {
         ...prayer,
@@ -87,12 +82,20 @@
 
     // Find the next prayer for today
     let next = prayerMinutes.find(prayer => prayer.minutes > currentTime);
-    // console.log('tttt Next prayer found:', next);
     
-    // If no next prayer today, return first prayer for tomorrow
+    // If no next prayer today, only return Fajr if it's after midnight
     if (!next) {
-      // console.log('tttt No next prayer today, returning first prayer for tomorrow:', prayers[0]);
-      return prayers[0];
+      const fajr = prayers[0]; // Fajr is always the first prayer
+      const [fajrTime, fajrPeriod] = fajr.time.split(' ');
+      const [fajrHours, fajrMinutes] = fajrTime.split(':');
+      let fajrHour = parseInt(fajrHours);
+      if (fajrPeriod === 'AM' && fajrHour === 12) fajrHour = 0;
+      
+      // Only show Fajr as next prayer if current time is after midnight and before Fajr
+      if (now.getHours() >= 0 && now.getHours() < fajrHour) {
+        return fajr;
+      }
+      return null; // No next prayer to show
     }
 
     return next;

@@ -424,6 +424,17 @@ export function getNextPrayer() {
     }
   }
 
-  // If no upcoming prayer found today, return the first prayer for tomorrow
-  return prayers[0];
+  // If no prayer is found for today, only return Fajr if it's after midnight
+  const fajr = prayers[0]; // Fajr is always the first prayer
+  const [fajrTime, fajrPeriod] = fajr.time.split(' ');
+  const [fajrHours] = fajrTime.split(':');
+  let fajrHour = parseInt(fajrHours);
+  if (fajrPeriod === 'AM' && fajrHour === 12) fajrHour = 0;
+  
+  // Only show Fajr as next prayer if current time is after midnight and before Fajr
+  if (now.getHours() >= 0 && now.getHours() < fajrHour) {
+    return fajr;
+  }
+  
+  return null; // No next prayer to show
 }
