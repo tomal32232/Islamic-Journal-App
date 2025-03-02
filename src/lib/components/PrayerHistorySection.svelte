@@ -7,6 +7,7 @@
   let filteredHistory = [];
   let isLoading = true;
   let isRefreshing = false;
+  let prayerStats = { onTime: 0, late: 0, missed: 0, total: 0 };
 
   // Filter prayers based on selected days
   function filterPrayers() {
@@ -40,10 +41,45 @@
       });
   }
 
+  // Calculate prayer statistics based on filtered history
+  function calculatePrayerStats(prayers) {
+    const stats = {
+      onTime: 0,
+      late: 0,
+      missed: 0,
+      total: 0,
+      onTimePercent: 0,
+      latePercent: 0,
+      missedPercent: 0
+    };
+
+    prayers.forEach(prayer => {
+      if (prayer.status === 'ontime') {
+        stats.onTime++;
+      } else if (prayer.status === 'late') {
+        stats.late++;
+      } else if (prayer.status === 'missed') {
+        stats.missed++;
+      }
+    });
+
+    stats.total = stats.onTime + stats.late + stats.missed;
+    
+    // Calculate percentages
+    if (stats.total > 0) {
+      stats.onTimePercent = Math.round((stats.onTime / stats.total) * 100);
+      stats.latePercent = Math.round((stats.late / stats.total) * 100);
+      stats.missedPercent = Math.round((stats.missed / stats.total) * 100);
+    }
+    
+    return stats;
+  }
+
   // Update filtered history when filter days or prayer history changes
   $: {
     if ($prayerHistoryStore?.history) {
       filteredHistory = filterPrayers();
+      prayerStats = calculatePrayerStats(filteredHistory);
       isLoading = false;
       isRefreshing = false;
     }
@@ -192,6 +228,46 @@
         <p>No prayer history found for the selected period.</p>
       </div>
     {:else}
+      <!-- Prayer Summary Section -->
+      <div class="prayer-summary">
+        <div class="summary-title">Summary for last {filterDays} days</div>
+        <div class="summary-stats">
+          <div class="stat-item">
+            <div class="stat-value on-time">{prayerStats.onTime}</div>
+            <div class="stat-label">On Time</div>
+            {#if prayerStats.total > 0}
+              <div class="stat-percent">{prayerStats.onTimePercent}%</div>
+            {/if}
+          </div>
+          <div class="stat-item">
+            <div class="stat-value late">{prayerStats.late}</div>
+            <div class="stat-label">Late</div>
+            {#if prayerStats.total > 0}
+              <div class="stat-percent">{prayerStats.latePercent}%</div>
+            {/if}
+          </div>
+          <div class="stat-item">
+            <div class="stat-value missed">{prayerStats.missed}</div>
+            <div class="stat-label">Missed</div>
+            {#if prayerStats.total > 0}
+              <div class="stat-percent">{prayerStats.missedPercent}%</div>
+            {/if}
+          </div>
+          <div class="stat-item">
+            <div class="stat-value total">{prayerStats.total}</div>
+            <div class="stat-label">Total</div>
+          </div>
+        </div>
+        
+        {#if prayerStats.total > 0}
+          <div class="progress-bar">
+            <div class="progress-segment on-time" style="width: {prayerStats.onTimePercent}%"></div>
+            <div class="progress-segment late" style="width: {prayerStats.latePercent}%"></div>
+            <div class="progress-segment missed" style="width: {prayerStats.missedPercent}%"></div>
+          </div>
+        {/if}
+      </div>
+
       <div class="prayer-history-list">
         {#each groupedPrayers as group}
           <div class="date-group">
@@ -202,8 +278,12 @@
               {#each group.prayers as prayer}
                 {@const statusInfo = getStatusInfo(prayer.status)}
                 <div class="prayer-item">
-                  <div class="prayer-name">{prayer.prayerName}</div>
+                  <div class="prayer-info">
+                    <div class="prayer-name">{prayer.prayerName}</div>
+                    <div class="prayer-time">{prayer.time || ''}</div>
+                  </div>
                   <div class="prayer-status" style="color: {statusInfo.color}">
+                    <div class="status-indicator" style="background-color: {statusInfo.color}"></div>
                     <svelte:component this={statusInfo.icon} size={16} weight="bold" />
                     <span>{statusInfo.text}</span>
                   </div>
@@ -387,10 +467,21 @@
     border-radius: 8px;
   }
 
+  .prayer-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
   .prayer-name {
     font-size: 0.875rem;
     font-weight: 500;
     color: #334155;
+  }
+  
+  .prayer-time {
+    font-size: 0.75rem;
+    color: #64748b;
   }
 
   .prayer-status {
@@ -399,5 +490,117 @@
     gap: 0.25rem;
     font-size: 0.75rem;
     font-weight: 500;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    background-color: rgba(0, 0, 0, 0.03);
+  }
+  
+  .status-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 0.25rem;
+  }
+
+  .prayer-summary {
+    background: #f8fafc;
+    border-radius: 10px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border: 1px solid #e2e8f0;
+  }
+
+  .summary-title {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #64748b;
+    margin-bottom: 0.75rem;
+    text-align: center;
+  }
+
+  .summary-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+
+  @media (max-width: 480px) {
+    .summary-stats {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1rem;
+    }
+  }
+
+  .stat-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  .stat-value {
+    font-size: 1.25rem;
+    font-weight: 600;
+    padding: 0.25rem 0.5rem;
+    border-radius: 6px;
+    min-width: 2rem;
+    text-align: center;
+  }
+
+  .stat-value.on-time {
+    color: #4CAF50;
+    background: rgba(76, 175, 80, 0.1);
+  }
+
+  .stat-value.late {
+    color: #E09453;
+    background: rgba(224, 148, 83, 0.1);
+  }
+
+  .stat-value.missed {
+    color: #F44336;
+    background: rgba(244, 67, 54, 0.1);
+  }
+
+  .stat-value.total {
+    color: #216974;
+    background: rgba(33, 105, 116, 0.1);
+  }
+
+  .stat-label {
+    font-size: 0.75rem;
+    color: #64748b;
+  }
+  
+  .stat-percent {
+    font-size: 0.7rem;
+    color: #94a3b8;
+    margin-top: -0.25rem;
+  }
+  
+  .progress-bar {
+    height: 6px;
+    width: 100%;
+    background: #e2e8f0;
+    border-radius: 3px;
+    display: flex;
+    overflow: hidden;
+  }
+  
+  .progress-segment {
+    height: 100%;
+  }
+  
+  .progress-segment.on-time {
+    background-color: #4CAF50;
+  }
+  
+  .progress-segment.late {
+    background-color: #E09453;
+  }
+  
+  .progress-segment.missed {
+    background-color: #F44336;
   }
 </style> 
