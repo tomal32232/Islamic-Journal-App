@@ -12,7 +12,8 @@ import {
   orderBy,
   writeBatch,
   serverTimestamp,
-  updateDoc
+  updateDoc,
+  getFirestore
 } from 'firebase/firestore';
 import { prayerTimesStore, fetchPrayerTimes } from './prayerTimes';
 import { updatePrayerProgress } from '../services/badgeProgressService';
@@ -543,6 +544,26 @@ export async function savePrayerStatus(prayerData) {
   const prayerName = prayerData.prayerName || prayerData.name;
 
   try {
+    // Check if the prayer date is before account creation
+    const db = getFirestore();
+    const trialRef = doc(db, 'trials', user.uid);
+    const trialDoc = await getDoc(trialRef);
+    
+    if (trialDoc.exists()) {
+      const trialData = trialDoc.data();
+      const accountCreationDate = trialData.startDate.toDate();
+      const prayerDate = new Date(prayerData.date);
+      
+      // Set time to midnight for accurate date comparison
+      accountCreationDate.setHours(0, 0, 0, 0);
+      prayerDate.setHours(0, 0, 0, 0);
+      
+      if (prayerDate < accountCreationDate) {
+        alert('You cannot mark prayers for dates before your account was created.');
+        return;
+      }
+    }
+
     const prayerId = `${prayerData.date}_${prayerName}`;
     
     // Get current timezone offset in minutes

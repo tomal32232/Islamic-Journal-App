@@ -710,6 +710,10 @@
     showMoodPopup = false;
   }
 
+  function handleMoodClose(): void {
+    showMoodPopup = false;
+  }
+
   async function loadWeekMoods() {
     try {
       await getMoodHistory(7);
@@ -1270,9 +1274,10 @@
 
 {#if showMoodPopup}
   <MoodPopup
-    {currentMoodPeriod}
-    on:close={handleMoodClose}
+    period={currentMoodPeriod}
+    on:select={handleMoodSelect}
     on:skip={handleMoodSkip}
+    on:close={handleMoodClose}
   />
 {/if}
 

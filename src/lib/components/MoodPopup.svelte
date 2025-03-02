@@ -1,12 +1,13 @@
 <script lang="ts">
   import { fade, fly } from 'svelte/transition';
   import { onMount } from 'svelte';
+  import { createEventDispatcher } from 'svelte';
   import MoodSelector from './MoodSelector.svelte';
   import OnboardingGuide from './OnboardingGuide.svelte';
   import { isFirstTimeVisitor } from '../stores/userPreferences';
 
-  export let onSelect = (event) => {};
-  export let onSkip = () => {};
+  const dispatch = createEventDispatcher();
+
   export let period: 'morning' | 'evening';
 
   let showOnboarding = false;
@@ -22,6 +23,18 @@
 
   function handleGuideClose() {
     showOnboarding = false;
+  }
+
+  function handleSelect(event) {
+    dispatch('select', event.detail);
+  }
+
+  function handleSkip() {
+    dispatch('skip');
+  }
+
+  function handleClose() {
+    dispatch('close');
   }
 
   const titles = {
@@ -57,7 +70,7 @@
 
 <div class="popup-backdrop" transition:fade={{ duration: 300 }}>
   <div class="popup-content" transition:fly={{ y: 50, duration: 300, delay: 150 }}>
-    <button class="close-button" on:click={onSkip}>
+    <button class="close-button" on:click={handleClose}>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M18 6L6 18M6 6l12 12" stroke-linecap="round" stroke-linejoin="round" />
       </svg>
@@ -72,10 +85,10 @@
     </div>
 
     <div class="mood-selector-container">
-      <MoodSelector on:select={onSelect} />
+      <MoodSelector on:select={handleSelect} />
     </div>
 
-    <button class="skip-button" on:click={onSkip}>
+    <button class="skip-button" on:click={handleSkip}>
       Skip for now
     </button>
   </div>
