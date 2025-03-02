@@ -134,6 +134,7 @@
     if (typeof window !== 'undefined') {
       const storedTab = window.localStorage.getItem('prayer_active_tab');
       if (storedTab) {
+        // Set the active tab
         activeTab = storedTab;
         // Clear the stored tab after using it
         window.localStorage.removeItem('prayer_active_tab');

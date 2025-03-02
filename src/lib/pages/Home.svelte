@@ -964,6 +964,27 @@
 
   // Add this function to handle manual mood tracking
   function handleManualMoodTracking(period) {
+    // Get prayer times
+    const prayerTimes = $prayerTimesStore;
+    const fajrPrayer = prayerTimes.find(p => p.name === 'Fajr');
+    const maghribPrayer = prayerTimes.find(p => p.name === 'Maghrib');
+    
+    if (!fajrPrayer || !maghribPrayer) return;
+
+    const now = new Date();
+    const fajrTime = new Date(fajrPrayer.timestamp);
+    const maghribTime = new Date(maghribPrayer.timestamp);
+
+    if (period === 'morning' && now < fajrTime) {
+      alert('Please wait until after Fajr prayer to record your morning reflection.');
+      return;
+    }
+
+    if (period === 'evening' && now < maghribTime) {
+      alert('Please wait until after Maghrib prayer to record your evening reflection.');
+      return;
+    }
+
     currentMoodPeriod = period;
     showMoodPopup = true;
   }
@@ -1140,11 +1161,12 @@
             </div>
 
             <div class="activity-card" on:click={() => {
-              navigateTo('prayer');
-              // Set the activeTab in Prayer component to 'tasbih'
+              // Set the activeTab in Prayer component to 'tasbih' first
               if (typeof window !== 'undefined') {
                 window.localStorage.setItem('prayer_active_tab', 'tasbih');
               }
+              // Then navigate to prayer page
+              navigateTo('prayer');
             }}>
               <div class="activity-icon tasbih">
                 <svelte:component this={iconMap.Timer} size={18} weight="fill" color="#216974" />
