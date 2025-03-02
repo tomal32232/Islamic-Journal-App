@@ -10,7 +10,6 @@
   import { savePrayerStatus, getPrayerHistory, prayerHistoryStore, initializeMonthlyPrayers, updatePrayerStatuses, cache as prayerHistoryCache } from '../stores/prayerHistoryStore';
   import { iconMap } from '../utils/icons';
   import { nearbyMosquesStore, mosqueLoadingStore, fetchNearbyMosques } from '../services/mosqueService';
-  import PrayerHistorySection from '../components/PrayerHistorySection.svelte';
   import QuranReading from '../components/QuranReading.svelte';
   import { Mosque, Book, HandsPraying, Check, Clock } from 'phosphor-svelte';
   import { saveTasbihSession, getWeeklyStats, weeklyStatsStore } from '../stores/tasbihStore';
@@ -478,8 +477,6 @@
           </div>
         {/if}
       </div>
-
-      <PrayerHistorySection />
     </div>
   {:else if activeTab === 'tasbih'}
     {#if !isCounterMode}
