@@ -1172,6 +1172,18 @@
               </div>
             </div>
           </div>
+          
+          {#if $journalStore.todayMorningReflection?.affirmation}
+            <div class="affirmation-card">
+              <div class="affirmation-icon">
+                <svelte:component this={iconMap.Star} size={16} weight="fill" color="#E09453" />
+              </div>
+              <div class="affirmation-content">
+                <span class="affirmation-label">Today's Affirmation</span>
+                <p class="affirmation-text">"{$journalStore.todayMorningReflection.affirmation}"</p>
+              </div>
+            </div>
+          {/if}
         </div>
 
         <div class="next-prayer-card">
@@ -1930,7 +1942,7 @@
   }
 
   .next-prayer-card {
-    margin-bottom: 1rem;
+    margin-top: 1rem;
   }
 
   .next-prayer-content {
@@ -2274,6 +2286,51 @@
 
   .mood-add-button.evening {
     border: 1px solid rgba(70, 130, 180, 0.3);
+  }
+
+  .next-prayer-card {
+    margin-top: 1rem;
+  }
+  
+  .affirmation-card {
+    background-color: #f8f5f0;
+    border-radius: 12px;
+    padding: 0.75rem;
+    margin-top: 0.75rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  }
+  
+  .affirmation-icon {
+    background-color: #fdf2e9;
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  
+  .affirmation-content {
+    flex: 1;
+  }
+  
+  .affirmation-label {
+    font-size: 0.75rem;
+    color: #666;
+    display: block;
+    margin-bottom: 0.25rem;
+  }
+  
+  .affirmation-text {
+    font-size: 0.875rem;
+    color: #333;
+    font-style: italic;
+    margin: 0;
+    line-height: 1.4;
   }
 </style>
 
