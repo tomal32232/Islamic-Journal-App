@@ -5,11 +5,13 @@
     getPrayerHistory, 
     getPrayerDateTime,
     shouldMarkPrayerExcused,
-    savePrayerStatus 
+    savePrayerStatus,
+    invalidatePrayerHistoryCache
   } from '../stores/prayerHistoryStore';
   import { prayerTimesStore, fetchPrayerTimes } from '../stores/prayerTimes';
   import { iconMap } from '../utils/icons';
   import { auth } from '../firebase';
+  import { ArrowClockwise } from 'phosphor-svelte';
 
   // Add loading and error states
   let isLoading = true;
@@ -17,11 +19,18 @@
   let retryCount = 0;
   const MAX_RETRIES = 3;
 
+  // Add a flag to track if data has been loaded at least once
+  let dataInitialized = false;
+  
+  // Add a flag to track if we're showing cached data while loading fresh data
+  let showingCachedData = false;
+
   // Preload data as soon as the component is created
   let preloadPromise = preloadData();
 
   async function preloadData() {
     try {
+      // Set loading state, but don't show loading indicator if we have cached data
       isLoading = true;
       loadingError = null;
       
@@ -33,15 +42,27 @@
         // Continue with initialization even if cache loading fails
       }
       
-      // If we have cached data, show it immediately while we fetch fresh data
+      // If we have cached data, show it immediately and don't show loading indicator
       if (gridCache && gridCache.data && gridCache.data.grid && gridCache.data.grid.length > 0) {
         weeklyGrid = gridCache.data.grid;
         weeklyStats = gridCache.data.weeklyStats || { ontime: 0, late: 0, missed: 0, excused: 0 };
-        // Keep loading state true to show overlay while we fetch fresh data
+        // Don't show loading state if we have cached data
+        showingCachedData = true;
+        isLoading = false;
       }
       
-      // Fetch prayer history and times in parallel if needed
-      if (!$prayerHistoryStore.history || $prayerHistoryStore.history.length === 0) {
+      // Check if we already have data in the store and it's recent enough
+      const storeHasData = $prayerHistoryStore.history && $prayerHistoryStore.history.length > 0;
+      const cacheIsRecent = gridCache && gridCache.timestamp && (Date.now() - gridCache.timestamp < 5 * 60 * 1000); // 5 minutes
+      
+      // Only fetch from database if we don't have recent data
+      if (!storeHasData || !cacheIsRecent || !dataInitialized) {
+        // If we're showing cached data, don't show loading indicator while fetching fresh data
+        if (!showingCachedData) {
+          isLoading = true;
+        }
+        
+        // Fetch prayer history and times in parallel if needed
         await Promise.allSettled([
           getPrayerHistory().catch(error => {
             console.error('Error fetching prayer history:', error);
@@ -60,13 +81,22 @@
           if (errors.length > 0) {
             throw new Error(errors.join(', '));
           }
+          
+          // Mark data as initialized
+          dataInitialized = true;
         });
+      } else {
+        console.log('Using existing data from store, skipping fetch');
+        // If we have recent data, we can skip loading state
+        isLoading = false;
       }
       
       // Generate grid with available data
       await updateGrid();
       
+      // Reset flags
       isLoading = false;
+      showingCachedData = false;
     } catch (error) {
       console.error('Error preloading data:', error);
       loadingError = error.message || 'Failed to load prayer data';
@@ -305,7 +335,19 @@
       // ensuring the UI updates immediately
       weeklyGrid = [...weeklyGrid];
       weeklyStats = {...weeklyStats};
+      
+      // Add a second update after a short delay to ensure the UI is updated
+      setTimeout(() => {
+        weeklyGrid = [...weeklyGrid];
+        weeklyStats = {...weeklyStats};
+      }, 100);
     });
+    
+    // Invalidate the cache to ensure fresh data on next load
+    if (gridCache) {
+      gridCache.historyHash = getPrayerHistoryHash($prayerHistoryStore.history);
+      saveCacheToStorage();
+    }
   }
 
   // Add cache for grid data
@@ -801,61 +843,97 @@
 
   let isUpdating = false;
   async function updateGrid() {
-    if (isUpdating) return;
-    isUpdating = true;
-    
     try {
-      if ($prayerHistoryStore.history) {
-        // Check if we already have valid cached data before generating
-        const currentWeekStart = getWeekStartDate();
-        const currentHistoryHash = getPrayerHistoryHash($prayerHistoryStore.history);
-        
-        // Skip update if we already have valid cached data
-        if (gridCache && 
-            gridCache.data && 
-            gridCache.historyHash === currentHistoryHash && 
-            gridCache.weekStartDate === currentWeekStart &&
-            Date.now() - gridCache.timestamp < 30 * 60 * 1000) {
-          console.log('Using existing cached data for grid update');
-          weeklyGrid = gridCache.data.grid;
-          weeklyStats = gridCache.data.weeklyStats;
-          return;
-        }
-        
-        // Otherwise generate new grid data
-        console.log('Generating new grid data in updateGrid');
-        try {
-          const gridData = await generatePrayerGrid();
-          weeklyGrid = gridData.grid;
-          weeklyStats = gridData.weeklyStats;
-          console.log('Grid data generated successfully');
-        } catch (gridError) {
-          console.error('Error generating prayer grid:', gridError);
-          loadingError = 'Failed to generate prayer grid. Please try again.';
-          
-          // Try to use cached data as fallback
-          if (gridCache && gridCache.data) {
-            console.log('Using cached data as fallback after grid generation error');
-            weeklyGrid = gridCache.data.grid || [];
-            weeklyStats = gridCache.data.weeklyStats || { ontime: 0, late: 0, missed: 0, excused: 0 };
-          }
-        }
-      } else {
-        console.log('No prayer history data available for grid update');
-        loadingError = 'No prayer history data available';
+      console.log('Updating prayer grid...');
+      
+      // Don't show loading indicator if we already have grid data
+      const hasExistingData = weeklyGrid.length > 0;
+      if (!hasExistingData) {
+        isLoading = true;
+        showingCachedData = false;
       }
+      
+      // Force a fresh fetch of prayer history if it's been more than 5 minutes
+      const needsFreshData = !gridCache.timestamp || (Date.now() - gridCache.timestamp > 5 * 60 * 1000);
+      
+      if (needsFreshData) {
+        console.log('Fetching fresh prayer history data');
+        await getPrayerHistory();
+      }
+      
+      // Generate the grid
+      const gridData = await generatePrayerGrid();
+      
+      // Update the grid and stats
+      weeklyGrid = gridData.grid;
+      weeklyStats = gridData.weeklyStats;
+      
+      // Save to cache
+      gridCache = {
+        data: gridData,
+        timestamp: Date.now(),
+        historyHash: getPrayerHistoryHash($prayerHistoryStore.history),
+        weekStartDate: getWeekStartDate()
+      };
+      
+      // Save cache to localStorage
+      saveCacheToStorage();
+      
+      // Reset loading state
+      isLoading = false;
+      
+      return gridData;
     } catch (error) {
       console.error('Error updating grid:', error);
-      loadingError = 'Failed to update prayer grid';
+      isLoading = false;
+      throw error;
+    }
+  }
+
+  // Add a function to force refresh the grid
+  async function forceRefreshGrid() {
+    try {
+      console.log('Forcing grid refresh...');
       
-      // Try to use cached data as fallback
-      if (gridCache && gridCache.data) {
-        console.log('Using cached data as fallback after update error');
-        weeklyGrid = gridCache.data.grid || [];
-        weeklyStats = gridCache.data.weeklyStats || { ontime: 0, late: 0, missed: 0, excused: 0 };
+      // Only show loading indicator if we don't have existing data
+      if (weeklyGrid.length === 0) {
+        isLoading = true;
+        showingCachedData = false;
       }
-    } finally {
-      isUpdating = false;
+      
+      // Clear cache timestamp to force fresh data fetch
+      if (gridCache) {
+        gridCache.timestamp = null;
+      }
+      
+      // Invalidate the prayer history cache to force a fresh fetch
+      await invalidatePrayerHistoryCache();
+      
+      // Force fetch fresh prayer history
+      await getPrayerHistory();
+      
+      // Update the grid
+      const result = await updateGrid();
+      
+      // Reset loading state
+      isLoading = false;
+      
+      return result;
+    } catch (error) {
+      console.error('Error forcing grid refresh:', error);
+      isLoading = false;
+      throw error;
+    }
+  }
+
+  // Add a reactive statement to update the grid when prayer history changes
+  $: if ($prayerHistoryStore && $prayerHistoryStore.history) {
+    const currentHash = getPrayerHistoryHash($prayerHistoryStore.history);
+    if (gridCache && gridCache.historyHash !== currentHash) {
+      console.log('Prayer history changed, updating grid');
+      updateGrid().catch(error => {
+        console.error('Error updating grid after history change:', error);
+      });
     }
   }
 
@@ -878,9 +956,35 @@
     clearTimeout(updateTimeout);
     clearTimeout(tapTimeout); // Clear tap timeout to prevent memory leaks
   });
+
+  // Add a function to handle manual refresh
+  async function handleManualRefresh() {
+    try {
+      isLoading = true;
+      showingCachedData = false; // Force showing loading indicator during manual refresh
+      loadingError = null;
+      
+      // Invalidate cache and force refresh
+      await invalidatePrayerHistoryCache();
+      await forceRefreshGrid();
+      
+      isLoading = false;
+    } catch (error) {
+      console.error('Error during manual refresh:', error);
+      loadingError = error.message || 'Failed to refresh prayer data';
+      isLoading = false;
+    }
+  }
 </script>
 
 <div class="prayer-history">
+  <div class="header">
+    <h2>Weekly Prayer History</h2>
+    <button class="refresh-button" on:click={handleManualRefresh} aria-label="Refresh prayer history">
+      <ArrowClockwise size={18} weight="bold" />
+    </button>
+  </div>
+  
   <div class="instructions">
     <p>Tap once to mark prayer as on time, double tap to mark as late. Only past prayers can be marked.</p>
   </div>
@@ -888,8 +992,8 @@
   <!-- Only show grid when not loading and no errors, or if we have cached data -->
   {#if (!isLoading && !loadingError) || (weeklyGrid.length > 0)}
     <div class="history-grid-container">
-      <!-- Add loading overlay -->
-      {#if isLoading}
+      <!-- Add loading overlay - only show when loading and not showing cached data -->
+      {#if isLoading && !showingCachedData && weeklyGrid.length === 0}
         <div class="loading-overlay">
           <div class="loading-spinner"></div>
           <p>Loading prayer history...</p>
@@ -976,6 +1080,40 @@
     border-radius: 0.5rem;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     min-height: 300px; /* Ensure consistent height even when loading */
+  }
+
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+  }
+
+  .header h2 {
+    margin: 0;
+    font-size: 1.25rem;
+    color: #216974;
+  }
+
+  .refresh-button {
+    background: transparent;
+    border: none;
+    color: #216974;
+    padding: 8px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.2s;
+  }
+  
+  .refresh-button:hover {
+    background: rgba(33, 105, 116, 0.1);
+  }
+  
+  .refresh-button:active {
+    background: rgba(33, 105, 116, 0.2);
   }
 
   /* Add loading overlay styles */
@@ -1149,6 +1287,7 @@
   .status-dot.pending {
     background: #e0e0e0;
     border: 2px solid #216974;
+    animation: blink 1.5s infinite;
   }
 
   .status-dot.has-notification {
@@ -1231,6 +1370,12 @@
       transform: scale(1);
       opacity: 1;
     }
+  }
+
+  @keyframes blink {
+    0% { opacity: 1; }
+    50% { opacity: 0.4; }
+    100% { opacity: 1; }
   }
 
   @media (max-width: 640px) {

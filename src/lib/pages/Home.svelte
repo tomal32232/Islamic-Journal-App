@@ -79,6 +79,13 @@
   let lastMoodCheck: Date | null = null;
   let weekMoods: WeekMoods = {};
 
+  // Add a flag to track if an update is already in progress
+  let isUpdatingPrayerStatus = false;
+  // Add a timestamp to track the last update time
+  let lastPrayerStatusUpdate: number = 0;
+  // Minimum time between updates (5 seconds)
+  const MIN_UPDATE_INTERVAL: number = 5000;
+
   async function checkAndSetAdminStatus() {
     const firebaseAuth = getAuth();
     const user = firebaseAuth.currentUser;
@@ -160,7 +167,8 @@
       checkExcusedStatus()
     ]);
     
-    const prayerInterval = setInterval(() => updatePrayerStatus(), 60000);
+    // Increase the interval to 5 minutes to reduce frequency of calls
+    const prayerInterval = setInterval(() => updatePrayerStatus(), 300000);
     const countdownInterval = setInterval(updateCountdown, 1000);
     const notificationInterval = setInterval(checkPrayerNotifications, 60000);
     
@@ -369,10 +377,13 @@
     const diff = prayerDate - now;
     if (diff < 0) {
       // Prayer time has passed
-      countdownEnded = true;
-      // Move to pending and find next upcoming prayer
-      await getPrayerHistory();
-      updatePrayerStatus();
+      // Only update if countdown wasn't already ended
+      if (!countdownEnded) {
+        countdownEnded = true;
+        // Move to pending and find next upcoming prayer
+        await getPrayerHistory();
+        updatePrayerStatus();
+      }
       return;
     }
     
@@ -387,7 +398,23 @@
   async function updatePrayerStatus() {
     console.log('pppp Starting updatePrayerStatus...');
     
+    // Check if document is visible (skip updates when app is in background)
+    if (document.hidden) {
+      console.log('pppp Skipping update - app is in background');
+      return;
+    }
+    
+    // Check if an update is already in progress or if it's too soon for another update
+    const now = Date.now();
+    if (isUpdatingPrayerStatus || (now - lastPrayerStatusUpdate < MIN_UPDATE_INTERVAL)) {
+      console.log('pppp Skipping update - already in progress or too soon since last update');
+      return;
+    }
+    
+    // Set the flag to prevent concurrent updates
+    isUpdatingPrayerStatus = true;
     isLoadingPrayers = true;
+    
     try {
       // Check if we have data in the store
       if (!$prayerTimesStore || $prayerTimesStore.length === 0) {
@@ -447,10 +474,15 @@
       } else {
         console.log('pppp No upcoming prayer found');
       }
+      
+      // Update the timestamp of the last successful update
+      lastPrayerStatusUpdate = Date.now();
     } catch (error) {
       console.error('pppp Error updating prayer status:', error);
     } finally {
       isLoadingPrayers = false;
+      // Reset the flag to allow future updates
+      isUpdatingPrayerStatus = false;
     }
   }
 
@@ -801,19 +833,19 @@
 
   // Function to get the next prayer
   function getNextPrayer() {
-    console.log('pppp getNextPrayer called');
+    // console.log('pppp getNextPrayer called');
     if (!$prayerTimesStore || $prayerTimesStore.length === 0) {
-      console.log('pppp No prayer times in store, returning null');
+      // console.log('pppp No prayer times in store, returning null');
       return null;
     }
     
     const now = new Date();
     const currentTime = Number(now.getHours()) * 60 + Number(now.getMinutes());
-    console.log('pppp Current time (minutes since midnight):', currentTime);
-    console.log('pppp Current date/time:', now.toLocaleString());
+    // console.log('pppp Current time (minutes since midnight):', currentTime);
+    // console.log('pppp Current date/time:', now.toLocaleString());
     
     for (const prayer of $prayerTimesStore) {
-      console.log('pppp Checking prayer:', prayer.name, prayer.time);
+      // console.log('pppp Checking prayer:', prayer.name, prayer.time);
       const [time, period] = prayer.time.split(' ');
       const [hours, minutes] = time.split(':');
       let prayerHours = Number(parseInt(hours));
@@ -826,16 +858,16 @@
       }
       
       const prayerTime = prayerHours * 60 + Number(parseInt(minutes));
-      console.log('pppp Prayer time (minutes since midnight):', prayerTime);
+      // console.log('pppp Prayer time (minutes since midnight):', prayerTime);
       
       if (prayerTime > currentTime) {
-        console.log('pppp Found next prayer:', prayer.name);
+        // console.log('pppp Found next prayer:', prayer.name);
         return prayer;
       }
     }
     
     // If no prayer is found for today, return the first prayer of tomorrow
-    console.log('pppp No upcoming prayers today, returning first prayer for tomorrow:', $prayerTimesStore[0].name);
+    // console.log('pppp No upcoming prayers today, returning first prayer for tomorrow:', $prayerTimesStore[0].name);
     return $prayerTimesStore[0];
   }
 
@@ -1128,7 +1160,6 @@
         </div>
 
         <div class="weekly-prayer-history">
-          <h3 class="section-title">Weekly Prayer History</h3>
           <WeeklyPrayerHistory />
         </div>
       </div>

@@ -28,6 +28,16 @@ let lastUpdateTime = 0;
 // Add last known data hash to detect actual changes
 let lastKnownDataHash = null;
 
+// Add a variable to track the last time getPrayerHistory was called
+let lastPrayerHistoryFetch = 0;
+// Minimum time between fetches (10 seconds)
+const MIN_FETCH_INTERVAL = 10000;
+
+// Add a variable to track the last time updatePrayerStatuses was called
+let lastPrayerStatusesUpdate = 0;
+// Minimum time between updates (3 seconds)
+const MIN_STATUS_UPDATE_INTERVAL = 3000;
+
 function getDataHash(data) {
   return JSON.stringify({
     history: data.history.map(h => ({
@@ -370,6 +380,16 @@ export async function initializeMonthlyPrayers() {
 }
 
 export async function updatePrayerStatuses() {
+    // Check if it's too soon for another update
+    const now = Date.now();
+    if (now - lastPrayerStatusesUpdate < MIN_STATUS_UPDATE_INTERVAL) {
+        console.log('Skipping prayer statuses update - too soon since last update');
+        return;
+    }
+    
+    // Update the last update timestamp
+    lastPrayerStatusesUpdate = now;
+    
     try {
         const user = auth.currentUser;
         if (!user) return;
@@ -572,6 +592,19 @@ export function convertPrayerTimeToDate(timeStr) {
 }
 
 export async function getPrayerHistory() {
+  // Check if it's too soon for another fetch
+  const now = Date.now();
+  if (now - lastPrayerHistoryFetch < MIN_FETCH_INTERVAL) {
+    console.log('Skipping prayer history fetch - too soon since last fetch');
+    // Return the cached data if available
+    if (cache.prayerHistory) {
+      return cache.prayerHistory;
+    }
+  }
+  
+  // Update the last fetch timestamp
+  lastPrayerHistoryFetch = now;
+  
   return throttledUpdate(async () => {
     const user = auth.currentUser;
     if (!user) {
@@ -585,125 +618,168 @@ export async function getPrayerHistory() {
       console.log('Using cached prayer history data');
       const currentHash = getDataHash(cache.prayerHistory);
       if (currentHash === lastKnownDataHash) {
-        return cache.prayerHistory; // Return cached data
+        // Return cached data without updating the store to prevent unnecessary re-renders
+        return cache.prayerHistory;
       }
       lastKnownDataHash = currentHash;
       prayerHistoryStore.set(cache.prayerHistory);
       return cache.prayerHistory;
     }
 
-    // Implement retry logic
-    let retryCount = 0;
-    const MAX_RETRIES = 3;
-    let lastError = null;
-
-    while (retryCount < MAX_RETRIES) {
+    // Try to load from localStorage first if we don't have memory cache
+    if (!cache.prayerHistory) {
       try {
-        console.log(`Fetching prayer history (attempt ${retryCount + 1}/${MAX_RETRIES})...`);
-        const sevenDaysAgo = new Date();
-        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-        const sevenDaysAgoStr = sevenDaysAgo.toLocaleDateString('en-CA');
-        
-        // Query prayer_history collection
-        const prayerHistoryRef = collection(db, 'prayer_history');
-        
-        let querySnapshot;
-        
-        // Try the indexed query first
-        try {
-          const q = query(
-            prayerHistoryRef,
-            where('userId', '==', user.uid),
-            where('date', '>=', sevenDaysAgoStr),
-            orderBy('date', 'desc')
-          );
-          
-          querySnapshot = await getDocs(q);
-          console.log(`Retrieved ${querySnapshot.docs.length} prayer records`);
-        } catch (indexError) {
-          console.warn('Indexed query failed, falling back to client-side filtering:', indexError);
-          const q = query(
-            prayerHistoryRef,
-            where('userId', '==', user.uid)
-          );
-          
-          const snapshot = await getDocs(q);
-          console.log(`Retrieved ${snapshot.docs.length} total prayer records, filtering for last 7 days`);
-          
-          const filteredDocs = snapshot.docs.filter(doc => {
-            const data = doc.data();
-            return data.date >= sevenDaysAgoStr;
-          }).sort((a, b) => b.data().date.localeCompare(a.data().date));
-          
-          querySnapshot = { docs: filteredDocs };
-          console.log(`Filtered to ${filteredDocs.length} prayer records within last 7 days`);
+        const storedCache = localStorage.getItem('prayerHistoryCache');
+        if (storedCache) {
+          const parsedCache = JSON.parse(storedCache);
+          if (parsedCache && parsedCache.data && 
+              Date.now() - parsedCache.timestamp < CACHE_DURATION * 2) { // Double duration for localStorage
+            console.log('Using prayer history from localStorage');
+            cache.prayerHistory = parsedCache.data;
+            cache.lastFetched = parsedCache.timestamp;
+            
+            // Update the store with localStorage data
+            const currentHash = getDataHash(cache.prayerHistory);
+            if (currentHash !== lastKnownDataHash) {
+              lastKnownDataHash = currentHash;
+              prayerHistoryStore.set(cache.prayerHistory);
+            }
+            
+            // Return the data but continue with fetch in background
+            const result = cache.prayerHistory;
+            
+            // Fetch fresh data in the background after a short delay
+            setTimeout(() => {
+              fetchFreshPrayerHistory(user).catch(error => {
+                console.error('Background fetch error:', error);
+              });
+            }, 1000);
+            
+            return result;
+          }
         }
-
-        const result = processQueryResults(querySnapshot);
-        
-        // Check if data has actually changed
-        const newHash = getDataHash(result);
-        if (newHash === lastKnownDataHash) {
-          console.log('Prayer history data unchanged');
-          return cache.prayerHistory || result; // Return existing cache or new result
-        }
-        
-        // Update cache and store only if there are actual changes
-        console.log('Prayer history data changed, updating store');
-        lastKnownDataHash = newHash;
-        cache.prayerHistory = result;
-        cache.lastFetched = Date.now();
-        
-        // Save to localStorage for offline access
-        try {
-          localStorage.setItem('prayerHistoryCache', JSON.stringify({
-            data: result,
-            timestamp: cache.lastFetched
-          }));
-        } catch (storageError) {
-          console.warn('Failed to save prayer history to localStorage:', storageError);
-        }
-        
-        prayerHistoryStore.set(result);
-        return result;
-      } catch (error) {
-        console.error(`Error fetching prayer history (attempt ${retryCount + 1}/${MAX_RETRIES}):`, error);
-        lastError = error;
-        retryCount++;
-        
-        if (retryCount < MAX_RETRIES) {
-          // Wait before retrying with exponential backoff
-          const delay = 1000 * Math.pow(2, retryCount);
-          console.log(`Retrying in ${delay}ms...`);
-          await new Promise(resolve => setTimeout(resolve, delay));
-        }
+      } catch (storageError) {
+        console.error('Error loading prayer history from localStorage:', storageError);
       }
     }
 
-    console.error('Failed to fetch prayer history after multiple attempts');
-    
-    // Try to load from localStorage as a last resort
-    try {
-      const storedCache = localStorage.getItem('prayerHistoryCache');
-      if (storedCache) {
-        const parsedCache = JSON.parse(storedCache);
-        if (parsedCache && parsedCache.data) {
-          console.log('Using prayer history from localStorage after failed fetch');
-          cache.prayerHistory = parsedCache.data;
-          cache.lastFetched = parsedCache.timestamp || Date.now();
-          prayerHistoryStore.set(parsedCache.data);
-          return parsedCache.data;
-        }
-      }
-    } catch (storageError) {
-      console.error('Error loading prayer history from localStorage:', storageError);
-    }
-    
-    // If all else fails, return empty result
-    const emptyResult = { history: [], pendingByDate: {}, missedByDate: {} };
-    prayerHistoryStore.set(emptyResult);
-    return emptyResult;
+    return fetchFreshPrayerHistory(user);
   });
+}
+
+// Separate function to fetch fresh data from Firestore
+async function fetchFreshPrayerHistory(user) {
+  // Implement retry logic
+  let retryCount = 0;
+  const MAX_RETRIES = 3;
+  let lastError = null;
+
+  while (retryCount < MAX_RETRIES) {
+    try {
+      console.log(`Fetching prayer history (attempt ${retryCount + 1}/${MAX_RETRIES})...`);
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      const sevenDaysAgoStr = sevenDaysAgo.toLocaleDateString('en-CA');
+      
+      // Query prayer_history collection
+      const prayerHistoryRef = collection(db, 'prayer_history');
+      
+      let querySnapshot;
+      
+      // Try the indexed query first
+      try {
+        const q = query(
+          prayerHistoryRef,
+          where('userId', '==', user.uid),
+          where('date', '>=', sevenDaysAgoStr),
+          orderBy('date', 'desc')
+        );
+        
+        querySnapshot = await getDocs(q);
+        console.log(`Retrieved ${querySnapshot.docs.length} prayer records`);
+      } catch (indexError) {
+        console.warn('Indexed query failed, falling back to client-side filtering:', indexError);
+        const q = query(
+          prayerHistoryRef,
+          where('userId', '==', user.uid)
+        );
+        
+        const snapshot = await getDocs(q);
+        console.log(`Retrieved ${snapshot.docs.length} total prayer records, filtering for last 7 days`);
+        
+        const filteredDocs = snapshot.docs.filter(doc => {
+          const data = doc.data();
+          return data.date >= sevenDaysAgoStr;
+        }).sort((a, b) => b.data().date.localeCompare(a.data().date));
+        
+        querySnapshot = { docs: filteredDocs };
+        console.log(`Filtered to ${filteredDocs.length} prayer records within last 7 days`);
+      }
+
+      const result = processQueryResults(querySnapshot);
+      
+      // Check if data has actually changed
+      const newHash = getDataHash(result);
+      if (newHash === lastKnownDataHash) {
+        console.log('Prayer history data unchanged');
+        return cache.prayerHistory || result; // Return existing cache or new result
+      }
+      
+      // Update cache and store only if there are actual changes
+      console.log('Prayer history data changed, updating store');
+      lastKnownDataHash = newHash;
+      cache.prayerHistory = result;
+      cache.lastFetched = Date.now();
+      
+      // Save to localStorage for offline access
+      try {
+        localStorage.setItem('prayerHistoryCache', JSON.stringify({
+          data: result,
+          timestamp: cache.lastFetched
+        }));
+      } catch (storageError) {
+        console.warn('Failed to save prayer history to localStorage:', storageError);
+      }
+      
+      prayerHistoryStore.set(result);
+      return result;
+    } catch (error) {
+      console.error(`Error fetching prayer history (attempt ${retryCount + 1}/${MAX_RETRIES}):`, error);
+      lastError = error;
+      retryCount++;
+      
+      if (retryCount < MAX_RETRIES) {
+        // Wait before retrying with exponential backoff
+        const delay = 1000 * Math.pow(2, retryCount);
+        console.log(`Retrying in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+
+  console.error('Failed to fetch prayer history after multiple attempts');
+  
+  // Try to load from localStorage as a last resort
+  try {
+    const storedCache = localStorage.getItem('prayerHistoryCache');
+    if (storedCache) {
+      const parsedCache = JSON.parse(storedCache);
+      if (parsedCache && parsedCache.data) {
+        console.log('Using prayer history from localStorage after failed fetch');
+        cache.prayerHistory = parsedCache.data;
+        cache.lastFetched = parsedCache.timestamp || Date.now();
+        prayerHistoryStore.set(parsedCache.data);
+        return parsedCache.data;
+      }
+    }
+  } catch (storageError) {
+    console.error('Error loading prayer history from localStorage:', storageError);
+  }
+  
+  // If all else fails, return empty result
+  const emptyResult = { history: [], pendingByDate: {}, missedByDate: {} };
+  prayerHistoryStore.set(emptyResult);
+  return emptyResult;
 }
 
 // Helper function to process query results
@@ -1300,8 +1376,21 @@ async function getPrayerStatus(prayerName, date) {
 
 // Add cache invalidation function
 export function invalidatePrayerHistoryCache() {
+  console.log('Invalidating prayer history cache');
   cache.prayerHistory = null;
   cache.lastFetched = null;
+  lastKnownDataHash = null;
+  
+  // Also clear localStorage cache
+  try {
+    localStorage.removeItem('prayerHistoryCache');
+    localStorage.removeItem('weeklyGridCache');
+  } catch (error) {
+    console.error('Error clearing localStorage cache:', error);
+  }
+  
+  // Force a fresh fetch
+  return getPrayerHistory();
 } 
 
 export async function updatePastPrayerStatuses() {

@@ -112,7 +112,38 @@
           }
           
           // Ensure prayer data is initialized
-          await ensurePrayerData();
+          try {
+            console.log('Initializing prayer data...');
+            // First try to load from cache
+            const storedCache = localStorage.getItem('prayerHistoryCache');
+            if (storedCache) {
+              try {
+                const parsedCache = JSON.parse(storedCache);
+                if (parsedCache && parsedCache.data && parsedCache.timestamp) {
+                  console.log('Found cached prayer history data');
+                  // Only use cache if it's less than 1 hour old
+                  if (Date.now() - parsedCache.timestamp < 60 * 60 * 1000) {
+                    console.log('Using cached prayer history data');
+                    // No need to set the store here, it will be done when needed
+                    
+                    // Skip ensurePrayerData if we have recent cache
+                    if (Date.now() - parsedCache.timestamp < 5 * 60 * 1000) { // 5 minutes
+                      console.log('Cache is recent, skipping ensurePrayerData');
+                      return;
+                    }
+                  }
+                }
+              } catch (cacheError) {
+                console.error('Error parsing prayer history cache:', cacheError);
+              }
+            }
+            
+            // Always ensure prayer data is initialized regardless of cache
+            await ensurePrayerData();
+          } catch (prayerError) {
+            console.error('Error initializing prayer data:', prayerError);
+            // Continue loading the app even if prayer data initialization fails
+          }
         } catch (error) {
           console.error('Error during initialization:', error);
           initializationError = error.message;

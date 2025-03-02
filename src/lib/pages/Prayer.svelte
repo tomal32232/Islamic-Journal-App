@@ -44,8 +44,11 @@
   let weeklyStreak = 0;
   let target = 33;
 
-  // Add loading state
-  let isLoading = false;
+  // Track if initial data has been loaded
+  let initialDataLoaded = false;
+
+  // Add a flag to track if we're currently loading data
+  let isLoadingPrayerData = false;
 
   let showManualDhikrPopup = false;
   let manualDhikrSelection = null;
@@ -53,16 +56,16 @@
   let manualDhikrText = '';
 
   function getNextPrayer(prayers) {
-    console.log('tttt prayers:', prayers);
+    // console.log('tttt prayers:', prayers);
     
     if (!prayers || prayers.length === 0) {
-      console.log('tttt No prayers available');
+      // console.log('tttt No prayers available');
       return null;
     }
     
     const now = new Date();
     const currentTime = now.getHours() * 60 + now.getMinutes();
-    console.log('tttt currentTime in minutes:', currentTime);
+    // console.log('tttt currentTime in minutes:', currentTime);
 
     // Convert prayer times to minutes for comparison
     const prayerMinutes = prayers.map(prayer => {
@@ -73,7 +76,7 @@
       if (period === 'AM' && hour === 12) hour = 0;
       
       const totalMinutes = hour * 60 + parseInt(minutes);
-      console.log(`tttt Prayer ${prayer.name}: ${prayer.time} -> ${totalMinutes} minutes`);
+      // console.log(`tttt Prayer ${prayer.name}: ${prayer.time} -> ${totalMinutes} minutes`);
       
       return {
         ...prayer,
@@ -83,11 +86,11 @@
 
     // Find the next prayer for today
     let next = prayerMinutes.find(prayer => prayer.minutes > currentTime);
-    console.log('tttt Next prayer found:', next);
+    // console.log('tttt Next prayer found:', next);
     
     // If no next prayer today, return first prayer for tomorrow
     if (!next) {
-      console.log('tttt No next prayer today, returning first prayer for tomorrow:', prayers[0]);
+      // console.log('tttt No next prayer today, returning first prayer for tomorrow:', prayers[0]);
       return prayers[0];
     }
 
@@ -104,13 +107,13 @@
     const prayer = $prayerHistoryStore?.history?.find(
       p => p.date === today && p.prayerName === prayerName
     );
-    console.log(`Getting status for ${prayerName}:`, prayer?.status);
+    // console.log(`Getting status for ${prayerName}:`, prayer?.status);
     return prayer?.status;
   }
 
   // Add reactive statement to handle prayer history updates
   $: if ($prayerHistoryStore?.history) {
-    console.log('Prayer history updated:', $prayerHistoryStore.history);
+    // console.log('Prayer history updated:', $prayerHistoryStore.history);
     // Force component update
     $prayerTimesStore = [...$prayerTimesStore];
   }
@@ -133,17 +136,40 @@
       nextPrayer = getNextPrayer($prayerTimesStore);
     }
 
-    // Initial data load
-    Promise.all([
-      getPrayerHistory(),
-      fetchPrayerTimes(),
-      updatePrayerStatuses()
-    ]).then(() => {
-      // Update next prayer after data is loaded
-      nextPrayer = getNextPrayer($prayerTimesStore);
-    }).catch(error => {
-      console.error('Error loading initial data:', error);
-    });
+    // Check if we already have data in the store
+    const hasHistoryData = $prayerHistoryStore?.history && $prayerHistoryStore.history.length > 0;
+    const hasPrayerTimes = $prayerTimesStore && $prayerTimesStore.length > 0;
+    
+    if (hasHistoryData && hasPrayerTimes && !initialDataLoaded) {
+      console.log('Using existing data from stores');
+      // Just update prayer statuses without fetching everything
+      isLoadingPrayerData = true;
+      updatePrayerStatuses().then(() => {
+        nextPrayer = getNextPrayer($prayerTimesStore);
+        initialDataLoaded = true;
+        isLoadingPrayerData = false;
+      }).catch(error => {
+        console.error('Error updating prayer statuses:', error);
+        isLoadingPrayerData = false;
+      });
+    } else if (!initialDataLoaded) {
+      // Initial data load only if not already loaded
+      console.log('Loading initial data');
+      isLoadingPrayerData = true;
+      Promise.all([
+        getPrayerHistory(),
+        fetchPrayerTimes(),
+        updatePrayerStatuses()
+      ]).then(() => {
+        // Update next prayer after data is loaded
+        nextPrayer = getNextPrayer($prayerTimesStore);
+        initialDataLoaded = true;
+        isLoadingPrayerData = false;
+      }).catch(error => {
+        console.error('Error loading initial data:', error);
+        isLoadingPrayerData = false;
+      });
+    }
 
     getWeeklyStats().then(stats => {
       weeklyStreak = stats?.streak || 0;
@@ -182,21 +208,29 @@
 
   async function saveSession() {
     if (totalCount > 0) {
-      for (const dhikr of selectedDhikrs) {
-        await saveTasbihSession({
-          dhikr,
-          count,
-          sets,
-          totalCount: Math.floor(totalCount / selectedDhikrs.length) // Distribute count evenly
-        });
+      isLoadingPrayerData = true;
+      try {
+        for (const dhikr of selectedDhikrs) {
+          await saveTasbihSession({
+            dhikr,
+            count,
+            sets,
+            totalCount: Math.floor(totalCount / selectedDhikrs.length) // Distribute count evenly
+          });
+        }
+        const stats = await getWeeklyStats();
+        weeklyStreak = stats?.streak || 0;
+      } catch (error) {
+        console.error('Error saving dhikr session:', error);
+      } finally {
+        isLoadingPrayerData = false;
       }
-      const stats = await getWeeklyStats();
-      weeklyStreak = stats?.streak || 0;
     }
   }
 
   async function exitCounter() {
     if (totalCount > 0) {
+      isLoadingPrayerData = true;
       try {
         for (const dhikr of selectedDhikrs) {
           await saveTasbihSession({
@@ -211,6 +245,8 @@
         weeklyStreak = stats?.streak || 0;
       } catch (error) {
         console.error('Error saving dhikr session:', error);
+      } finally {
+        isLoadingPrayerData = false;
       }
     }
     isCounterMode = false;
@@ -272,7 +308,7 @@
     if (!selectedPrayer) return;
 
     const today = new Date().toLocaleDateString('en-CA');
-    isLoading = true;
+    isLoadingPrayerData = true;
     
     try {
       // First save the prayer status
@@ -304,7 +340,7 @@
       // Fetch fresh data
       await getPrayerHistory();
     } finally {
-      isLoading = false;
+      isLoadingPrayerData = false;
     }
   }
 
@@ -606,9 +642,9 @@
         <button 
           class="mark-btn on-time" 
           on:click={() => markPrayer('ontime')}
-          disabled={isLoading}
+          disabled={isLoadingPrayerData}
         >
-          {#if isLoading}
+          {#if isLoadingPrayerData}
             <div class="loading-spinner"></div>
           {:else}
             <Check weight="bold" />
@@ -618,9 +654,9 @@
         <button 
           class="mark-btn late" 
           on:click={() => markPrayer('late')}
-          disabled={isLoading}
+          disabled={isLoadingPrayerData}
         >
-          {#if isLoading}
+          {#if isLoadingPrayerData}
             <div class="loading-spinner"></div>
           {:else}
             <Clock weight="bold" />
