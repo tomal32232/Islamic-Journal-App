@@ -1139,7 +1139,13 @@
               </div>
             </div>
 
-            <div class="activity-card" on:click={() => navigateTo('tasbih')}>
+            <div class="activity-card" on:click={() => {
+              navigateTo('prayer');
+              // Set the activeTab in Prayer component to 'tasbih'
+              if (typeof window !== 'undefined') {
+                window.localStorage.setItem('prayer_active_tab', 'tasbih');
+              }
+            }}>
               <div class="activity-icon tasbih">
                 <svelte:component this={iconMap.Timer} size={18} weight="fill" color="#216974" />
               </div>
@@ -1242,9 +1248,9 @@
 
 {#if showMoodPopup}
   <MoodPopup
-    period={currentMoodPeriod}
-    onSelect={handleMoodSelect}
-    onSkip={handleMoodSkip}
+    {currentMoodPeriod}
+    on:close={handleMoodClose}
+    on:skip={handleMoodSkip}
   />
 {/if}
 

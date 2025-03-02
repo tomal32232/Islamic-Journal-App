@@ -129,7 +129,17 @@
     });
   }
 
-  onMount(() => {
+  onMount(async () => {
+    // Check if there's a stored active tab
+    if (typeof window !== 'undefined') {
+      const storedTab = window.localStorage.getItem('prayer_active_tab');
+      if (storedTab) {
+        activeTab = storedTab;
+        // Clear the stored tab after using it
+        window.localStorage.removeItem('prayer_active_tab');
+      }
+    }
+
     const container = document.querySelector('.prayer-container');
     if (container) {
       container.addEventListener('scroll', handleScroll);
@@ -167,19 +177,19 @@
       // Initial data load only if not already loaded
       console.log('Loading initial data');
       isLoadingPrayerData = true;
-      Promise.all([
-        getPrayerHistory(),
-        fetchPrayerTimes(),
-        updatePrayerStatuses()
-      ]).then(() => {
-        // Update next prayer after data is loaded
+      try {
+        await Promise.all([
+          getPrayerHistory(),
+          fetchPrayerTimes()
+        ]);
+        
         nextPrayer = getNextPrayer($prayerTimesStore);
         initialDataLoaded = true;
+      } catch (error) {
+        console.error('Error loading prayer data:', error);
+      } finally {
         isLoadingPrayerData = false;
-      }).catch(error => {
-        console.error('Error loading initial data:', error);
-        isLoadingPrayerData = false;
-      });
+      }
     }
 
     getWeeklyStats().then(stats => {
