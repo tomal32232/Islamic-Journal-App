@@ -1421,7 +1421,7 @@ export async function updatePastPrayerStatuses() {
   const today = new Date();
   const todayStr = formatDate(today);
   
-  // Get prayers from the last 7 days that are not marked
+  // Get prayers from the last 7 days that are not marked as ontime, late, or excused
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
   const sevenDaysAgoStr = formatDate(sevenDaysAgo);
@@ -1431,7 +1431,7 @@ export async function updatePastPrayerStatuses() {
     where('userId', '==', user.uid),
     where('date', '>=', sevenDaysAgoStr),
     where('date', '<', todayStr),
-    where('status', 'in', ['upcoming', 'pending', null])
+    where('status', 'not-in', ['ontime', 'late', 'excused'])
   );
   
   const querySnapshot = await getDocs(prayerQuery);
@@ -1440,12 +1440,11 @@ export async function updatePastPrayerStatuses() {
   const excusedPeriods = await getExcusedPeriods();
   
   // Batch update for efficiency
-  const batch = writeBatch(db);
+  let batch = writeBatch(db);
   let count = 0;
   
   for (const doc of querySnapshot.docs) {
     const prayer = doc.data();
-    const prayerId = prayer.prayerId;
     const isExcused = isDateInExcusedPeriod(prayer.date, excusedPeriods);
     
     // Get prayer time for the date
@@ -1475,6 +1474,7 @@ export async function updatePastPrayerStatuses() {
       // Firestore has a limit of 500 operations per batch
       if (count >= 450) {
         await batch.commit();
+        batch = writeBatch(db); // Create new batch
         count = 0;
       }
     }
@@ -1483,6 +1483,9 @@ export async function updatePastPrayerStatuses() {
   if (count > 0) {
     await batch.commit();
   }
+  
+  // After updating, refresh the prayer history
+  await getPrayerHistory();
   
   console.log(`Updated ${count} past prayers`);
 } 

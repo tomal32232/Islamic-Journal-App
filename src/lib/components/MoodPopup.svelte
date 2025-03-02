@@ -61,9 +61,17 @@
       <path d="M19.07 4.93l-1.41 1.41" stroke-linecap="round" />
     </svg>`,
     evening: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <path d="M12 3a9 9 0 1 0 9 9" />
-      <path d="M12 3v9l5.2 3.2" />
-      <path d="M21 12h-9" />
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v2" stroke-linecap="round" />
+      <path d="M12 20v2" stroke-linecap="round" />
+      <path d="M4.93 4.93l1.41 1.41" stroke-linecap="round" />
+      <path d="M17.66 17.66l1.41 1.41" stroke-linecap="round" />
+      <path d="M2 12h2" stroke-linecap="round" />
+      <path d="M20 12h2" stroke-linecap="round" />
+      <path d="M6.34 17.66l-1.41 1.41" stroke-linecap="round" />
+      <path d="M19.07 4.93l-1.41 1.41" stroke-linecap="round" />
+      <path d="M12 12L12 16" stroke-linecap="round" />
+      <path d="M9 14L12 16L15 14" stroke-linecap="round" stroke-linejoin="round" />
     </svg>`
   };
 </script>

@@ -18,7 +18,8 @@
     saveExcusedPeriod,
     endExcusedPeriod,
     getActiveExcusedPeriod,
-    cache as prayerHistoryCache
+    cache as prayerHistoryCache,
+    updatePastPrayerStatuses
   } from '../stores/prayerHistoryStore';
   import WeeklyPrayerHistory from '../components/WeeklyPrayerHistory.svelte';
   import { createEventDispatcher } from 'svelte';
@@ -439,8 +440,6 @@
   }
 
   async function updatePrayerStatus() {
-    console.log('pppp Starting updatePrayerStatus...');
-    
     // Check if document is visible (skip updates when app is in background)
     if (document.hidden) {
       console.log('pppp Skipping update - app is in background');
@@ -459,33 +458,15 @@
     isLoadingPrayers = true;
     
     try {
+      // Update past prayer statuses first
+      await updatePastPrayerStatuses();
+      
       // Check if we have data in the store
       if (!$prayerTimesStore || $prayerTimesStore.length === 0) {
         console.log('pppp No prayer times in store, fetching...');
         await fetchPrayerTimes();
-      } else {
-        // Check if we need to fetch new prayer times (after midnight)
-        const now = new Date();
-        const lastFetchDate = $prayerTimesStore[0]?.fetchDate;
-        
-        if (lastFetchDate) {
-          const lastFetch = new Date(lastFetchDate);
-          const isSameDay = lastFetch.getDate() === now.getDate() && 
-                           lastFetch.getMonth() === now.getMonth() &&
-                           lastFetch.getFullYear() === now.getFullYear();
-                           
-          if (!isSameDay) {
-            console.log('pppp New day detected, fetching new prayer times...');
-            await fetchPrayerTimes();
-          } else {
-            console.log('pppp Using cached prayer times from same day');
-          }
-        } else {
-          console.log('pppp No fetch date found, fetching new prayer times...');
-          await fetchPrayerTimes();
-        }
       }
-
+      
       // Only fetch prayer history if we don't have it or if it's stale
       if (!$prayerHistoryStore?.history || !prayerHistoryCache.lastFetched) {
         console.log('pppp No prayer history in store or cache expired, fetching...');
