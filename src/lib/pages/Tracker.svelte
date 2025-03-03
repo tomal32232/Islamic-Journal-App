@@ -562,9 +562,9 @@
     <!-- Prayer Streak Card -->
     <div class="insight-card">
       <div class="card-header" on:click={() => toggleTooltip('prayer_streak')}>
-        <Timer weight="fill" size={24} />
+        <Timer weight="fill" size={20} />
         <h2>Prayer Streak</h2>
-        <Info size={16} weight="bold" class="info-icon" />
+        <Info size={14} weight="bold" class="info-icon" />
       </div>
       {#if activeTooltip === 'prayer_streak'}
         <div class="tooltip" transition:fade>
@@ -580,9 +580,9 @@
     <!-- On-Time Rate Card -->
     <div class="insight-card">
       <div class="card-header" on:click={() => toggleTooltip('on_time_rate')}>
-        <ChartLine weight="fill" size={24} />
+        <ChartLine weight="fill" size={20} />
         <h2>On-Time Rate</h2>
-        <Info size={16} weight="bold" class="info-icon" />
+        <Info size={14} weight="bold" class="info-icon" />
       </div>
       {#if activeTooltip === 'on_time_rate'}
         <div class="tooltip" transition:fade>
@@ -600,9 +600,9 @@
     <!-- Dhikr Streak Card -->
     <div class="insight-card">
       <div class="card-header" on:click={() => toggleTooltip('dhikr_streak')}>
-        <HandsPraying weight="fill" size={24} />
+        <HandsPraying weight="fill" size={20} />
         <h2>Dhikr Streak</h2>
-        <Info size={16} weight="bold" class="info-icon" />
+        <Info size={14} weight="bold" class="info-icon" />
       </div>
       {#if activeTooltip === 'dhikr_streak'}
         <div class="tooltip" transition:fade>
@@ -625,7 +625,7 @@
           <path d="M12 13c0 2.5 2 3 2 3s-2 .5-2 3"/>
         </svg>
         <h2>Quran Streak</h2>
-        <Info size={16} weight="bold" class="info-icon" />
+        <Info size={14} weight="bold" class="info-icon" />
       </div>
       {#if activeTooltip === 'quran_streak'}
         <div class="tooltip" transition:fade>
@@ -651,9 +651,9 @@
   <!-- Prayer Time Analysis -->
   <div class="analysis-card">
     <div class="card-header" on:click={() => toggleTooltip('prayer_analysis')}>
-      <Brain weight="fill" size={24} />
+      <Brain weight="fill" size={20} />
       <h2>Prayer Time Analysis</h2>
-      <Info size={16} weight="bold" class="info-icon" />
+      <Info size={14} weight="bold" class="info-icon" />
     </div>
     {#if activeTooltip === 'prayer_analysis'}
       <div class="tooltip" transition:fade>
@@ -684,9 +684,9 @@
   <div class="insights-grid">
     <div class="insight-card">
       <div class="card-header" on:click={() => toggleTooltip('mood_streak')}>
-        <Brain weight="fill" size={24} />
+        <Brain weight="fill" size={20} />
         <h2>Mood Streak</h2>
-        <Info size={16} weight="bold" class="info-icon" />
+        <Info size={14} weight="bold" class="info-icon" />
       </div>
       {#if activeTooltip === 'mood_streak'}
         <div class="tooltip" transition:fade>
@@ -701,9 +701,9 @@
 
     <div class="insight-card">
       <div class="card-header" on:click={() => toggleTooltip('common_mood')}>
-        <Heart weight="fill" size={24} />
+        <Heart weight="fill" size={20} />
         <h2>Most Common Mood</h2>
-        <Info size={16} weight="bold" class="info-icon" />
+        <Info size={14} weight="bold" class="info-icon" />
       </div>
       {#if activeTooltip === 'common_mood'}
         <div class="tooltip" transition:fade>
@@ -732,9 +732,9 @@
   <!-- Mood & Prayer Patterns -->
   <div class="analysis-card">
     <div class="card-header" on:click={() => toggleTooltip('mood_patterns')}>
-      <Brain weight="fill" size={24} />
+      <Brain weight="fill" size={20} />
       <h2>Daily Mood Patterns</h2>
-      <Info size={16} weight="bold" class="info-icon" />
+      <Info size={14} weight="bold" class="info-icon" />
     </div>
     {#if activeTooltip === 'mood_patterns'}
       <div class="tooltip" transition:fade>
@@ -774,13 +774,13 @@
 
   h1 {
     color: #216974;
-    font-size: 1.5rem;
+    font-size: 1.25rem;
     margin-bottom: 0.5rem;
   }
 
   .subtitle {
     color: #666;
-    font-size: 0.875rem;
+    font-size: 0.75rem;
     margin-bottom: 1.5rem;
   }
 
@@ -794,14 +794,14 @@
   .insight-card {
     background: white;
     border-radius: 12px;
-    padding: 1rem;
+    padding: 0.75rem;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
   }
 
   .analysis-card {
     background: white;
     border-radius: 12px;
-    padding: 1rem;
+    padding: 0.75rem;
     margin-bottom: 1.5rem;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
   }
@@ -810,12 +810,17 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    margin-bottom: 1rem;
+    margin-bottom: 0.75rem;
     color: #216974;
     cursor: pointer;
     padding: 0.5rem;
     border-radius: 8px;
     transition: background-color 0.2s;
+  }
+
+  .card-header h2 {
+    font-size: 0.95rem;
+    margin: 0;
   }
 
   .card-header:hover {
@@ -832,20 +837,20 @@
     color: white;
     padding: 0.75rem;
     border-radius: 8px;
-    font-size: 0.875rem;
+    font-size: 0.75rem;
     line-height: 1.4;
     margin: -0.5rem 0 1rem;
   }
 
   .big-number {
-    font-size: 1.75rem;
+    font-size: 1.25rem;
     font-weight: 600;
     color: #216974;
     margin-bottom: 0.25rem;
   }
 
   .sub-text {
-    font-size: 0.875rem;
+    font-size: 0.75rem;
     color: #666;
   }
 
@@ -871,13 +876,13 @@
   }
 
   .prayer-name {
-    font-size: 0.875rem;
+    font-size: 0.8rem;
     color: #216974;
     font-weight: 500;
   }
 
   .progress-bar-container {
-    height: 8px;
+    height: 6px;
     background: #f1f5f9;
     border-radius: 4px;
     overflow: hidden;
@@ -891,7 +896,7 @@
   }
 
   .prayer-rate {
-    font-size: 0.875rem;
+    font-size: 0.75rem;
     color: #666;
     text-align: right;
     min-width: 45px;
@@ -900,7 +905,7 @@
   .patterns-list {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: 0.75rem;
   }
 
   .pattern-item {
@@ -914,8 +919,8 @@
   }
 
   .pattern-icon {
-    width: 1.5rem;
-    height: 1.5rem;
+    width: 1.25rem;
+    height: 1.25rem;
     color: #216974;
     display: flex;
     align-items: center;
@@ -929,14 +934,14 @@
   }
 
   .pattern-content h3 {
-    font-size: 1.5rem;
+    font-size: 1rem;
     font-weight: 600;
     color: #216974;
     margin: 0 0 0.25rem 0;
   }
 
   .pattern-content p {
-    font-size: 0.875rem;
+    font-size: 0.75rem;
     color: #666;
     margin: 0;
   }
@@ -950,7 +955,7 @@
   }
 
   .change-rate {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     padding: 0.125rem 0.25rem;
     border-radius: 4px;
     min-width: 45px;
@@ -990,8 +995,8 @@
   }
 
   .mood-icon.small {
-    width: 1.5rem;
-    height: 1.5rem;
+    width: 1.25rem;
+    height: 1.25rem;
     color: #216974;
     flex-shrink: 0;
   }
@@ -1011,7 +1016,7 @@
     }
 
     .big-number {
-      font-size: 1.5rem;
+      font-size: 1.25rem;
     }
   }
 
@@ -1020,6 +1025,7 @@
     color: #666;
     font-style: italic;
     margin: 1rem 0;
+    font-size: 0.75rem;
   }
 
   .quran-streak {
@@ -1027,8 +1033,8 @@
   }
 
   .quran-icon {
-    width: 24px;
-    height: 24px;
+    width: 20px;
+    height: 20px;
   }
 
   .test-button {
@@ -1039,6 +1045,7 @@
     border-radius: 4px;
     margin-bottom: 1rem;
     cursor: pointer;
+    font-size: 0.8rem;
   }
 
   .test-button:hover {
