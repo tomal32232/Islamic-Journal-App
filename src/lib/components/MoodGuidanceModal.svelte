@@ -244,12 +244,13 @@
   }
 
   .mood-icon {
-    width: 4rem;
-    height: 4rem;
-    color: #216974;
-    background: rgba(33, 105, 116, 0.1);
-    padding: 1.25rem;
+    width: 6rem;
+    height: 6rem;
+    background: none;
+    padding: 0;
     border-radius: 50%;
+    margin-bottom: 1.5rem;
+    color: #216974;
   }
 
   .title {

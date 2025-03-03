@@ -36,10 +36,10 @@
   const moods = [
     { 
       icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-        <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" />
-        <path d="M8 13C8.5 15 10.5 16 12 16C13.5 16 15.5 15 16 13" stroke-linecap="round" />
-        <path d="M9 9H9.01" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" />
-        <path d="M15 9H15.01" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" />
+        <circle cx="12" cy="12" r="10" />
+        <path d="M8 14C8.5 16 10.5 17 12 17C13.5 17 15.5 16 16 14" stroke-linecap="round" />
+        <circle cx="9" cy="9" r="1" />
+        <circle cx="15" cy="9" r="1" />
       </svg>`,
       name: 'Grateful',
       description: 'Alhamdulillah',
@@ -47,10 +47,9 @@
     },
     {
       icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-        <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" />
-        <path d="M12 7V12L14.5 14.5" stroke-linecap="round" stroke-linejoin="round" />
-        <path d="M7.5 12H8.5" stroke-linecap="round" stroke-linejoin="round" />
-        <path d="M15.5 12H16.5" stroke-linecap="round" stroke-linejoin="round" />
+        <circle cx="12" cy="12" r="10" />
+        <circle cx="12" cy="10" r="2" />
+        <path d="M7 17C8.5 15.5 10.5 14.5 12 14.5C13.5 14.5 15.5 15.5 17 17" stroke-linecap="round" />
       </svg>`,
       name: 'Seeking Peace',
       description: 'Sabr',
@@ -58,9 +57,9 @@
     },
     {
       icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-        <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" />
-        <path d="M12 16L12 7" stroke-linecap="round" />
-        <path d="M9 13L12 16L15 13" stroke-linecap="round" stroke-linejoin="round" />
+        <circle cx="12" cy="12" r="10" />
+        <path d="M8 12L12 8L16 12" stroke-linecap="round" stroke-linejoin="round" />
+        <path d="M12 8L12 16" stroke-linecap="round" />
       </svg>`,
       name: 'Hopeful',
       description: 'InshaAllah',
@@ -68,10 +67,10 @@
     },
     {
       icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-        <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" />
-        <path d="M8 15H16" stroke-linecap="round" />
-        <path d="M9 9H9.01" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" />
-        <path d="M15 9H15.01" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" />
+        <circle cx="12" cy="12" r="10" />
+        <path d="M8 14L16 14" stroke-linecap="round" />
+        <circle cx="9" cy="9" r="1" />
+        <circle cx="15" cy="9" r="1" />
       </svg>`,
       name: 'Anxious',
       description: 'Ya Allah',
@@ -79,9 +78,9 @@
     },
     {
       icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-        <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" />
-        <path d="M12 7V12" stroke-linecap="round" />
-        <path d="M12 16H12.01" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" />
+        <circle cx="12" cy="12" r="10" />
+        <path d="M12 8V12" stroke-linecap="round" />
+        <circle cx="12" cy="16" r="1" />
       </svg>`,
       name: 'Reflecting',
       description: 'SubhanAllah',
@@ -89,10 +88,9 @@
     },
     {
       icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-        <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" />
-        <path d="M12 16L12 7" stroke-linecap="round" />
-        <path d="M15 10L12 7L9 10" stroke-linecap="round" stroke-linejoin="round" />
-        <path d="M9 14L12 16L15 14" stroke-linecap="round" stroke-linejoin="round" />
+        <circle cx="12" cy="12" r="10" />
+        <path d="M7 11L12 7L17 11" stroke-linecap="round" stroke-linejoin="round" />
+        <path d="M7 15L12 19L17 15" stroke-linecap="round" stroke-linejoin="round" />
       </svg>`,
       name: 'Blessed',
       description: 'MashaAllah',

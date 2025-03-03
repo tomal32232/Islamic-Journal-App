@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { Timer, ChartLine, Heart, Brain, HandsPraying, Info } from 'phosphor-svelte';
-  import { prayerHistoryStore, getPrayerHistory } from '../stores/prayerHistoryStore';
+  import { prayerHistoryStore, getPrayerHistory, ensurePrayerData } from '../stores/prayerHistoryStore';
   import { moodHistoryStore, getMoodHistory } from '../stores/moodStore';
   import { auth } from '../firebase';
   import { quranHistoryStore, getQuranHistory, addTestQuranReading } from '../stores/quranHistoryStore';
@@ -156,6 +156,14 @@
     calculateInsights();
   });
 
+  // Function to manually initialize prayer data for testing
+  async function initializePrayerData() {
+    console.log('Manually initializing prayer data');
+    await ensurePrayerData();
+    await getPrayerHistory();
+    calculateInsights();
+  }
+
   // Subscribe to weeklyStatsStore changes
   $: if ($weeklyStatsStore) {
     dhikrStreak = $weeklyStatsStore.streak || 0;
@@ -167,6 +175,7 @@
     if (!$prayerHistoryStore.history) return;
 
     console.log('Prayer History:', $prayerHistoryStore.history);
+    console.log('Raw Prayer History Store:', JSON.stringify($prayerHistoryStore));
 
     // Calculate prayer streak and on-time rate
     const today = new Date();
@@ -179,6 +188,30 @@
       new Date(b.date).getTime() - new Date(a.date).getTime()
     );
     console.log('Sorted Prayers:', sortedPrayers);
+
+    // Check if we have any prayer data for the current week
+    const currentWeekPrayers = sortedPrayers.filter(prayer => {
+      const prayerDate = new Date(prayer.date);
+      return prayerDate >= sevenDaysAgo && prayerDate <= today;
+    });
+    
+    console.log('Current week prayers:', currentWeekPrayers);
+    
+    // If no data for current week, set default values
+    if (currentWeekPrayers.length === 0) {
+      console.log('No prayer data for current week, setting default values');
+      Object.keys(prayerAnalysis).forEach(prayer => {
+        prayerAnalysis[prayer] = {
+          rate: 0,
+          change: 0
+        };
+      });
+      prayerStreak = 0;
+      longestStreak = 0;
+      onTimeRate = 0;
+      onTimeChange = 0;
+      return;
+    }
 
     // Group prayers by date
     const prayersByDate = {};
@@ -237,8 +270,7 @@
     longestStreak = maxStreak;
     console.log('Final streak:', prayerStreak, 'Longest streak:', longestStreak);
 
-    let totalPrayers = 0;
-    let onTimePrayers = 0;
+    // Initialize prayer counts
     const prayerCounts = {
       Fajr: { total: 0, completed: 0, lastWeekTotal: 0, lastWeekCompleted: 0 },
       Dhuhr: { total: 0, completed: 0, lastWeekTotal: 0, lastWeekCompleted: 0 },
@@ -248,7 +280,7 @@
     };
 
     // Process prayer history
-    let currentWeekPrayers = 0;
+    let currentWeekPrayersCount = 0;
     let currentWeekOnTime = 0;
     let lastWeekPrayers = 0;
     let lastWeekOnTime = 0;
@@ -265,7 +297,7 @@
         if (prayer.status === 'ontime') {
           currentWeekOnTime++;
         }
-        currentWeekPrayers++;
+        currentWeekPrayersCount++;
       } else {
         // Last week's data
         const lastWeekStart = new Date(sevenDaysAgo);
@@ -284,12 +316,26 @@
     });
 
     // Calculate on-time rates
-    const currentWeekRate = currentWeekPrayers > 0 ? (currentWeekOnTime / currentWeekPrayers) * 100 : 0;
+    const currentWeekRate = currentWeekPrayersCount > 0 ? (currentWeekOnTime / currentWeekPrayersCount) * 100 : 0;
     const lastWeekRate = lastWeekPrayers > 0 ? (lastWeekOnTime / lastWeekPrayers) * 100 : 0;
     
     // Calculate the change in percentage points
     onTimeChange = Math.round(currentWeekRate - lastWeekRate);
     onTimeRate = Math.round(currentWeekRate);
+
+    // Check if we have any actual prayer data
+    const hasPrayerData = Object.values(prayerCounts).some(count => count.total > 0);
+    
+    if (!hasPrayerData) {
+      console.log('No prayer data found, setting default values');
+      Object.keys(prayerAnalysis).forEach(prayer => {
+        prayerAnalysis[prayer] = {
+          rate: 0,
+          change: 0
+        };
+      });
+      return;
+    }
 
     // Calculate completion rate and growth for each prayer
     Object.keys(prayerCounts).forEach(prayer => {
@@ -298,13 +344,20 @@
       const lastWeekTotal = prayerCounts[prayer].lastWeekTotal;
       const lastWeekCompleted = prayerCounts[prayer].lastWeekCompleted;
 
+      console.log(`Prayer ${prayer}: total=${total}, completed=${completed}, lastWeekTotal=${lastWeekTotal}, lastWeekCompleted=${lastWeekCompleted}`);
+
+      // If there's no prayer data (total is 0), set a default rate of 0 instead of showing 100%
       const currentRate = total > 0 ? (completed / total) * 100 : 0;
       const lastWeekRate = lastWeekTotal > 0 ? (lastWeekCompleted / lastWeekTotal) * 100 : 0;
+      
+      console.log(`Prayer ${prayer}: currentRate=${currentRate}, lastWeekRate=${lastWeekRate}`);
       
       prayerAnalysis[prayer] = {
         rate: Math.round(currentRate),
         change: Math.round(currentRate - lastWeekRate)
       };
+      
+      console.log(`Prayer ${prayer} analysis:`, prayerAnalysis[prayer]);
     });
 
     // Process mood history
@@ -558,6 +611,15 @@
   <h1>Smart Worship Insights</h1>
   <p class="subtitle">Your spiritual journey patterns</p>
 
+  {#if import.meta.env.DEV}
+    <button 
+      class="test-button"
+      on:click={initializePrayerData}
+    >
+      Initialize Prayer Data
+    </button>
+  {/if}
+
   <div class="insights-grid">
     <!-- Prayer Streak Card -->
     <div class="insight-card">
@@ -661,22 +723,26 @@
       </div>
     {/if}
     <div class="prayer-analysis">
-      {#each Object.entries(prayerAnalysis) as [prayer, stats]}
-        <div class="prayer-row">
-          <span class="prayer-name">{prayer}</span>
-          <div class="progress-bar-container">
-            <div class="progress-bar" style="width: {stats.rate}%"></div>
+      {#if Object.values(prayerAnalysis).every(stats => stats.rate === 100 && stats.change === 0)}
+        <p class="no-data-message">No prayer data available for the current week. Complete your prayers to see analysis.</p>
+      {:else}
+        {#each Object.entries(prayerAnalysis) as [prayer, stats]}
+          <div class="prayer-row">
+            <span class="prayer-name">{prayer}</span>
+            <div class="progress-bar-container">
+              <div class="progress-bar" style="width: {stats.rate}%"></div>
+            </div>
+            <div class="prayer-stats">
+              <span class="prayer-rate">{stats.rate}%</span>
+              {#if stats.change !== 0}
+                <span class="change-rate {stats.change >= 0 ? 'positive' : 'negative'}">
+                  {stats.change >= 0 ? '+' : ''}{stats.change}%
+                </span>
+              {/if}
+            </div>
           </div>
-          <div class="prayer-stats">
-            <span class="prayer-rate">{stats.rate}%</span>
-            {#if stats.change !== 0}
-              <span class="change-rate {stats.change >= 0 ? 'positive' : 'negative'}">
-                {stats.change >= 0 ? '+' : ''}{stats.change}%
-              </span>
-            {/if}
-          </div>
-        </div>
-      {/each}
+        {/each}
+      {/if}
     </div>
   </div>
 
@@ -1050,5 +1116,13 @@
 
   .test-button:hover {
     opacity: 0.9;
+  }
+
+  .no-data-message {
+    text-align: center;
+    color: #666;
+    font-style: italic;
+    margin: 1rem 0;
+    font-size: 0.75rem;
   }
 </style> 
