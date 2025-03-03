@@ -43,6 +43,7 @@
   import QuranReading from '../components/QuranReading.svelte';
   import LocationPermissionDialog from '../components/LocationPermissionDialog.svelte';
   import MoodPopup from '../components/MoodPopup.svelte';
+  import MoodCalendarPopup from '../components/MoodCalendarPopup.svelte';
   const dispatch = createEventDispatcher();
   
   let currentPage = 'home';
@@ -86,6 +87,8 @@
   let lastPrayerStatusUpdate: number = 0;
   // Minimum time between updates (5 seconds)
   const MIN_UPDATE_INTERVAL: number = 5000;
+
+  let showMoodCalendarPopup = false;
 
   async function checkAndSetAdminStatus() {
     const firebaseAuth = getAuth();
@@ -1085,6 +1088,21 @@
     const result = await addSeekingPeaceGuidance();
     console.log('Result of adding seeking_peace guidance:', result);
   }
+
+  function handleMoodCalendarClick() {
+    showMoodCalendarPopup = true;
+  }
+
+  function handleMoodCalendarClose() {
+    showMoodCalendarPopup = false;
+  }
+
+  function handleMoodCalendarSelect(event) {
+    // Handle mood selection from calendar
+    const selectedMood = event.detail;
+    selectedHistoryMood = selectedMood;
+    showMoodCalendarPopup = false;
+  }
 </script>
 
 <div class="home-container">
@@ -1246,6 +1264,17 @@
                 {/if}
               </div>
             {/each}
+            
+            <!-- Mood Calendar Button -->
+            <button class="mood-calendar-button" on:click={handleMoodCalendarClick} title="View Mood Calendar">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                <line x1="16" y1="2" x2="16" y2="6" />
+                <line x1="8" y1="2" x2="8" y2="6" />
+                <line x1="3" y1="10" x2="21" y2="10" />
+                <circle cx="12" cy="15" r="2" />
+              </svg>
+            </button>
           </div>
         </div>
 
@@ -1418,6 +1447,14 @@
     <button on:click={testSeekingPeaceMood}>Test Seeking Peace</button>
     <button on:click={handleAddSeekingPeaceGuidance}>Add Seeking Peace Guidance</button>
   </div>
+{/if}
+
+{#if showMoodCalendarPopup}
+  <MoodCalendarPopup 
+    moods={moods}
+    onClose={handleMoodCalendarClose}
+    on:select={handleMoodCalendarSelect}
+  />
 {/if}
 
 <style>
@@ -2498,6 +2535,30 @@
     font-style: italic;
     margin: 0;
     line-height: 1.4;
+  }
+
+  .mood-calendar-button {
+    width: 3.5rem;
+    height: 100%;
+    background: #F8FAFC;
+    border: 1px solid #E2E8F0;
+    border-left: none;
+    border-radius: 0 12px 12px 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: #216974;
+    transition: all 0.2s;
+  }
+
+  .mood-calendar-button svg {
+    width: 1.5rem;
+    height: 1.5rem;
+  }
+
+  .mood-calendar-button:hover {
+    background: #E6F7F9;
   }
 </style>
 
