@@ -28,23 +28,76 @@
   async function fetchRandomGuidance() {
     if (!mood) return;
     
+    console.log('Fetching guidance for mood:', mood.value);
+    // Check if there's any whitespace or special characters in the mood value
+    console.log('Mood value characters:', [...mood.value].map(c => `'${c}' (${c.charCodeAt(0)})`));
+    
     try {
       // First try to refresh guidance data from Google Sheets
       await fetchMoodGuidance();
       
       // Then fetch from Firestore
       const guidanceRef = collection(db, 'moodGuidance');
-      const q = query(guidanceRef, where('mood', '==', mood.value));
+      
+      // Normalize the mood value - convert underscores to spaces for querying
+      const normalizedMoodValue = mood.value.replace('_', ' ');
+      console.log('Normalized mood value for query:', normalizedMoodValue);
+      
+      // If the selected mood is 'seeking_peace', let's try a direct query with the normalized value
+      if (mood.value === 'seeking_peace') {
+        console.log('Trying direct query for seeking peace (normalized)');
+        
+        // Try with the normalized value
+        const directQuery = query(guidanceRef, where('mood', '==', 'seeking peace'));
+        const directSnapshot = await getDocs(directQuery);
+        console.log('Direct query for seeking peace - empty?', directSnapshot.empty);
+        console.log('Direct query for seeking peace - size:', directSnapshot.size);
+        
+        if (!directSnapshot.empty) {
+          console.log('Found guidance with direct query!');
+          const guidances = directSnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          })) as Guidance[];
+          guidance = guidances[Math.floor(Math.random() * guidances.length)];
+          loading = false;
+          return;
+        } else {
+          console.log('Direct query found no results, trying with original query');
+        }
+      }
+      
+      // Use the normalized mood value for the query
+      const q = query(guidanceRef, where('mood', '==', normalizedMoodValue));
+      console.log('Firestore query for mood:', normalizedMoodValue);
+      
+      // Let's also try to get all mood guidance entries to see what's available
+      const allGuidanceQuery = await getDocs(collection(db, 'moodGuidance'));
+      console.log('All available moods in database:', 
+        allGuidanceQuery.docs.map(doc => doc.data().mood)
+          .filter((value, index, self) => self.indexOf(value) === index));
+      
       const querySnapshot = await getDocs(q);
+      console.log('Query snapshot empty?', querySnapshot.empty);
+      console.log('Query snapshot size:', querySnapshot.size);
       
       if (!querySnapshot.empty) {
         // Get all documents for this mood
-        const guidances = querySnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        })) as Guidance[];
+        const guidances = querySnapshot.docs.map(doc => {
+          console.log('Document data:', doc.data());
+          return {
+            id: doc.id,
+            ...doc.data()
+          };
+        }) as Guidance[];
+        
+        console.log('Found guidances:', guidances.length);
         // Select a random guidance
         guidance = guidances[Math.floor(Math.random() * guidances.length)];
+        console.log('Selected guidance:', guidance);
+      } else {
+        console.log('No guidance found for mood:', normalizedMoodValue);
+        guidance = null;
       }
     } catch (error) {
       console.error('Error fetching guidance:', error);
@@ -58,6 +111,7 @@
   }
 
   $: if (mood) {
+    console.log('Mood changed to:', mood.value);
     loading = true;
     fetchRandomGuidance();
   }

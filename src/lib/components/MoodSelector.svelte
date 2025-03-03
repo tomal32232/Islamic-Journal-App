@@ -7,10 +7,12 @@
   let selectedMood = null;
 
   function handleMoodClick(mood) {
+    console.log('Mood clicked:', mood.value);
     selectedMood = mood;
   }
 
   function handleModalClose() {
+    console.log('Modal closed, dispatching selected mood:', selectedMood.value);
     dispatch('select', {
       value: selectedMood.value,
       name: selectedMood.name,
@@ -23,6 +25,7 @@
 
   function handleNextClick() {
     if (selectedMood) {
+      console.log('Next clicked for mood:', selectedMood.value);
       // Open the guidance modal
       showGuidanceModal = true;
     }
@@ -96,6 +99,11 @@
       value: 'blessed'
     }
   ];
+
+  console.log('Available moods:', moods.map(m => m.value));
+  console.log('Seeking peace mood in MoodSelector:', moods.find(m => m.value === 'seeking_peace'));
+  console.log('Seeking peace mood value characters:', 
+    [...moods.find(m => m.value === 'seeking_peace').value].map(c => `'${c}' (${c.charCodeAt(0)})`));
 </script>
 
 {#if showSelector}

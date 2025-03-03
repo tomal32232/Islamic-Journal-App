@@ -39,7 +39,7 @@
   import { notificationPermissionStore, checkNotificationPermission } from '../services/notificationService';
   import NotificationPermissionDialog from '../components/NotificationPermissionDialog.svelte';
   import { checkAdminStatus } from '../services/adminService';
-  import { fetchMoodGuidance } from '../services/moodGuidanceService';
+  import { fetchMoodGuidance, addSeekingPeaceGuidance } from '../services/moodGuidanceService';
   import QuranReading from '../components/QuranReading.svelte';
   import LocationPermissionDialog from '../components/LocationPermissionDialog.svelte';
   import MoodPopup from '../components/MoodPopup.svelte';
@@ -390,6 +390,10 @@
     }
   ];
 
+  // Add this right after the moods array definition
+  console.log('Moods array in Home.svelte:', moods);
+  console.log('Seeking peace mood in Home.svelte:', moods.find(m => m.value === 'seeking_peace'));
+
   $: {
     const today = new Date().toISOString().split('T')[0];
     if ($prayerHistoryStore?.history) {
@@ -657,10 +661,13 @@
 
   async function handleMoodSubmit(selectedMood: any, period: MoodPeriod): Promise<void> {
     try {
+      console.log('handleMoodSubmit called with mood:', selectedMood.value, 'period:', period);
       await saveMood(selectedMood, selectedMood.guidance, period);
       
       // Use the local mood template to ensure we have the icon
       const matchingMood = moods.find(m => m.value === selectedMood.value);
+      console.log('Found matching mood:', matchingMood ? matchingMood.value : 'none');
+      
       if (matchingMood) {
         const moodData = {
           value: selectedMood.value,
@@ -669,11 +676,15 @@
           description: matchingMood.description,
           guidance: selectedMood.guidance
         };
+        
+        console.log('Created mood data:', moodData.value);
 
         if (period === 'morning') {
           currentMorningMood = moodData;
+          console.log('Set currentMorningMood');
         } else {
           currentEveningMood = moodData;
+          console.log('Set currentEveningMood');
         }
       }
       await loadWeekMoods();
@@ -699,24 +710,76 @@
     try {
       await getMoodHistory(7);
       const moodsFromDb = get(moodHistoryStore);
-      weekMoods = moodsFromDb.reduce((acc, mood) => {
+      console.log('Raw moods from DB:', JSON.stringify(moodsFromDb));
+      
+      // Check for duplicate mood entries (same date and period)
+      const moodsByDateAndPeriod: Record<string, any[]> = {};
+      moodsFromDb.forEach(mood => {
+        const key = `${mood.date}_${mood.period}`;
+        if (!moodsByDateAndPeriod[key]) {
+          moodsByDateAndPeriod[key] = [];
+        }
+        moodsByDateAndPeriod[key].push(mood);
+      });
+      
+      // Log any duplicates found
+      Object.entries(moodsByDateAndPeriod).forEach(([key, moods]) => {
+        if (moods.length > 1) {
+          console.log(`Found ${moods.length} duplicate moods for ${key}:`, moods);
+        }
+      });
+      
+      // Use the most recent mood for each date and period
+      const uniqueMoods = Object.values(moodsByDateAndPeriod).map(moods => {
+        // Sort by timestamp descending and take the first one
+        return moods.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
+      });
+      
+      console.log('Unique moods after deduplication:', uniqueMoods);
+      
+      weekMoods = uniqueMoods.reduce((acc, mood) => {
         if (!acc[mood.date]) {
           acc[mood.date] = {};
         }
         acc[mood.date][mood.period] = mood;
+        console.log(`Setting mood for ${mood.date}, period ${mood.period}:`, mood);
         return acc;
       }, {});
 
+      console.log('Processed weekMoods:', JSON.stringify(weekMoods));
+
       // Check if we have moods for today
       const today = new Date().toLocaleDateString();
+      console.log('Today is:', today);
       const todayMoods = weekMoods[today] || {};
+      console.log('Today moods:', JSON.stringify(todayMoods));
       
       // Get prayer times to determine which mood selector to show
       const prayerTimes = get(prayerTimesStore);
-      const { showMorningMood, showEveningMood } = shouldShowMoodSelector(prayerTimes);
+      const selectorInfo = shouldShowMoodSelector(prayerTimes);
+      const showMorningMood = selectorInfo ? selectorInfo.showMorningMood : false;
+      const showEveningMood = selectorInfo ? selectorInfo.showEveningMood : false;
 
       if (todayMoods.morning) {
-        const matchingMood = moods.find(m => m.value === todayMoods.morning.mood);
+        console.log('Found morning mood:', todayMoods.morning.mood);
+        // Try to find a direct match first
+        let matchingMood = moods.find(m => m.value === todayMoods.morning.mood);
+        
+        // If no match found, try converting spaces to underscores
+        if (!matchingMood) {
+          const normalizedValue = todayMoods.morning.mood.replace(/\s+/g, '_');
+          console.log('Trying normalized value with underscores:', normalizedValue);
+          matchingMood = moods.find(m => m.value === normalizedValue);
+        }
+        
+        // If still no match, try converting underscores to spaces
+        if (!matchingMood) {
+          const denormalizedValue = todayMoods.morning.mood.replace(/_+/g, ' ');
+          console.log('Trying denormalized value with spaces:', denormalizedValue);
+          matchingMood = moods.find(m => m.value === denormalizedValue);
+        }
+        
+        console.log('Matching mood from array:', matchingMood ? matchingMood.value : 'none');
         if (matchingMood) {
           currentMorningMood = {
             value: todayMoods.morning.mood,
@@ -724,11 +787,30 @@
             icon: matchingMood.icon,
             description: matchingMood.description
           };
+          console.log('Set currentMorningMood:', currentMorningMood.value);
         }
       }
 
       if (todayMoods.evening) {
-        const matchingMood = moods.find(m => m.value === todayMoods.evening.mood);
+        console.log('Found evening mood:', todayMoods.evening.mood);
+        // Try to find a direct match first
+        let matchingMood = moods.find(m => m.value === todayMoods.evening.mood);
+        
+        // If no match found, try converting spaces to underscores
+        if (!matchingMood) {
+          const normalizedValue = todayMoods.evening.mood.replace(/\s+/g, '_');
+          console.log('Trying normalized value with underscores:', normalizedValue);
+          matchingMood = moods.find(m => m.value === normalizedValue);
+        }
+        
+        // If still no match, try converting underscores to spaces
+        if (!matchingMood) {
+          const denormalizedValue = todayMoods.evening.mood.replace(/_+/g, ' ');
+          console.log('Trying denormalized value with spaces:', denormalizedValue);
+          matchingMood = moods.find(m => m.value === denormalizedValue);
+        }
+        
+        console.log('Matching mood from array:', matchingMood ? matchingMood.value : 'none');
         if (matchingMood) {
           currentEveningMood = {
             value: todayMoods.evening.mood,
@@ -736,6 +818,7 @@
             icon: matchingMood.icon,
             description: matchingMood.description
           };
+          console.log('Set currentEveningMood:', currentEveningMood.value);
         }
       }
 
@@ -982,6 +1065,26 @@
       console.log('Home: Updated today\'s tasbih count from store to', todayTasbihCount);
     }
   }
+
+  // Add this function to test the seeking_peace mood specifically
+  function testSeekingPeaceMood() {
+    console.log('Testing seeking_peace mood specifically');
+    const seekingPeaceMood = moods.find(m => m.value === 'seeking_peace');
+    if (seekingPeaceMood) {
+      console.log('Found seeking_peace mood in moods array:', seekingPeaceMood);
+      currentMoodPeriod = 'morning';
+      void handleMoodSubmit(seekingPeaceMood, currentMoodPeriod);
+    } else {
+      console.error('Could not find seeking_peace mood in moods array');
+    }
+  }
+
+  // Add this function to the Home.svelte component
+  async function handleAddSeekingPeaceGuidance() {
+    console.log('Adding seeking_peace guidance');
+    const result = await addSeekingPeaceGuidance();
+    console.log('Result of adding seeking_peace guidance:', result);
+  }
 </script>
 
 <div class="home-container">
@@ -1055,7 +1158,13 @@
                 {#if weekMoods[fullDate]}
                   <div class="mood-buttons">
                     {#if weekMoods[fullDate].morning}
-                      {@const morningMood = moods.find(m => m.value === weekMoods[fullDate].morning.mood)}
+                      <!-- Try to find a direct match first -->
+                      {@const moodValue = weekMoods[fullDate].morning.mood}
+                      {@const morningMood = moods.find(m => 
+                        m.value === moodValue || 
+                        m.value === moodValue.replace(/\s+/g, '_') || 
+                        m.value === moodValue.replace(/_+/g, ' ')
+                      )}
                       {#if morningMood}
                         <button 
                           class="mood-icon-button morning" 
@@ -1063,11 +1172,28 @@
                           title={`Morning: ${morningMood.name}`}
                         >
                           {@html morningMood.icon}
+                          <span class="debug-info" style="display: none;">
+                            {console.log(`Rendering morning mood for ${fullDate}:`, weekMoods[fullDate].morning.mood)}
+                          </span>
                         </button>
+                      {:else}
+                        <span class="debug-info" style="display: none;">
+                          {console.log(`No matching morning mood found for ${fullDate}. Value:`, weekMoods[fullDate].morning.mood)}
+                        </span>
                       {/if}
+                    {:else}
+                      <span class="debug-info" style="display: none;">
+                        {console.log(`No morning mood data for ${fullDate}`)}
+                      </span>
                     {/if}
                     {#if weekMoods[fullDate].evening}
-                      {@const eveningMood = moods.find(m => m.value === weekMoods[fullDate].evening.mood)}
+                      <!-- Try to find a direct match first -->
+                      {@const moodValue = weekMoods[fullDate].evening.mood}
+                      {@const eveningMood = moods.find(m => 
+                        m.value === moodValue || 
+                        m.value === moodValue.replace(/\s+/g, '_') || 
+                        m.value === moodValue.replace(/_+/g, ' ')
+                      )}
                       {#if eveningMood}
                         <button 
                           class="mood-icon-button evening" 
@@ -1075,8 +1201,19 @@
                           title={`Evening: ${eveningMood.name}`}
                         >
                           {@html eveningMood.icon}
+                          <span class="debug-info" style="display: none;">
+                            {console.log(`Rendering evening mood for ${fullDate}:`, weekMoods[fullDate].evening.mood)}
+                          </span>
                         </button>
+                      {:else}
+                        <span class="debug-info" style="display: none;">
+                          {console.log(`No matching evening mood found for ${fullDate}. Value:`, weekMoods[fullDate].evening.mood)}
+                        </span>
                       {/if}
+                    {:else}
+                      <span class="debug-info" style="display: none;">
+                        {console.log(`No evening mood data for ${fullDate}`)}
+                      </span>
                     {/if}
                   </div>
                 {/if}
@@ -1272,6 +1409,15 @@
     on:skip={handleMoodSkip}
     on:close={handleMoodClose}
   />
+{/if}
+
+{#if isAdmin}
+  <div class="admin-controls">
+    <button on:click={handleSync}>Sync Quotes</button>
+    <button on:click={handleTestMoodPopup}>Test Mood Popup</button>
+    <button on:click={testSeekingPeaceMood}>Test Seeking Peace</button>
+    <button on:click={handleAddSeekingPeaceGuidance}>Add Seeking Peace Guidance</button>
+  </div>
 {/if}
 
 <style>
