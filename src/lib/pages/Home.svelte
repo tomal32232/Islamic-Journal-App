@@ -1492,8 +1492,7 @@
     justify-content: space-between;
     margin: 0;
     padding: 0.25rem 0;
-    transition: opacity 0.3s ease, transform 0.3s ease;
-    transform-origin: top center;
+    align-items: flex-start;
   }
 
   .quote-card.scrolled + .calendar-strip {
@@ -1566,7 +1565,9 @@
     align-items: center;
     gap: 0.125rem;
     padding: 0.25rem;
-    min-width: 2rem;
+    min-width: 2.5rem;
+    position: relative;
+    height: 6rem; /* Fixed height to ensure consistent alignment */
   }
 
   .day {
@@ -1577,6 +1578,7 @@
   .date-num {
     font-size: 1rem;
     color: #000;
+    margin-bottom: 0.25rem;
   }
 
   .day-item.active .date-num {
@@ -2305,8 +2307,18 @@
 
   .mood-buttons {
     display: flex;
-    gap: 0.25rem;
+    flex-direction: column;
     align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.25rem;
+  }
+
+  .mood-add-buttons {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.25rem;
   }
 
   .mood-icon-button {
