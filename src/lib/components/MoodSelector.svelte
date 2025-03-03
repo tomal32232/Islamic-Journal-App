@@ -206,11 +206,11 @@
   }
 
   .selected-mood-icon {
-    width: 5rem;
-    height: 5rem;
+    width: 6rem;
+    height: 6rem;
     color: #216974;
-    background: rgba(33, 105, 116, 0.1);
-    padding: 1.5rem;
+    background: none;
+    padding: 0;
     border-radius: 50%;
     transition: all 0.3s;
   }
@@ -306,17 +306,18 @@
   }
 
   .mood-icon {
-    width: 2.5rem;
-    height: 2.5rem;
+    width: 4rem;
+    height: 4rem;
     color: #216974;
-    background: rgba(33, 105, 116, 0.1);
-    padding: 0.75rem;
+    background: none;
+    padding: 0;
     border-radius: 50%;
     transition: all 0.2s;
   }
 
   .mood-button:hover .mood-icon, .mood-button.selected .mood-icon {
-    background: rgba(33, 105, 116, 0.15);
+    background: none;
+    transform: scale(1.1);
   }
 
   .mood-name {
@@ -328,15 +329,15 @@
 
   @media (max-width: 360px) {
     .selected-mood-icon {
-      width: 4rem;
-      height: 4rem;
-      padding: 1.25rem;
+      width: 5rem;
+      height: 5rem;
+      padding: 0;
     }
     
     .mood-icon {
-      width: 2rem;
-      height: 2rem;
-      padding: 0.625rem;
+      width: 3rem;
+      height: 3rem;
+      padding: 0;
     }
   }
 </style> 

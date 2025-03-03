@@ -2065,13 +2065,12 @@
   }
 
   .mood-icon-button {
-    width: 1.25rem;
-    height: 1.25rem;
+    width: 1.5rem;
+    height: 1.5rem;
     padding: 0;
     background: none;
     border: none;
     cursor: pointer;
-    color: #216974;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -2080,6 +2079,14 @@
 
   .mood-icon-button:hover {
     transform: scale(1.1);
+  }
+
+  .mood-icon-button.morning {
+    color: #216974;
+  }
+
+  .mood-icon-button.evening {
+    color: #E09453;
   }
 
   .mood-icon-button :global(svg) {
@@ -2303,8 +2310,8 @@
   }
 
   .mood-icon-button {
-    width: 1.25rem;
-    height: 1.25rem;
+    width: 1.5rem;
+    height: 1.5rem;
     padding: 0;
     background: none;
     border: none;
@@ -2402,8 +2409,8 @@
   }
 
   .mood-add-button {
-    width: 1.25rem;
-    height: 1.25rem;
+    width: 1.5rem;
+    height: 1.5rem;
     border-radius: 50%;
     border: none;
     background: #f0f4f5;
@@ -2414,24 +2421,26 @@
     padding: 0;
     cursor: pointer;
     transition: all 0.2s;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
   }
 
   .mood-add-button:hover {
     background: #e0eaec;
     transform: scale(1.1);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.15);
   }
 
   .mood-add-button svg {
-    width: 0.75rem;
-    height: 0.75rem;
+    width: 1.25rem;
+    height: 1.25rem;
   }
 
   .mood-add-button.morning {
-    border: 1px solid rgba(255, 166, 0, 0.3);
+    border: 1px solid rgba(33, 105, 116, 0.3);
   }
 
   .mood-add-button.evening {
-    border: 1px solid rgba(70, 130, 180, 0.3);
+    border: 1px solid rgba(224, 148, 83, 0.3);
   }
 
   .next-prayer-card {
