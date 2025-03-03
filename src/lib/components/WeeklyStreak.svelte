@@ -58,7 +58,9 @@
       maxCount = Math.max(...dailyCounts.map(d => d.count));
       weeklyStatsStore.set({
         dailyCounts: weeklyStats.dailyCounts,
-        streak: weeklyStats.currentStreak
+        streak: weeklyStats.currentStreak,
+        todayCompleted: weeklyStats.todayCompleted,
+        totalDays: weeklyStats.totalDays
       });
     }
   }
@@ -86,6 +88,7 @@
     if ($weeklyStatsStore.dailyCounts) {
       dailyCounts = $weeklyStatsStore.dailyCounts;
       stats.currentStreak = $weeklyStatsStore.streak;
+      stats.totalDays = $weeklyStatsStore.totalDays;
       maxCount = Math.max(...dailyCounts.map(d => d.count));
     }
   }

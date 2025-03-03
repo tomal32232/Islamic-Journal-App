@@ -4,6 +4,9 @@ import { App } from '@capacitor/app';
 import { writable, get } from 'svelte/store';
 import { scheduleMoodNotifications } from './moodNotificationService';
 import { scheduleEndOfDayReminders } from './prayerReminderService';
+import { auth } from '../firebase';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '../firebase';
 
 let prayerTimes = [];
 prayerTimesStore.subscribe(value => {
@@ -159,16 +162,43 @@ async function scheduleMarkPrayerNotifications() {
             console.log('Cancelled existing mark prayer notifications');
         }
 
+        // Get user's timezone offset
+        const userTimezoneOffset = new Date().getTimezoneOffset();
+        console.log(`User's timezone offset for mark notifications: ${userTimezoneOffset} minutes`);
+
         // Schedule notifications for each prayer time
         for (const prayer of prayerTimes) {
             console.log(`Scheduling mark notification for ${prayer.name} prayer...`);
             
-            // Use the new getPrayerTimeAsDate function to get the correct schedule time
-            const prayerTime = getPrayerTimeAsDate(prayer.originalTime);
+            // Check if we have timezone information for this prayer in the database
+            let prayerTimezoneOffset = null;
+            try {
+                const user = auth.currentUser;
+                if (user) {
+                    const today = new Date().toLocaleDateString('en-CA');
+                    const prayerId = `${today}-${prayer.name.toLowerCase()}`;
+                    const prayerQuery = query(
+                        collection(db, 'prayer_history'),
+                        where('userId', '==', user.uid),
+                        where('prayerId', '==', prayerId)
+                    );
+                    const querySnapshot = await getDocs(prayerQuery);
+                    if (!querySnapshot.empty) {
+                        const prayerData = querySnapshot.docs[0].data();
+                        prayerTimezoneOffset = prayerData.timezoneOffset || null;
+                        console.log(`Found timezone offset for ${prayer.name} mark notification: ${prayerTimezoneOffset}`);
+                    }
+                }
+            } catch (error) {
+                console.error('Error getting prayer timezone information for mark notification:', error);
+            }
+            
+            // Use the getPrayerTimeAsDate function with timezone offset
+            const prayerTime = getPrayerTimeAsDate(prayer.originalTime, prayerTimezoneOffset);
             const scheduleTime = new Date(prayerTime);
             scheduleTime.setMinutes(scheduleTime.getMinutes() + MARK_PRAYER_DELAY);
 
-            console.log(`Scheduling ${prayer.name} notification for:`, scheduleTime.toLocaleString());
+            console.log(`Scheduling ${prayer.name} mark notification for:`, scheduleTime.toLocaleString());
 
             // Generate a consistent ID for each prayer's mark notification
             const notificationId = 3000 + getPrayerIndex(prayer.name);
@@ -235,15 +265,53 @@ export async function setupNotifications() {
         const settings = getNotificationSettings();
         console.log('Notification settings:', settings);
 
+        // Initialize notification channels first
+        await initializeNotificationChannels();
+        console.log('Notification channels initialized');
+
         // Set up notification click handler
         await setupNotificationClickHandler();
         console.log('Notification click handler set up');
+
+        // Remove any existing app state listeners to prevent duplicates
+        try {
+            await App.removeAllListeners();
+            console.log('Removed existing app state listeners');
+        } catch (error) {
+            console.error('Error removing app state listeners:', error);
+        }
+
+        // Fetch prayer times first
+        console.log('Fetching prayer times...');
+        await fetchPrayerTimes();
+        const prayerTimes = get(prayerTimesStore);
+        
+        if (!prayerTimes || prayerTimes.length === 0) {
+            console.log('Retrying prayer times fetch...');
+            await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+            await fetchPrayerTimes();
+        }
+
+        // Cancel all existing notifications to start fresh
+        try {
+            const pendingNotifications = await LocalNotifications.getPending();
+            if (pendingNotifications.notifications.length > 0) {
+                await LocalNotifications.cancel(pendingNotifications);
+                console.log('Cancelled all existing notifications to start fresh');
+            }
+        } catch (error) {
+            console.error('Error cancelling existing notifications:', error);
+        }
 
         // Set up app lifecycle listeners
         App.addListener('appStateChange', async ({ isActive }) => {
             if (isActive) {
                 console.log('App became active, rescheduling notifications...');
+                // Fetch fresh prayer times when app becomes active
+                await fetchPrayerTimes();
+                
                 if (settings.prayerNotifications) {
+                    // Schedule notifications in sequence to avoid race conditions
                     await scheduleAllPrayerNotifications();
                     await scheduleMarkPrayerNotifications();
                     await scheduleEndOfDayReminders();
@@ -257,6 +325,7 @@ export async function setupNotifications() {
         // Do initial scheduling
         if (settings.prayerNotifications) {
             console.log('Scheduling prayer notifications...');
+            // Schedule notifications in sequence to avoid race conditions
             await scheduleAllPrayerNotifications();
             await scheduleMarkPrayerNotifications();
             await scheduleEndOfDayReminders();
@@ -264,6 +333,22 @@ export async function setupNotifications() {
         if (settings.moodNotifications) {
             console.log('Scheduling mood notifications...');
             await scheduleMoodNotifications(true);
+        }
+
+        // Log all scheduled notifications
+        try {
+            const pendingNotifications = await LocalNotifications.getPending();
+            console.log('All scheduled notifications after setup:', 
+                pendingNotifications.notifications.map(n => ({
+                    id: n.id,
+                    title: n.title,
+                    body: n.body,
+                    channelId: n.channelId,
+                    scheduledTime: n.schedule && n.schedule.at ? new Date(n.schedule.at).toLocaleString() : 'unknown'
+                }))
+            );
+        } catch (error) {
+            console.error('Error logging scheduled notifications:', error);
         }
 
         console.log('Notification system setup complete');
@@ -275,48 +360,96 @@ export async function setupNotifications() {
 
 async function scheduleAllPrayerNotifications() {
     try {
+        console.log('Starting to schedule prayer notifications...');
+        
         // Fetch latest prayer times
         await fetchPrayerTimes();
+        const prayerTimes = get(prayerTimesStore);
         
-        // Cancel any existing notifications
-        const pendingNotifications = await LocalNotifications.getPending();
-        if (pendingNotifications.notifications.length > 0) {
-            await LocalNotifications.cancel(pendingNotifications);
+        if (!prayerTimes || prayerTimes.length === 0) {
+            console.error('No prayer times available for scheduling notifications');
+            return;
         }
+        
+        // Cancel any existing prayer notifications
+        const pendingNotifications = await LocalNotifications.getPending();
+        const prayerNotifications = pendingNotifications.notifications.filter(n => 
+            n.channelId === 'prayer_notifications'
+        );
+        
+        if (prayerNotifications.length > 0) {
+            await LocalNotifications.cancel({ notifications: prayerNotifications });
+            console.log('Cancelled existing prayer notifications:', prayerNotifications.length);
+        }
+
+        // Get user's timezone offset
+        const userTimezoneOffset = new Date().getTimezoneOffset();
+        console.log(`User's timezone offset: ${userTimezoneOffset} minutes`);
 
         // Schedule notifications for each prayer time
         for (const prayer of prayerTimes) {
-            const [time, period] = prayer.time.split(' ');
-            const [hours, minutes] = time.split(':');
-            let prayerHours = parseInt(hours);
-            
-            // Convert to 24-hour format
-            if (period === 'PM' && prayerHours !== 12) {
-                prayerHours += 12;
-            } else if (period === 'AM' && prayerHours === 12) {
-                prayerHours = 0;
+            // Skip if prayer time is not available
+            if (!prayer.time || !prayer.originalTime) {
+                console.log(`Skipping notification for ${prayer.name} - time not available`);
+                continue;
             }
-
-            // Create notification schedule time in local timezone
+            
+            console.log(`Processing notification for ${prayer.name} prayer at ${prayer.time} (${prayer.originalTime})`);
+            
+            // Use the original 24-hour time format for calculations
+            const [hours, minutes] = prayer.originalTime.split(':').map(num => parseInt(num, 10));
+            
+            // Create notification schedule time (5 minutes before prayer time)
             const now = new Date();
             const scheduleTime = new Date(
                 now.getFullYear(),
                 now.getMonth(),
                 now.getDate(),
-                prayerHours,
-                parseInt(minutes) - 5 // 5 minutes before prayer time
+                hours,
+                minutes - 5, // 5 minutes before prayer time
+                0
             );
 
             // If the prayer time has passed for today, schedule for tomorrow
             if (scheduleTime < now) {
                 scheduleTime.setDate(scheduleTime.getDate() + 1);
+                console.log(`Prayer time ${prayer.name} has passed for today, scheduling for tomorrow at ${scheduleTime.toLocaleString()}`);
             }
 
-            // Ensure we're working with local time
-            scheduleTime.setMinutes(scheduleTime.getMinutes() - scheduleTime.getTimezoneOffset());
+            // Check if we have timezone information for this prayer in the database
+            let prayerTimezoneOffset = null;
+            try {
+                const user = auth.currentUser;
+                if (user) {
+                    const today = new Date().toLocaleDateString('en-CA');
+                    const prayerId = `${today}-${prayer.name.toLowerCase()}`;
+                    const prayerQuery = query(
+                        collection(db, 'prayer_history'),
+                        where('userId', '==', user.uid),
+                        where('prayerId', '==', prayerId)
+                    );
+                    const querySnapshot = await getDocs(prayerQuery);
+                    if (!querySnapshot.empty) {
+                        const prayerData = querySnapshot.docs[0].data();
+                        prayerTimezoneOffset = prayerData.timezoneOffset || null;
+                        console.log(`Found timezone offset for ${prayer.name}: ${prayerTimezoneOffset}`);
+                    }
+                }
+            } catch (error) {
+                console.error('Error getting prayer timezone information:', error);
+            }
+
+            // Adjust for timezone if we have the information
+            if (prayerTimezoneOffset !== null && prayerTimezoneOffset !== userTimezoneOffset) {
+                const offsetDiff = userTimezoneOffset - prayerTimezoneOffset;
+                scheduleTime.setMinutes(scheduleTime.getMinutes() + offsetDiff);
+                console.log(`Adjusted notification time for ${prayer.name} by ${offsetDiff} minutes for timezone difference`);
+            }
 
             await scheduleNotification(prayer.name, scheduleTime);
         }
+        
+        console.log('Completed scheduling all prayer notifications');
     } catch (error) {
         console.error('Error scheduling prayer notifications:', error);
     }
@@ -324,35 +457,59 @@ async function scheduleAllPrayerNotifications() {
 
 async function scheduleNotification(prayerName, scheduleTime) {
     try {
-        // Convert the local time to UTC for the notification
-        const utcScheduleTime = new Date(
-            Date.UTC(
-                scheduleTime.getFullYear(),
-                scheduleTime.getMonth(),
-                scheduleTime.getDate(),
-                scheduleTime.getHours(),
-                scheduleTime.getMinutes(),
-                0
-            )
-        );
-
+        console.log(`Scheduling prayer notification for ${prayerName} at ${scheduleTime.toLocaleString()}`);
+        
+        // Use a consistent ID based on prayer name
+        const prayerOrder = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
+        const prayerIndex = prayerOrder.indexOf(prayerName);
+        
+        if (prayerIndex === -1) {
+            console.error(`Invalid prayer name: ${prayerName}`);
+            return;
+        }
+        
+        const notificationId = 1000 + prayerIndex;
+        
+        // Schedule the notification with the local time
+        // Capacitor will handle the conversion to the correct time zone
         await LocalNotifications.schedule({
             notifications: [
                 {
                     title: 'Prayer Time',
                     body: `It's almost time for ${prayerName} prayer`,
-                    id: Math.floor(Math.random() * 100000),
-                    schedule: { at: utcScheduleTime },
+                    id: notificationId,
+                    schedule: { 
+                        at: scheduleTime,
+                        allowWhileIdle: true
+                    },
                     smallIcon: 'ic_launcher_foreground',
                     channelId: 'prayer_notifications',
                     sound: 'notification_sound',
                     actionTypeId: '',
-                    extra: null
+                    extra: {
+                        type: 'prayer_notification',
+                        prayerName: prayerName
+                    }
                 }
             ]
         });
+        
+        console.log(`Successfully scheduled ${prayerName} prayer notification (ID: ${notificationId}) for ${scheduleTime.toLocaleString()}`);
+        
+        // Log next 24 hours of scheduled notifications
+        const pending = await LocalNotifications.getPending();
+        console.log('Currently scheduled prayer notifications:', 
+            pending.notifications
+                .filter(n => n.channelId === 'prayer_notifications')
+                .map(n => ({
+                    id: n.id,
+                    title: n.title,
+                    body: n.body,
+                    scheduledTime: n.schedule && n.schedule.at ? new Date(n.schedule.at).toLocaleString() : 'unknown'
+                }))
+        );
     } catch (error) {
-        console.error('Error scheduling notification:', error);
+        console.error(`Error scheduling notification for ${prayerName}:`, error);
     }
 }
 

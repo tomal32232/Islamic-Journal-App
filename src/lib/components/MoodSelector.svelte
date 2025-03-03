@@ -10,79 +10,86 @@
     selectedMood = mood;
   }
 
-  function handleModalClose(guidance) {
+  function handleModalClose() {
     dispatch('select', {
       value: selectedMood.value,
       name: selectedMood.name,
       description: selectedMood.description,
-      icon: selectedMood.icon,
-      guidance: guidance
+      icon: selectedMood.icon
     });
     selectedMood = null;
     showSelector = false;
   }
 
+  function handleNextClick() {
+    if (selectedMood) {
+      // Open the guidance modal
+      showGuidanceModal = true;
+    }
+  }
+
+  let showGuidanceModal = false;
+
   const moods = [
     { 
-      icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M12 21C16.9706 21 21 16.9706 21 12C21 7.02944 16.9706 3 12 3C7.02944 3 3 7.02944 3 12C3 16.9706 7.02944 21 12 21Z"/>
-        <path d="M8 14C8 14 9.5 16 12 16C14.5 16 16 14 16 14"/>
-        <path d="M15 9H15.01"/>
-        <path d="M9 9H9.01"/>
+      icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" />
+        <path d="M8 13C8.5 15 10.5 16 12 16C13.5 16 15.5 15 16 13" stroke-linecap="round" />
+        <path d="M9 9H9.01" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" />
+        <path d="M15 9H15.01" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" />
       </svg>`,
       name: 'Grateful',
       description: 'Alhamdulillah',
       value: 'grateful'
     },
     {
-      icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z"/>
-        <path d="M8 12H16"/>
-        <path d="M12 8V16"/>
+      icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" />
+        <path d="M12 7V12L14.5 14.5" stroke-linecap="round" stroke-linejoin="round" />
+        <path d="M7.5 12H8.5" stroke-linecap="round" stroke-linejoin="round" />
+        <path d="M15.5 12H16.5" stroke-linecap="round" stroke-linejoin="round" />
       </svg>`,
       name: 'Seeking Peace',
       description: 'Sabr',
       value: 'seeking_peace'
     },
     {
-      icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M12 21C16.9706 21 21 16.9706 21 12C21 7.02944 16.9706 3 12 3C7.02944 3 3 7.02944 3 12C3 16.9706 7.02944 21 12 21Z"/>
-        <path d="M8 14C8 14 9.5 16 12 16C14.5 16 16 14 16 14"/>
-        <path d="M15 9H15.01"/>
-        <path d="M9 9H9.01"/>
+      icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" />
+        <path d="M12 16L12 7" stroke-linecap="round" />
+        <path d="M9 13L12 16L15 13" stroke-linecap="round" stroke-linejoin="round" />
       </svg>`,
       name: 'Hopeful',
       description: 'InshaAllah',
       value: 'hopeful'
     },
     {
-      icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M12 21C16.9706 21 21 16.9706 21 12C21 7.02944 16.9706 3 12 3C7.02944 3 3 7.02944 3 12C3 16.9706 7.02944 21 12 21Z"/>
-        <path d="M8 16C8 16 9.5 14 12 14C14.5 14 16 16 16 16"/>
-        <path d="M12 7V11"/>
-        <path d="M12 12L12 12.01"/>
+      icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" />
+        <path d="M8 15H16" stroke-linecap="round" />
+        <path d="M9 9H9.01" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" />
+        <path d="M15 9H15.01" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" />
       </svg>`,
       name: 'Anxious',
       description: 'Ya Allah',
       value: 'anxious'
     },
     {
-      icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M12 21C16.9706 21 21 16.9706 21 12C21 7.02944 16.9706 3 12 3C7.02944 3 3 7.02944 3 12C3 16.9706 7.02944 21 12 21Z"/>
-        <path d="M12 7V11"/>
-        <path d="M12 12L12 12.01"/>
-        <path d="M8 15H16"/>
+      icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" />
+        <path d="M12 7V12" stroke-linecap="round" />
+        <path d="M12 16H12.01" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" />
       </svg>`,
       name: 'Reflecting',
       description: 'SubhanAllah',
       value: 'reflecting'
     },
     {
-      icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M12 21C16.9706 21 21 16.9706 21 12C21 7.02944 16.9706 3 12 3C7.02944 3 3 7.02944 3 12C3 16.9706 7.02944 21 12 21Z"/>
-        <path d="M8 14C8 14 9.5 16 12 16C14.5 16 16 14 16 14"/>
-        <path d="M15 9H15.01"/>
-        <path d="M9 9H9.01"/>
+      icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" />
+        <path d="M12 16L12 7" stroke-linecap="round" />
+        <path d="M15 10L12 7L9 10" stroke-linecap="round" stroke-linejoin="round" />
+        <path d="M9 14L12 16L15 14" stroke-linecap="round" stroke-linejoin="round" />
       </svg>`,
       name: 'Blessed',
       description: 'MashaAllah',
@@ -93,90 +100,215 @@
 
 {#if showSelector}
   <div class="mood-selector">
-    <h3 class="mood-title">How are you feeling today?</h3>
-    <div class="mood-options">
-      {#each moods as mood}
-        <button 
-          class="mood-button" 
-          on:click={() => handleMoodClick(mood)}
-          title={mood.description}
-        >
-          <div class="mood-icon">
-            {@html mood.icon}
+    <div class="selected-mood-display">
+      {#if selectedMood}
+        <div class="selected-mood">
+          <div class="selected-mood-icon">
+            {@html selectedMood.icon}
           </div>
-          <span class="mood-name">{mood.name}</span>
-          <span class="mood-description">{mood.description}</span>
+          <div class="selected-mood-text">
+            <span class="selected-mood-name">{selectedMood.name}</span>
+            <span class="selected-mood-description">{selectedMood.description}</span>
+          </div>
+        </div>
+        <button class="next-button" on:click={handleNextClick}>
+          Next
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9 18l6-6-6-6" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
         </button>
-      {/each}
+      {:else}
+        <div class="mood-prompt">
+          <h3>How are you feeling today?</h3>
+          <p>Select a mood below</p>
+        </div>
+      {/if}
+    </div>
+    
+    <div class="mood-carousel">
+      <div class="mood-options">
+        {#each moods as mood}
+          <button 
+            class="mood-button {selectedMood && selectedMood.value === mood.value ? 'selected' : ''}" 
+            on:click={() => handleMoodClick(mood)}
+            title={mood.description}
+          >
+            <div class="mood-icon">
+              {@html mood.icon}
+            </div>
+            <span class="mood-name">{mood.name}</span>
+          </button>
+        {/each}
+      </div>
     </div>
   </div>
 {/if}
 
-<MoodGuidanceModal 
-  mood={selectedMood} 
-  onClose={handleModalClose}
-/>
+<!-- Hidden button to trigger the modal -->
+<button id="mood-guidance-trigger" style="display: none;" on:click={() => {}}></button>
+
+{#if showGuidanceModal}
+  <MoodGuidanceModal 
+    mood={selectedMood} 
+    onClose={handleModalClose}
+  />
+{/if}
 
 <style>
   .mood-selector {
-    background: white;
-    border-radius: 12px;
-    padding: 1rem;
-    margin-bottom: 0.5rem;
-    border: 1px solid transparent;
-    background-image: linear-gradient(white, white), 
-                     linear-gradient(to bottom, 
-                       rgba(0, 0, 0, 0.01) 0%,
-                       rgba(0, 0, 0, 0.1) 100%);
-    background-origin: border-box;
-    background-clip: padding-box, border-box;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    width: 100%;
   }
 
-  .mood-title {
-    font-size: 0.875rem;
-    color: #666;
-    margin-bottom: 1rem;
+  .selected-mood-display {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 2rem 1rem;
+    min-height: 200px;
+  }
+
+  .mood-prompt {
     text-align: center;
-    font-weight: normal;
   }
 
-  .mood-options {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    grid-template-rows: repeat(2, 1fr);
-    gap: 0.5rem;
-    padding: 0.25rem;
+  .mood-prompt h3 {
+    font-size: 1.25rem;
+    color: #216974;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
   }
 
-  .mood-button {
-    background: none;
-    border: none;
-    padding: 0.5rem 0.25rem;
-    cursor: pointer;
+  .mood-prompt p {
+    color: #718096;
+    font-size: 0.875rem;
+    margin: 0;
+  }
+
+  .selected-mood {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .selected-mood-icon {
+    width: 5rem;
+    height: 5rem;
+    color: #216974;
+    background: rgba(33, 105, 116, 0.1);
+    padding: 1.5rem;
+    border-radius: 50%;
+    transition: all 0.3s;
+  }
+
+  .selected-mood-text {
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 0.25rem;
-    transition: all 0.2s;
-    border-radius: 8px;
-    width: 100%;
   }
 
-  .mood-button:hover {
-    background-color: rgba(0, 0, 0, 0.05);
+  .selected-mood-name {
+    font-size: 1.25rem;
+    color: #2D3748;
+    font-weight: 500;
+  }
+
+  .selected-mood-description {
+    font-size: 0.875rem;
+    color: #718096;
+  }
+
+  .next-button {
+    background: #216974;
+    color: white;
+    border: none;
+    border-radius: 12px;
+    padding: 0.75rem 1.5rem;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.2s;
+    margin-top: 1rem;
+  }
+
+  .next-button:hover {
+    background: #184f58;
     transform: translateY(-2px);
   }
 
-  .mood-icon {
-    width: 1.75rem;
-    height: 1.75rem;
-    color: #4A5568;
-    margin-bottom: 0.125rem;
+  .next-button svg {
+    width: 1rem;
+    height: 1rem;
   }
 
-  .mood-icon :global(svg) {
-    width: 100%;
-    height: 100%;
+  .mood-carousel {
+    padding: 1rem 0;
+    background: #f8f9fa;
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.05);
+  }
+
+  .mood-options {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    gap: 1rem;
+    padding: 0.5rem 1rem;
+    -ms-overflow-style: none;  /* Hide scrollbar for IE and Edge */
+    scrollbar-width: none;  /* Hide scrollbar for Firefox */
+  }
+
+  .mood-options::-webkit-scrollbar {
+    display: none; /* Hide scrollbar for Chrome, Safari and Opera */
+  }
+
+  .mood-button {
+    background: white;
+    border: 1px solid #E2E8F0;
+    padding: 0.75rem;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.2s;
+    border-radius: 12px;
+    min-width: 80px;
+    scroll-snap-align: center;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  }
+
+  .mood-button:hover, .mood-button.selected {
+    border-color: #216974;
+    transform: translateY(-2px);
+  }
+
+  .mood-button.selected {
+    background-color: rgba(33, 105, 116, 0.05);
+  }
+
+  .mood-icon {
+    width: 2.5rem;
+    height: 2.5rem;
+    color: #216974;
+    background: rgba(33, 105, 116, 0.1);
+    padding: 0.75rem;
+    border-radius: 50%;
+    transition: all 0.2s;
+  }
+
+  .mood-button:hover .mood-icon, .mood-button.selected .mood-icon {
+    background: rgba(33, 105, 116, 0.15);
   }
 
   .mood-name {
@@ -186,17 +318,17 @@
     text-align: center;
   }
 
-  .mood-description {
-    font-size: 0.625rem;
-    color: #718096;
-    font-weight: normal;
-    text-align: center;
-  }
-
   @media (max-width: 360px) {
+    .selected-mood-icon {
+      width: 4rem;
+      height: 4rem;
+      padding: 1.25rem;
+    }
+    
     .mood-icon {
-      width: 1.5rem;
-      height: 1.5rem;
+      width: 2rem;
+      height: 2rem;
+      padding: 0.625rem;
     }
   }
 </style> 

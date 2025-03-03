@@ -105,17 +105,17 @@ export function shouldShowMoodSelector(prayerTimes) {
   const now = new Date();
   const currentTime = now.getTime();
 
-  // Get Fajr and Dhuhr times
+  // Get Fajr, Dhuhr and Maghrib times
   const fajrPrayer = prayerTimes.find(p => p.name === 'Fajr');
   const dhuhrPrayer = prayerTimes.find(p => p.name === 'Dhuhr');
-  const ishaPrayer = prayerTimes.find(p => p.name === 'Isha');
+  const maghribPrayer = prayerTimes.find(p => p.name === 'Maghrib');
 
-  if (!fajrPrayer || !dhuhrPrayer || !ishaPrayer) return false;
+  if (!fajrPrayer || !dhuhrPrayer || !maghribPrayer) return false;
 
   // Convert prayer times to Date objects
   const fajrTime = convertPrayerTimeToDate(fajrPrayer.time);
   const dhuhrTime = convertPrayerTimeToDate(dhuhrPrayer.time);
-  const ishaTime = convertPrayerTimeToDate(ishaPrayer.time);
+  const maghribTime = convertPrayerTimeToDate(maghribPrayer.time);
   
   // Set end time for morning mood (before Dhuhr)
   const morningEndTime = dhuhrTime;
@@ -127,8 +127,8 @@ export function shouldShowMoodSelector(prayerTimes) {
   // Check if we're in the morning window (after Fajr, before Dhuhr)
   const isMorningWindow = currentTime >= fajrTime.getTime() && currentTime < morningEndTime.getTime();
   
-  // Check if we're in the evening window (after Isha, before midnight)
-  const isEveningWindow = currentTime >= ishaTime.getTime() && currentTime < eveningEndTime.getTime();
+  // Check if we're in the evening window (after Maghrib, before midnight)
+  const isEveningWindow = currentTime >= maghribTime.getTime() && currentTime < eveningEndTime.getTime();
 
   return {
     showMorningMood: isMorningWindow,
@@ -136,15 +136,13 @@ export function shouldShowMoodSelector(prayerTimes) {
   };
 }
 
+// Helper function to convert prayer time string to Date object
 function convertPrayerTimeToDate(timeStr) {
-  const [time, period] = timeStr.split(' ');
-  const [hours, minutes] = time.split(':');
-  const date = new Date();
-  let hour = parseInt(hours);
+  const now = new Date();
+  const [hours, minutes] = timeStr.split(':').map(Number);
   
-  if (period === 'PM' && hour !== 12) hour += 12;
-  if (period === 'AM' && hour === 12) hour = 0;
+  const date = new Date(now);
+  date.setHours(hours, minutes, 0, 0);
   
-  date.setHours(hour, parseInt(minutes), 0, 0);
   return date;
 } 

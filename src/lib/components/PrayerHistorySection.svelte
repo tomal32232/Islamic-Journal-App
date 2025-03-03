@@ -1,241 +1,310 @@
 <script>
-  import { prayerHistoryStore } from '../stores/prayerHistoryStore';
-  import { iconMap } from '../utils/icons';
-  
-  let selectedFilter = '7'; // Default to 7 days
-  
-  $: filteredHistory = filterPrayerHistory($prayerHistoryStore.history, selectedFilter);
-  $: groupedHistory = groupHistoryByDate(filteredHistory);
-  $: summary = calculateSummary(filteredHistory);
-  $: prayerPatterns = analyzePrayerPatterns(filteredHistory);
+  import { onMount } from 'svelte';
+  import { prayerHistoryStore, getPrayerHistory, invalidatePrayerHistoryCache } from '../stores/prayerHistoryStore';
+  import { Calendar, Clock, Check, ArrowClockwise } from 'phosphor-svelte';
 
-  function filterPrayerHistory(history, days) {
+  let filterDays = 7;
+  let filteredHistory = [];
+  let isLoading = true;
+  let isRefreshing = false;
+  let prayerStats = { onTime: 0, late: 0, missed: 0, total: 0 };
+
+  // Filter prayers based on selected days
+  function filterPrayers() {
+    if (!$prayerHistoryStore?.history) return [];
+    
     const today = new Date();
-    today.setHours(23, 59, 59, 999);
+    today.setHours(0, 0, 0, 0); // Set to start of day
     
     const filterDate = new Date(today);
-    filterDate.setDate(filterDate.getDate() - parseInt(days));
-    filterDate.setHours(0, 0, 0, 0);
+    filterDate.setDate(today.getDate() - filterDays);
+    filterDate.setHours(0, 0, 0, 0); // Set to start of day
     
-    const now = new Date();
-    
-    return history
+    return $prayerHistoryStore.history
       .filter(prayer => {
-        const prayerDate = new Date(prayer.date);
-        const prayerDateTime = new Date(prayer.date + ' ' + prayer.time);
-        
-        return prayerDate >= filterDate && 
-               prayerDate <= today && 
-               prayer.status !== 'upcoming' &&
-               (prayerDate.getTime() < now.setHours(0,0,0,0) || prayerDateTime.getTime() < now.getTime());
+        // Create date object with the correct timezone handling
+        const prayerDate = new Date(prayer.date + 'T00:00:00');
+        return prayerDate >= filterDate;
       })
       .sort((a, b) => {
-        const dateA = new Date(a.date).getTime();
-        const dateB = new Date(b.date).getTime();
-        return dateB - dateA;
+        // Sort by date (newest first) and then by prayer order
+        const dateA = new Date(a.date + 'T00:00:00');
+        const dateB = new Date(b.date + 'T00:00:00');
+        
+        if (dateB.getTime() !== dateA.getTime()) {
+          return dateB.getTime() - dateA.getTime();
+        }
+        
+        // Prayer order: Fajr, Dhuhr, Asr, Maghrib, Isha
+        const prayerOrder = { 'Fajr': 0, 'Dhuhr': 1, 'Asr': 2, 'Maghrib': 3, 'Isha': 4 };
+        return prayerOrder[a.prayerName] - prayerOrder[b.prayerName];
       });
   }
 
-  function groupHistoryByDate(history) {
-    const groups = {};
-    history.forEach(prayer => {
-      if (!groups[prayer.date]) {
-        groups[prayer.date] = {
-          date: prayer.date,
-          prayers: {
-            Fajr: null,
-            Dhuhr: null,
-            Asr: null,
-            Maghrib: null,
-            Isha: null
-          }
-        };
-      }
-      groups[prayer.date].prayers[prayer.prayerName] = prayer.status;
-    });
-    return Object.values(groups);
-  }
-
-  function formatDate(dateStr) {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', {
-      weekday: 'short',
-      day: 'numeric'
-    });
-  }
-
-  function calculateSummary(history) {
-    const total = history.length;
-    const ontime = history.filter(p => p.status === 'ontime').length;
-    const late = history.filter(p => p.status === 'late').length;
-    const missed = history.filter(p => p.status === 'missed').length;
-    const pending = history.filter(p => p.status === 'pending').length;
-
-    return {
-      total,
-      ontime,
-      late,
-      missed,
-      pending,
-      ontimePercentage: total ? Math.round((ontime / total) * 100) : 0,
-      latePercentage: total ? Math.round((late / total) * 100) : 0,
-      missedPercentage: total ? Math.round((missed / total) * 100) : 0
-    };
-  }
-
-  function analyzePrayerPatterns(history) {
-    const patterns = {
-      missed: {},
-      late: {}
+  // Calculate prayer statistics based on filtered history
+  function calculatePrayerStats(prayers) {
+    const stats = {
+      onTime: 0,
+      late: 0,
+      missed: 0,
+      total: 0,
+      onTimePercent: 0,
+      latePercent: 0,
+      missedPercent: 0
     };
 
-    // Initialize counters
     prayers.forEach(prayer => {
-      patterns.missed[prayer] = 0;
-      patterns.late[prayer] = 0;
-    });
-
-    // Count missed and late prayers
-    history.forEach(prayer => {
-      if (prayer.status === 'missed') {
-        patterns.missed[prayer.prayerName]++;
+      if (prayer.status === 'ontime') {
+        stats.onTime++;
       } else if (prayer.status === 'late') {
-        patterns.late[prayer.prayerName]++;
+        stats.late++;
+      } else if (prayer.status === 'missed') {
+        stats.missed++;
       }
     });
 
-    // Sort prayers by frequency
-    const missedSorted = Object.entries(patterns.missed)
-      .sort(([,a], [,b]) => b - a)
-      .filter(([,count]) => count > 0)
-      .slice(0, 2);
+    stats.total = stats.onTime + stats.late + stats.missed;
     
-    const lateSorted = Object.entries(patterns.late)
-      .sort(([,a], [,b]) => b - a)
-      .filter(([,count]) => count > 0)
-      .slice(0, 2);
-
-    return {
-      mostMissed: missedSorted,
-      mostLate: lateSorted
-    };
+    // Calculate percentages
+    if (stats.total > 0) {
+      stats.onTimePercent = Math.round((stats.onTime / stats.total) * 100);
+      stats.latePercent = Math.round((stats.late / stats.total) * 100);
+      stats.missedPercent = Math.round((stats.missed / stats.total) * 100);
+    }
+    
+    return stats;
   }
 
-  const prayers = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
+  // Update filtered history when filter days or prayer history changes
+  $: {
+    if ($prayerHistoryStore?.history) {
+      filteredHistory = filterPrayers();
+      prayerStats = calculatePrayerStats(filteredHistory);
+      isLoading = false;
+      isRefreshing = false;
+    }
+  }
+
+  // Format date to display in a readable format
+  function formatDate(dateStr) {
+    // Create date object with the correct timezone handling
+    const date = new Date(dateStr + 'T00:00:00');
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Set to start of day for comparison
+    
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    yesterday.setHours(0, 0, 0, 0); // Set to start of day for comparison
+    
+    // Compare dates by converting to date string to avoid time issues
+    const dateString = date.toDateString();
+    const todayString = today.toDateString();
+    const yesterdayString = yesterday.toDateString();
+    
+    if (dateString === todayString) {
+      return 'Today';
+    } else if (dateString === yesterdayString) {
+      return 'Yesterday';
+    } else {
+      return date.toLocaleDateString('en-US', { 
+        weekday: 'short', 
+        month: 'short', 
+        day: 'numeric' 
+      });
+    }
+  }
+
+  // Group prayers by date
+  function groupByDate(prayers) {
+    const grouped = {};
+    
+    prayers.forEach(prayer => {
+      if (!grouped[prayer.date]) {
+        grouped[prayer.date] = [];
+      }
+      grouped[prayer.date].push(prayer);
+    });
+    
+    return Object.entries(grouped).map(([date, prayers]) => ({
+      date,
+      formattedDate: formatDate(date),
+      prayers
+    })).sort((a, b) => {
+      const dateA = new Date(a.date + 'T00:00:00');
+      const dateB = new Date(b.date + 'T00:00:00');
+      return dateB.getTime() - dateA.getTime();
+    });
+  }
+
+  // Get status icon and color
+  function getStatusInfo(status) {
+    switch(status) {
+      case 'ontime':
+        return { icon: Check, color: '#4CAF50', text: 'On Time' };
+      case 'late':
+        return { icon: Clock, color: '#E09453', text: 'Late' };
+      case 'missed':
+        return { icon: Clock, color: '#F44336', text: 'Missed' };
+      default:
+        return { icon: Clock, color: '#9E9E9E', text: 'Not Marked' };
+    }
+  }
+
+  // Refresh prayer history
+  async function refreshPrayerHistory() {
+    isRefreshing = true;
+    
+    try {
+      // Force a complete refresh by invalidating the cache
+      invalidatePrayerHistoryCache();
+      
+      // Force a fresh fetch of prayer history
+      await getPrayerHistory();
+      
+      // Force UI update
+      filteredHistory = filterPrayers();
+    } catch (error) {
+      console.error('Error refreshing prayer history:', error);
+    } finally {
+      isRefreshing = false;
+    }
+  }
+
+  // Load prayer history on mount
+  onMount(async () => {
+    isLoading = true;
+    try {
+      // Invalidate cache to ensure we get fresh data
+      invalidatePrayerHistoryCache();
+      await getPrayerHistory();
+    } catch (error) {
+      console.error('Error loading prayer history:', error);
+    } finally {
+      isLoading = false;
+    }
+  });
+
+  // Get grouped prayers
+  $: groupedPrayers = groupByDate(filteredHistory);
 </script>
 
 <div class="prayer-history-section">
-  <div class="header">
-    <h2>Prayer History</h2>
-    <select 
-      bind:value={selectedFilter}
-      class="filter-select"
-    >
-      <option value="7">Last 7 days</option>
-      <option value="30">Last 30 days</option>
-    </select>
-  </div>
-
-  {#if filteredHistory.length === 0}
-    <div class="empty-state">
-      <p>No prayer records found for the selected period</p>
+  <div class="prayer-history-card">
+    <div class="header">
+      <h2>Prayer History</h2>
+      <div class="actions">
+        <button 
+          class="refresh-button" 
+          on:click={refreshPrayerHistory}
+          disabled={isRefreshing}
+          title="Refresh prayer history"
+        >
+          <div class:spinning={isRefreshing}>
+            <ArrowClockwise size={16} weight="bold" />
+          </div>
+        </button>
+        <div class="filter-buttons">
+          <button 
+            class="filter-button {filterDays === 7 ? 'active' : ''}" 
+            on:click={() => filterDays = 7}
+          >
+            Last 7 days
+          </button>
+          <button 
+            class="filter-button {filterDays === 30 ? 'active' : ''}" 
+            on:click={() => filterDays = 30}
+          >
+            Last 30 days
+          </button>
+        </div>
+      </div>
     </div>
-  {:else}
-    <div class="history-grid">
-      <div class="grid-header">
-        <div class="date-cell">Date</div>
-        {#each prayers as prayer}
-          <div class="prayer-header">{prayer}</div>
+
+    {#if isLoading}
+      <div class="loading">Loading prayer history...</div>
+    {:else if groupedPrayers.length === 0}
+      <div class="empty-state">
+        <Calendar size={48} weight="thin" />
+        <p>No prayer history found for the selected period.</p>
+      </div>
+    {:else}
+      <!-- Prayer Summary Section -->
+      <div class="prayer-summary">
+        <div class="summary-title">Summary for last {filterDays} days</div>
+        <div class="summary-stats">
+          <div class="stat-item">
+            <div class="stat-value on-time">{prayerStats.onTime}</div>
+            <div class="stat-label">On Time</div>
+            {#if prayerStats.total > 0}
+              <div class="stat-percent">{prayerStats.onTimePercent}%</div>
+            {/if}
+          </div>
+          <div class="stat-item">
+            <div class="stat-value late">{prayerStats.late}</div>
+            <div class="stat-label">Late</div>
+            {#if prayerStats.total > 0}
+              <div class="stat-percent">{prayerStats.latePercent}%</div>
+            {/if}
+          </div>
+          <div class="stat-item">
+            <div class="stat-value missed">{prayerStats.missed}</div>
+            <div class="stat-label">Missed</div>
+            {#if prayerStats.total > 0}
+              <div class="stat-percent">{prayerStats.missedPercent}%</div>
+            {/if}
+          </div>
+          <div class="stat-item">
+            <div class="stat-value total">{prayerStats.total}</div>
+            <div class="stat-label">Total</div>
+          </div>
+        </div>
+        
+        {#if prayerStats.total > 0}
+          <div class="progress-bar">
+            <div class="progress-segment on-time" style="width: {prayerStats.onTimePercent}%"></div>
+            <div class="progress-segment late" style="width: {prayerStats.latePercent}%"></div>
+            <div class="progress-segment missed" style="width: {prayerStats.missedPercent}%"></div>
+          </div>
+        {/if}
+      </div>
+
+      <div class="prayer-history-list">
+        {#each groupedPrayers as group}
+          <div class="date-group">
+            <div class="date-header">
+              <span class="date">{group.formattedDate}</span>
+            </div>
+            <div class="prayers-list">
+              {#each group.prayers as prayer}
+                {@const statusInfo = getStatusInfo(prayer.status)}
+                <div class="prayer-item">
+                  <div class="prayer-info">
+                    <div class="prayer-name">{prayer.prayerName}</div>
+                    <div class="prayer-time">{prayer.time || ''}</div>
+                  </div>
+                  <div class="prayer-status" style="color: {statusInfo.color}">
+                    <div class="status-indicator" style="background-color: {statusInfo.color}"></div>
+                    <svelte:component this={statusInfo.icon} size={16} weight="bold" />
+                    <span>{statusInfo.text}</span>
+                  </div>
+                </div>
+              {/each}
+            </div>
+          </div>
         {/each}
       </div>
-      
-      {#each groupedHistory as day}
-        <div class="grid-row">
-          <div class="date-cell">{formatDate(day.date)}</div>
-          {#each prayers as prayer}
-            {@const status = day.prayers[prayer]}
-            <div 
-              class="status-cell {status || 'pending'}"
-              title="{prayer}: {status || 'pending'}"
-            >
-              <div class="status-dot"></div>
-            </div>
-          {/each}
-        </div>
-      {/each}
-    </div>
-
-    <div class="legend">
-      <div class="legend-item">
-        <div class="legend-dot ontime"></div>
-        <span>On Time</span>
-      </div>
-      <div class="legend-item">
-        <div class="legend-dot late"></div>
-        <span>Late</span>
-      </div>
-      <div class="legend-item">
-        <div class="legend-dot missed"></div>
-        <span>Missed</span>
-      </div>
-    </div>
-
-    <div class="summary-section">
-      <div class="summary-stats">
-        <div class="stat-item">
-          <span class="stat-value">{summary.total}</span>
-          <span class="stat-label">Total</span>
-        </div>
-        <div class="stat-item ontime">
-          <span class="stat-value">{summary.ontime}</span>
-          <span class="stat-label">On Time</span>
-          <span class="stat-percentage">({summary.ontimePercentage}%)</span>
-        </div>
-        <div class="stat-item late">
-          <span class="stat-value">{summary.late}</span>
-          <span class="stat-label">Late</span>
-          <span class="stat-percentage">({summary.latePercentage}%)</span>
-        </div>
-        <div class="stat-item missed">
-          <span class="stat-value">{summary.missed}</span>
-          <span class="stat-label">Missed</span>
-          <span class="stat-percentage">({summary.missedPercentage}%)</span>
-        </div>
-      </div>
-
-      <div class="patterns-section">
-        {#if prayerPatterns.mostMissed.length > 0}
-          <div class="pattern-item">
-            <span class="pattern-label">Most Missed:</span>
-            <div class="pattern-prayers">
-              {#each prayerPatterns.mostMissed as [prayer, count]}
-                <span class="prayer-stat missed">
-                  {prayer} ({count} times)
-                </span>
-              {/each}
-            </div>
-          </div>
-        {/if}
-
-        {#if prayerPatterns.mostLate.length > 0}
-          <div class="pattern-item">
-            <span class="pattern-label">Most Late:</span>
-            <div class="pattern-prayers">
-              {#each prayerPatterns.mostLate as [prayer, count]}
-                <span class="prayer-stat late">
-                  {prayer} ({count} times)
-                </span>
-              {/each}
-            </div>
-          </div>
-        {/if}
-      </div>
-    </div>
-  {/if}
+    {/if}
+  </div>
 </div>
 
 <style>
   .prayer-history-section {
+    padding: 0 16px;
+    margin-top: 16px;
+    padding-bottom: 16px;
+  }
+
+  .prayer-history-card {
     margin-top: 1rem;
     padding: 1rem;
     background: white;
@@ -248,296 +317,290 @@
     justify-content: space-between;
     align-items: center;
     margin-bottom: 1rem;
+    flex-wrap: wrap;
+    gap: 0.5rem;
   }
 
   h2 {
-    font-size: 1.125rem;
+    font-size: 1rem;
     color: #216974;
+    margin: 0;
     font-weight: 500;
   }
 
-  .filter-select {
-    padding: 0.375rem;
-    border: 1px solid #eee;
-    border-radius: 6px;
-    font-size: 0.875rem;
-    color: #216974;
-    background: white;
+  .actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .refresh-button {
+    background: none;
+    border: none;
+    color: #64748b;
     cursor: pointer;
-  }
-
-  .history-grid {
-    border: 1px solid #eee;
-    border-radius: 8px;
-    overflow: hidden;
-  }
-
-  .grid-header {
-    display: grid;
-    grid-template-columns: 80px repeat(5, 1fr);
-    background: #f8f8f8;
-    border-bottom: 1px solid #eee;
-  }
-
-  .grid-row {
-    display: grid;
-    grid-template-columns: 80px repeat(5, 1fr);
-    border-bottom: 1px solid #eee;
-  }
-
-  .grid-row:last-child {
-    border-bottom: none;
-  }
-
-  .date-cell {
-    padding: 0.75rem 0.5rem;
-    font-size: 0.75rem;
-    color: #666;
+    padding: 0.25rem;
+    border-radius: 4px;
     display: flex;
     align-items: center;
-    border-right: 1px solid #eee;
+    justify-content: center;
+    transition: all 0.2s;
   }
 
-  .prayer-header {
-    padding: 0.75rem 0.5rem;
-    font-size: 0.75rem;
-    font-weight: 500;
+  .refresh-button:hover {
+    background: #f1f5f9;
     color: #216974;
-    text-align: center;
-    border-right: 1px solid #eee;
   }
 
-  .prayer-header:last-child,
-  .status-cell:last-child {
-    border-right: none;
+  .refresh-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 
-  .status-cell {
-    padding: 0.75rem 0.5rem;
+  .spinning {
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  .filter-buttons {
     display: flex;
-    align-items: center;
-    justify-content: center;
-    border-right: 1px solid #eee;
+    gap: 0.5rem;
   }
 
-  .status-dot {
-    width: 0.5rem;
-    height: 0.5rem;
-    border-radius: 50%;
-  }
-
-  .status-cell.ontime .status-dot {
-    background: #216974;
-  }
-
-  .status-cell.late .status-dot {
-    background: #E09453;
-  }
-
-  .status-cell.missed .status-dot {
-    background: #EF4444;
-  }
-
-  .status-cell.pending .status-dot {
-    background: #eee;
-  }
-
-  .legend {
-    display: flex;
-    gap: 1rem;
-    padding-top: 0.75rem;
-    justify-content: center;
-  }
-
-  .legend-item {
-    display: flex;
-    align-items: center;
-    gap: 0.375rem;
+  .filter-button {
+    background: #f1f5f9;
+    border: none;
+    padding: 0.5rem 0.75rem;
+    border-radius: 8px;
     font-size: 0.75rem;
-    color: #666;
+    cursor: pointer;
+    color: #64748b;
+    transition: all 0.2s;
   }
 
-  .legend-dot {
-    width: 0.5rem;
-    height: 0.5rem;
-    border-radius: 50%;
-  }
-
-  .legend-dot.ontime {
+  .filter-button.active {
     background: #216974;
+    color: white;
   }
 
-  .legend-dot.late {
-    background: #E09453;
+  .filter-button:hover:not(.active) {
+    background: #e2e8f0;
   }
 
-  .legend-dot.missed {
-    background: #EF4444;
+  .loading {
+    text-align: center;
+    padding: 2rem 0;
+    color: #64748b;
   }
 
   .empty-state {
-    text-align: center;
-    padding: 1rem;
-    color: #666;
-    background: #f8f8f8;
-    border-radius: 8px;
-    font-size: 0.875rem;
-  }
-
-  .summary-section {
-    margin-top: 1rem;
-    padding-top: 1rem;
-    border-top: 1px solid #eee;
-  }
-
-  .summary-stats {
-    display: flex;
-    justify-content: space-between;
-    gap: 0.5rem;
-    margin-bottom: 1.5rem;
-    padding: 0.5rem;
-    background: #f8f8f8;
-    border-radius: 8px;
-  }
-
-  .stat-item {
-    flex: 1;
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 0.5rem;
-    border-radius: 6px;
-    background: white;
+    justify-content: center;
+    padding: 2rem 0;
+    color: #94a3b8;
+    gap: 1rem;
   }
 
-  .stat-item.ontime {
-    color: #216974;
+  .empty-state p {
+    margin: 0;
+    text-align: center;
   }
 
-  .stat-item.late {
-    color: #E09453;
+  .prayer-history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    max-height: 400px;
+    overflow-y: auto;
+    padding-right: 0.5rem;
   }
 
-  .stat-item.missed {
-    color: #EF4444;
+  .prayer-history-list::-webkit-scrollbar {
+    width: 4px;
   }
 
-  .stat-label {
+  .prayer-history-list::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 4px;
+  }
+
+  .prayer-history-list::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+  }
+
+  .date-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .date-header {
+    padding: 0.25rem 0;
+    border-bottom: 1px solid #e2e8f0;
+  }
+
+  .date {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #64748b;
+  }
+
+  .prayers-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .prayer-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem;
+    background: #f8fafc;
+    border-radius: 8px;
+  }
+
+  .prayer-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .prayer-name {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #334155;
+  }
+  
+  .prayer-time {
     font-size: 0.75rem;
-    color: #666;
-    white-space: nowrap;
+    color: #64748b;
+  }
+
+  .prayer-status {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    background-color: rgba(0, 0, 0, 0.03);
+  }
+  
+  .status-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 0.25rem;
+  }
+
+  .prayer-summary {
+    background: #f8fafc;
+    border-radius: 10px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border: 1px solid #e2e8f0;
+  }
+
+  .summary-title {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #64748b;
+    margin-bottom: 0.75rem;
+    text-align: center;
+  }
+
+  .summary-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+
+  @media (max-width: 480px) {
+    .summary-stats {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1rem;
+    }
+  }
+
+  .stat-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
   }
 
   .stat-value {
     font-size: 1.25rem;
     font-weight: 600;
+    padding: 0.25rem 0.5rem;
+    border-radius: 6px;
+    min-width: 2rem;
+    text-align: center;
   }
 
-  .stat-percentage {
-    font-size: 0.625rem;
-    color: #666;
+  .stat-value.on-time {
+    color: #4CAF50;
+    background: rgba(76, 175, 80, 0.1);
   }
 
-  .patterns-section {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-  }
-
-  .pattern-item {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-  }
-
-  .pattern-label {
-    font-size: 0.875rem;
-    color: #666;
-    font-weight: 500;
-  }
-
-  .pattern-prayers {
-    display: flex;
-    gap: 0.75rem;
-    flex-wrap: wrap;
-  }
-
-  .prayer-stat {
-    font-size: 0.875rem;
-    padding: 0.25rem 0.75rem;
-    border-radius: 999px;
-    font-weight: 500;
-  }
-
-  .prayer-stat.missed {
-    background: rgba(239, 68, 68, 0.1);
-    color: #EF4444;
-  }
-
-  .prayer-stat.late {
-    background: rgba(224, 148, 83, 0.1);
+  .stat-value.late {
     color: #E09453;
+    background: rgba(224, 148, 83, 0.1);
   }
 
-  @media (max-width: 640px) {
-    .prayer-history-section {
-      padding: 0.75rem;
-    }
+  .stat-value.missed {
+    color: #F44336;
+    background: rgba(244, 67, 54, 0.1);
+  }
 
-    h2 {
-      font-size: 1rem;
-    }
+  .stat-value.total {
+    color: #216974;
+    background: rgba(33, 105, 116, 0.1);
+  }
 
-    .grid-header,
-    .grid-row {
-      grid-template-columns: 60px repeat(5, 1fr);
-    }
-
-    .date-cell,
-    .prayer-header {
-      padding: 0.5rem 0.25rem;
-      font-size: 0.625rem;
-    }
-
-    .status-cell {
-      padding: 0.5rem 0.25rem;
-    }
-
-    .status-dot,
-    .legend-dot {
-      width: 0.375rem;
-      height: 0.375rem;
-    }
-
-    .summary-stats {
-      padding: 0.25rem;
-      gap: 0.25rem;
-      margin-bottom: 1rem;
-    }
-
-    .stat-item {
-      padding: 0.25rem;
-    }
-
-    .stat-value {
-      font-size: 0.875rem;
-    }
-
-    .stat-label {
-      font-size: 0.625rem;
-    }
-
-    .stat-percentage {
-      font-size: 0.5rem;
-    }
-
-    .pattern-item {
-      font-size: 0.75rem;
-    }
-
-    .prayer-stat {
-      font-size: 0.75rem;
-      padding: 0.25rem 0.5rem;
-    }
+  .stat-label {
+    font-size: 0.75rem;
+    color: #64748b;
+  }
+  
+  .stat-percent {
+    font-size: 0.7rem;
+    color: #94a3b8;
+    margin-top: -0.25rem;
+  }
+  
+  .progress-bar {
+    height: 6px;
+    width: 100%;
+    background: #e2e8f0;
+    border-radius: 3px;
+    display: flex;
+    overflow: hidden;
+  }
+  
+  .progress-segment {
+    height: 100%;
+  }
+  
+  .progress-segment.on-time {
+    background-color: #4CAF50;
+  }
+  
+  .progress-segment.late {
+    background-color: #E09453;
+  }
+  
+  .progress-segment.missed {
+    background-color: #F44336;
   }
 </style> 

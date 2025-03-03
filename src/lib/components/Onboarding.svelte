@@ -18,19 +18,76 @@
   
     async function requestLocation() {
       try {
-        // Request permission
-        const permission = await Geolocation.requestPermissions();
+        console.log('Requesting location permission...');
+        const isNative = Capacitor.isNativePlatform();
         
-        if (permission.location === 'granted') {
-          // Test if we can actually get the location
-          await Geolocation.getCurrentPosition();
-          locationStatus = 'granted';
+        if (isNative) {
+          // Native platform (iOS/Android)
+          console.log('Using native location API');
+          
+          // Request permissions first
+          const permission = await Geolocation.requestPermissions();
+          console.log('Permission result:', permission);
+          
+          if (permission.location === 'granted' || permission.coarseLocation === 'granted') {
+            try {
+              // Test if we can actually get the location
+              const position = await Geolocation.getCurrentPosition({
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 0
+              });
+              
+              if (position) {
+                console.log('Successfully got position:', {
+                  latitude: position.coords.latitude,
+                  longitude: position.coords.longitude
+                });
+                locationStatus = 'granted';
+              } else {
+                throw new Error('Could not get position');
+              }
+            } catch (posError) {
+              console.error('Error getting position:', posError);
+              if (posError.message.includes('location unavailable')) {
+                alert('Please enable location services in your device settings and try again.');
+              }
+              locationStatus = 'denied';
+            }
+          } else {
+            locationStatus = 'denied';
+          }
         } else {
-          locationStatus = 'denied';
+          // Web platform
+          console.log('Using web location API');
+          if (!navigator.geolocation) {
+            throw new Error('Geolocation is not supported by your browser');
+          }
+
+          const position = await new Promise((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, {
+              enableHighAccuracy: true,
+              timeout: 10000,
+              maximumAge: 0
+            });
+          });
+
+          if (position) {
+            console.log('Successfully got web position:', {
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude
+            });
+            locationStatus = 'granted';
+          } else {
+            locationStatus = 'denied';
+          }
         }
       } catch (error) {
-        locationStatus = 'denied';
         console.error('Location permission error:', error);
+        if (error.message.includes('location unavailable')) {
+          alert('Please ensure location services are enabled in your device settings and try again.');
+        }
+        locationStatus = 'denied';
       }
     }
   
@@ -113,7 +170,25 @@
       if (currentSlide < totalSlides - 1) {
         currentSlide++;
       } else {
+        finishOnboarding();
+      }
+    }
+    
+    function finishOnboarding() {
+      console.log('Finishing onboarding...');
+      try {
         completeOnboarding();
+        console.log('Onboarding completed successfully');
+      } catch (error) {
+        console.error('Error completing onboarding:', error);
+        // Fallback: try to set localStorage directly
+        try {
+          localStorage.setItem('onboardingComplete', 'true');
+          onboardingComplete.set(true);
+          console.log('Onboarding completed via fallback method');
+        } catch (fallbackError) {
+          console.error('Fallback method also failed:', fallbackError);
+        }
       }
     }
   
@@ -270,7 +345,7 @@
             Next
           </button>
         {:else}
-          <button on:click={nextSlide} class="nav-button get-started">Get Started</button>
+          <button on:click={finishOnboarding} class="nav-button get-started">Get Started</button>
         {/if}
       </div>
     </div>

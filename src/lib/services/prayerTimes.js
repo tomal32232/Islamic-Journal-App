@@ -186,18 +186,63 @@ export async function fetchPrayerTimes() {
       );
       if (geocodeResponse.ok) {
         const locationData = await geocodeResponse.json();
-        const locality = locationData.locality || locationData.city;
+        
+        // Add detailed logging of the entire location data
+        console.log('LOCATION DATA RECEIVED:', JSON.stringify(locationData, null, 2));
+        
+        // Try to get the most specific location name available
+        let locality = locationData.locality || locationData.city;
+        const district = locationData.localityInfo?.administrative?.find(a => a.adminLevel === 2)?.name;
+        const state = locationData.principalSubdivision;
         const country = locationData.countryName;
+        
+        // Log individual fields we're using
+        console.log('Locality/City:', locality);
+        console.log('District:', district);
+        console.log('State/Province:', state);
+        console.log('Country:', country);
+        
+        // If locality contains "District", use state/province instead
+        if (locality && locality.toLowerCase().includes('district') && state) {
+          console.log('Replacing district with state/province');
+          locality = state;
+        }
+        // If locality is empty but we have district, use that instead
+        else if (!locality && district) {
+          locality = district;
+        }
         
         let locationString = '';
         if (locality) {
           locationString = locality;
           if (country) {
-            locationString += `, ${country}`;
+            // Simplify country name if it has parentheses
+            let displayCountry = country;
+            if (country.includes('(')) {
+              displayCountry = country.split('(')[0].trim();
+            }
+            locationString += `, ${displayCountry}`;
+          }
+        } else if (state) {
+          locationString = state;
+          if (country) {
+            // Simplify country name if it has parentheses
+            let displayCountry = country;
+            if (country.includes('(')) {
+              displayCountry = country.split('(')[0].trim();
+            }
+            locationString += `, ${displayCountry}`;
           }
         } else if (country) {
-          locationString = country;
+          // Simplify country name if it has parentheses
+          let displayCountry = country;
+          if (country.includes('(')) {
+            displayCountry = country.split('(')[0].trim();
+          }
+          locationString = displayCountry;
         }
+        
+        console.log('Final location string:', locationString);
         
         if (locationString) {
           locationStore.set(locationString);
@@ -324,11 +369,22 @@ function isPrayerPast(time24) {
 }
 
 // Helper function to get prayer time as Date object
-export function getPrayerTimeAsDate(time24) {
+export function getPrayerTimeAsDate(time24, timezoneOffset = null) {
   try {
     const [hours, minutes] = time24.split(':').map(num => parseInt(num, 10));
     const prayerTime = new Date();
     prayerTime.setHours(hours, minutes, 0, 0);
+
+    // If we have timezone offset information, adjust the date
+    if (timezoneOffset !== null) {
+      const currentOffset = new Date().getTimezoneOffset();
+      const offsetDiff = currentOffset - timezoneOffset; // Difference in minutes
+      
+      if (offsetDiff !== 0) {
+        prayerTime.setMinutes(prayerTime.getMinutes() + offsetDiff);
+        console.log(`Adjusted prayer notification time by ${offsetDiff} minutes for timezone difference`);
+      }
+    }
 
     // If prayer time has passed for today, set it for tomorrow
     if (prayerTime < new Date()) {
@@ -368,6 +424,17 @@ export function getNextPrayer() {
     }
   }
 
-  // If no upcoming prayer found today, return the first prayer for tomorrow
-  return prayers[0];
+  // If no prayer is found for today, only return Fajr if it's after midnight
+  const fajr = prayers[0]; // Fajr is always the first prayer
+  const [fajrTime, fajrPeriod] = fajr.time.split(' ');
+  const [fajrHours] = fajrTime.split(':');
+  let fajrHour = parseInt(fajrHours);
+  if (fajrPeriod === 'AM' && fajrHour === 12) fajrHour = 0;
+  
+  // Only show Fajr as next prayer if current time is after midnight and before Fajr
+  if (now.getHours() >= 0 && now.getHours() < fajrHour) {
+    return fajr;
+  }
+  
+  return null; // No next prayer to show
 }

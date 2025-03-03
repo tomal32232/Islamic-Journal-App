@@ -10,11 +10,12 @@
   import { savePrayerStatus, getPrayerHistory, prayerHistoryStore, initializeMonthlyPrayers, updatePrayerStatuses, cache as prayerHistoryCache } from '../stores/prayerHistoryStore';
   import { iconMap } from '../utils/icons';
   import { nearbyMosquesStore, mosqueLoadingStore, fetchNearbyMosques } from '../services/mosqueService';
-  import PrayerHistorySection from '../components/PrayerHistorySection.svelte';
   import QuranReading from '../components/QuranReading.svelte';
   import { Mosque, Book, HandsPraying, Check, Clock } from 'phosphor-svelte';
-  import { saveTasbihSession, getWeeklyStats, weeklyStatsStore } from '../stores/tasbihStore';
+  import { saveTasbihSession, getWeeklyStats, weeklyStatsStore, ensureAccurateDailyCount } from '../stores/tasbihStore';
   import { fade, slide } from 'svelte/transition';
+  import { auth } from '../firebase';
+  import PrayerHistorySection from '../components/PrayerHistorySection.svelte';
 
   let timeInterval;
   let currentPrayer = null;
@@ -45,16 +46,23 @@
   let weeklyStreak = 0;
   let target = 33;
 
-  // Add loading state
-  let isLoading = false;
+  // Track if initial data has been loaded
+  let initialDataLoaded = false;
+
+  // Add a flag to track if we're currently loading data
+  let isLoadingPrayerData = false;
 
   let showManualDhikrPopup = false;
   let manualDhikrSelection = null;
   let manualDhikrCount = 33;
+  let manualDhikrText = '';
 
   function getNextPrayer(prayers) {
+    if (!prayers || prayers.length === 0) {
+      return null;
+    }
+    
     const now = new Date();
-    const today = now.toLocaleDateString('en-CA');
     const currentTime = now.getHours() * 60 + now.getMinutes();
 
     // Convert prayer times to minutes for comparison
@@ -65,35 +73,33 @@
       if (period === 'PM' && hour !== 12) hour += 12;
       if (period === 'AM' && hour === 12) hour = 0;
       
-      // Get full date for this prayer time
-      const prayerDate = new Date();
-      prayerDate.setHours(hour, parseInt(minutes), 0);
+      const totalMinutes = hour * 60 + parseInt(minutes);
       
       return {
         ...prayer,
-        minutes: hour * 60 + parseInt(minutes),
-        date: prayerDate.toLocaleDateString('en-CA')
+        minutes: totalMinutes
       };
     });
 
-    // Find the next prayer for today only
-    let next = prayerMinutes.find(prayer => 
-      prayer.date === today && prayer.minutes > currentTime
-    );
+    // Find the next prayer for today
+    let next = prayerMinutes.find(prayer => prayer.minutes > currentTime);
     
-    // If no next prayer today, return null
+    // If no next prayer today, only return Fajr if it's after midnight
     if (!next) {
-      return null;
+      const fajr = prayers[0]; // Fajr is always the first prayer
+      const [fajrTime, fajrPeriod] = fajr.time.split(' ');
+      const [fajrHours, fajrMinutes] = fajrTime.split(':');
+      let fajrHour = parseInt(fajrHours);
+      if (fajrPeriod === 'AM' && fajrHour === 12) fajrHour = 0;
+      
+      // Only show Fajr as next prayer if current time is after midnight and before Fajr
+      if (now.getHours() >= 0 && now.getHours() < fajrHour) {
+        return fajr;
+      }
+      return null; // No next prayer to show
     }
 
     return next;
-  }
-
-  function updateNextPrayer() {
-    const prayers = $prayerTimesStore;
-    if (prayers.length > 0) {
-      nextPrayer = getNextPrayer(prayers);
-    }
   }
 
   function handleScroll(event) {
@@ -106,41 +112,98 @@
     const prayer = $prayerHistoryStore?.history?.find(
       p => p.date === today && p.prayerName === prayerName
     );
-    console.log(`Getting status for ${prayerName}:`, prayer?.status);
+    // console.log(`Getting status for ${prayerName}:`, prayer?.status);
     return prayer?.status;
   }
 
   // Add reactive statement to handle prayer history updates
   $: if ($prayerHistoryStore?.history) {
-    console.log('Prayer history updated:', $prayerHistoryStore.history);
+    // console.log('Prayer history updated:', $prayerHistoryStore.history);
     // Force component update
     $prayerTimesStore = [...$prayerTimesStore];
   }
 
-  onMount(() => {
+  // Add a reactive statement to recalculate the daily count when the user navigates to the tasbih tab
+  $: if (activeTab === 'tasbih' && auth.currentUser) {
+    ensureAccurateDailyCount().catch(error => {
+      console.error('Error ensuring accurate daily count:', error);
+    });
+  }
+
+  onMount(async () => {
+    // Check if there's a stored active tab
+    if (typeof window !== 'undefined') {
+      const storedTab = window.localStorage.getItem('prayer_active_tab');
+      if (storedTab) {
+        // Set the active tab
+        activeTab = storedTab;
+        // Clear the stored tab after using it
+        window.localStorage.removeItem('prayer_active_tab');
+      }
+    }
+
     const container = document.querySelector('.prayer-container');
     if (container) {
       container.addEventListener('scroll', handleScroll);
     }
 
-    timeInterval = setInterval(updateNextPrayer, 60000);
-    updateNextPrayer();
+    // Set up interval to update next prayer
+    timeInterval = setInterval(() => {
+      if ($prayerTimesStore.length > 0) {
+        nextPrayer = getNextPrayer($prayerTimesStore);
+      }
+    }, 60000); // Update every minute
 
-    // Initial data load - wait for all promises to resolve
-    Promise.all([
-      getPrayerHistory(),
-      fetchPrayerTimes(),
-      updatePrayerStatuses()
-    ]).then(() => {
-      // Force a UI update after initial data load
-      $prayerTimesStore = [...$prayerTimesStore];
-    }).catch(error => {
-      console.error('Error loading initial data:', error);
-    });
+    // Initial update
+    if ($prayerTimesStore.length > 0) {
+      nextPrayer = getNextPrayer($prayerTimesStore);
+    }
+
+    // Check if we already have data in the store
+    const hasHistoryData = $prayerHistoryStore?.history && $prayerHistoryStore.history.length > 0;
+    const hasPrayerTimes = $prayerTimesStore && $prayerTimesStore.length > 0;
+    
+    if (hasHistoryData && hasPrayerTimes && !initialDataLoaded) {
+      console.log('Using existing data from stores');
+      // Just update prayer statuses without fetching everything
+      isLoadingPrayerData = true;
+      updatePrayerStatuses().then(() => {
+        nextPrayer = getNextPrayer($prayerTimesStore);
+        initialDataLoaded = true;
+        isLoadingPrayerData = false;
+      }).catch(error => {
+        console.error('Error updating prayer statuses:', error);
+        isLoadingPrayerData = false;
+      });
+    } else if (!initialDataLoaded) {
+      // Initial data load only if not already loaded
+      console.log('Loading initial data');
+      isLoadingPrayerData = true;
+      try {
+        await Promise.all([
+          getPrayerHistory(),
+          fetchPrayerTimes()
+        ]);
+        
+        nextPrayer = getNextPrayer($prayerTimesStore);
+        initialDataLoaded = true;
+      } catch (error) {
+        console.error('Error loading prayer data:', error);
+      } finally {
+        isLoadingPrayerData = false;
+      }
+    }
 
     getWeeklyStats().then(stats => {
       weeklyStreak = stats?.streak || 0;
     });
+
+    // Ensure the daily count is accurate
+    if (auth.currentUser) {
+      ensureAccurateDailyCount().catch(error => {
+        console.error('Error ensuring accurate daily count:', error);
+      });
+    }
 
     return () => {
       if (timeInterval) clearInterval(timeInterval);
@@ -170,32 +233,56 @@
 
   function startCounter() {
     isCounterMode = true;
-  }
-
-  async function saveSession() {
-    if (totalCount > 0) {
-      for (const dhikr of selectedDhikrs) {
-        await saveTasbihSession({
-          dhikr,
-          count,
-          sets,
-          totalCount: Math.floor(totalCount / selectedDhikrs.length) // Distribute count evenly
-        });
-      }
-      const stats = await getWeeklyStats();
-      weeklyStreak = stats?.streak || 0;
-    }
+    document.body.classList.add('counter-active');
   }
 
   async function exitCounter() {
-    await saveSession();
+    if (totalCount > 0) {
+      isLoadingPrayerData = true;
+      console.log(`Saving session: totalCount=${totalCount}, dhikrs selected=${selectedDhikrs.length}`);
+      try {
+        // Flag to indicate if we're in a multi-dhikr session
+        const isMultiDhikr = selectedDhikrs.length > 1;
+        
+        // Save each dhikr as a separate session, but only count the first one
+        for (let i = 0; i < selectedDhikrs.length; i++) {
+          const dhikr = selectedDhikrs[i];
+          const isFirstDhikr = i === 0; // Only the first dhikr will contribute to the total count
+          
+          console.log(`Saving dhikr: ${dhikr.latin}, totalCount=${isFirstDhikr ? totalCount : 0}, isFirstDhikr=${isFirstDhikr}`);
+          await saveTasbihSession({
+            dhikr,
+            count,
+            sets,
+            // Only pass the totalCount for the first dhikr to prevent double counting
+            totalCount: isFirstDhikr ? totalCount : 0,
+            isManualEntry: dhikr.isCustom,
+            isMultiDhikr,
+            isFirstDhikr
+          });
+        }
+        const stats = await getWeeklyStats();
+        weeklyStreak = stats?.streak || 0;
+      } catch (error) {
+        console.error('Error saving dhikr session:', error);
+      } finally {
+        isLoadingPrayerData = false;
+      }
+    }
     isCounterMode = false;
+    document.body.classList.remove('counter-active');
     count = 0;
   }
 
   function increment() {
     count++;
     totalCount++;
+    console.log(`Increment: count=${count}, totalCount=${totalCount}, dhikrs selected=${selectedDhikrs.length}`);
+    
+    // No need to recalculate after each tap - we'll do it when saving
+    // This was causing unnecessary database operations
+    // The recalculation will happen when the session is saved
+    
     if (count === selectedTarget) {
       if ('vibrate' in navigator) {
         navigator.vibrate(200);
@@ -209,6 +296,7 @@
     count = 0;
     sets = 0;
     totalCount = 0;
+    console.log('Counter reset: all counts set to 0');
   }
 
   function setTarget(value) {
@@ -247,7 +335,7 @@
     if (!selectedPrayer) return;
 
     const today = new Date().toLocaleDateString('en-CA');
-    isLoading = true;
+    isLoadingPrayerData = true;
     
     try {
       // First save the prayer status
@@ -279,7 +367,7 @@
       // Fetch fresh data
       await getPrayerHistory();
     } finally {
-      isLoading = false;
+      isLoadingPrayerData = false;
     }
   }
 
@@ -324,36 +412,42 @@
   }
 
   function openManualDhikrPopup() {
-    manualDhikrSelection = null;
+    manualDhikrText = '';
     manualDhikrCount = 33;
     showManualDhikrPopup = true;
   }
 
   async function submitManualDhikr() {
-    if (manualDhikrSelection && manualDhikrCount > 0) {
+    if (manualDhikrText?.trim() && manualDhikrCount > 0) {
       try {
-        console.log('Saving manual dhikr:', manualDhikrSelection.latin, manualDhikrCount);
-        await saveTasbihSession({
-          dhikr: manualDhikrSelection,
-          count: manualDhikrCount % selectedTarget,
-          sets: Math.floor(manualDhikrCount / selectedTarget),
-          totalCount: manualDhikrCount,
-          isManualEntry: true
-        });
+        // Create a custom dhikr object similar to predefined ones
+        const customDhikr = {
+          text: manualDhikrText.trim(),
+          latin: manualDhikrText.trim(),
+          arabic: manualDhikrText.trim(),
+          meaning: '',
+          isCustom: true
+        };
         
-        // Update local state
-        totalCount += manualDhikrCount;
-        count = manualDhikrCount % selectedTarget;
-        sets += Math.floor(manualDhikrCount / selectedTarget);
+        // Set this as the selected dhikr
+        selectedDhikrs = [customDhikr];
         
-        // Update streak after saving
-        const stats = await getWeeklyStats();
-        weeklyStreak = stats?.streak || 0;
-        
+        // Close the popup
         showManualDhikrPopup = false;
-        console.log('Manual dhikr successfully saved');
+        
+        // Start counter mode
+        isCounterMode = true;
+        
+        // Reset counters
+        count = 0;
+        sets = 0;
+        totalCount = 0;
+        
+        // Set the target
+        selectedTarget = manualDhikrCount;
+        target = manualDhikrCount;
       } catch (error) {
-        console.error('Error saving manual dhikr:', error);
+        console.error('Error setting up manual dhikr:', error);
       }
     }
   }
@@ -365,6 +459,10 @@
     } else {
       selectedDhikrs = selectedDhikrs.filter(d => d.latin !== dhikr.latin);
     }
+  }
+
+  function saveSession() {
+    return exitCounter();
   }
 </script>
 
@@ -446,18 +544,14 @@
           </div>
         {/if}
       </div>
-
+      
+      <!-- Add Prayer History Section -->
       <PrayerHistorySection />
     </div>
   {:else if activeTab === 'tasbih'}
     {#if !isCounterMode}
       <div class="tasbih-section">
         <div class="setup-card">
-          <div class="streak-display">
-            <h3>Weekly Streak</h3>
-            <span class="streak-count">{weeklyStreak} days</span>
-          </div>
-          
           <h2>Select Dhikr (Multiple Selection)</h2>
           <div class="dhikr-options">
             {#each dhikrOptions as dhikr}
@@ -469,11 +563,11 @@
                 <span class="latin">{dhikr.latin}</span>
               </button>
             {/each}
+            <button class="dhikr-button add-dhikr" on:click={openManualDhikrPopup}>
+              <span class="arabic">+</span>
+              <span class="latin">Choose your own Dhikr</span>
+            </button>
           </div>
-
-          <button class="add-manual-button" on:click={openManualDhikrPopup}>
-            Add Manual Dhikr
-          </button>
 
           <div class="target-selector">
             <h3>Select Target</h3>
@@ -530,18 +624,22 @@
           <div class="dhikr-display">
             {#each selectedDhikrs as dhikr}
               <div class="dhikr-item">
-                <span class="arabic-large">{dhikr.arabic}</span>
+                <span class="arabic-large">{dhikr.isCustom ? dhikr.text : dhikr.arabic}</span>
                 <span class="latin-large">{dhikr.latin}</span>
-                <span class="meaning">{dhikr.meaning}</span>
+                {#if !dhikr.isCustom}
+                  <span class="meaning">{dhikr.meaning}</span>
+                {/if}
               </div>
             {/each}
           </div>
 
           <div class="progress">
-            <span class="sets-display">Set {sets + 1}</span>
+            <div class="count-info">
+              <span class="sets-display">Set {sets + 1}</span>
+              <span class="total-count">Total: {totalCount}</span>
+            </div>
             <span class="count-large">{count}</span>
             <span class="target-display">of {selectedTarget}</span>
-            <span class="total-count">Total: {totalCount}</span>
           </div>
 
           <button class="counter-button" on:click={increment}>
@@ -578,9 +676,9 @@
         <button 
           class="mark-btn on-time" 
           on:click={() => markPrayer('ontime')}
-          disabled={isLoading}
+          disabled={isLoadingPrayerData}
         >
-          {#if isLoading}
+          {#if isLoadingPrayerData}
             <div class="loading-spinner"></div>
           {:else}
             <Check weight="bold" />
@@ -590,9 +688,9 @@
         <button 
           class="mark-btn late" 
           on:click={() => markPrayer('late')}
-          disabled={isLoading}
+          disabled={isLoadingPrayerData}
         >
-          {#if isLoading}
+          {#if isLoadingPrayerData}
             <div class="loading-spinner"></div>
           {:else}
             <Clock weight="bold" />
@@ -615,20 +713,17 @@
       on:click|stopPropagation
       transition:slide={{ duration: 300, axis: 'y' }}
     >
-      <h3>Add Manual Dhikr</h3>
+      <h3>Start Dhikr</h3>
       
       <div class="popup-section">
-        <h4>Select Dhikr</h4>
-        <div class="dhikr-slider">
-          {#each dhikrOptions as dhikr}
-            <button 
-              class="dhikr-option {manualDhikrSelection === dhikr ? 'active' : ''}"
-              on:click={() => manualDhikrSelection = dhikr}
-            >
-              <span class="arabic">{dhikr.arabic}</span>
-              <span class="latin">{dhikr.latin}</span>
-            </button>
-          {/each}
+        <h4>Enter Dhikr Text</h4>
+        <div class="dhikr-input">
+          <input 
+            type="text" 
+            bind:value={manualDhikrText}
+            placeholder="Enter your dhikr"
+            class="text-input"
+          />
         </div>
       </div>
 
@@ -655,7 +750,7 @@
         <button 
           class="submit-button" 
           on:click={submitManualDhikr}
-          disabled={!manualDhikrSelection || manualDhikrCount <= 0}
+          disabled={!manualDhikrText?.trim() || manualDhikrCount <= 0}
         >
           Add Dhikr
         </button>
@@ -751,6 +846,7 @@
     background: white;
     border-radius: 12px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-bottom: 1rem;
   }
 
   .header {
@@ -761,10 +857,10 @@
   }
 
   h2 {
-    font-size: 1.125rem;
+    font-size: 1rem;
     color: #216974;
+    margin-bottom: 1rem;
     font-weight: 500;
-    margin: 0;
   }
 
   .prayer-times-grid {
@@ -889,37 +985,23 @@
     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
   }
 
-  .streak-display {
-    text-align: center;
-    margin-bottom: 2rem;
-    padding: 1rem;
-    background: rgba(33, 105, 116, 0.1);
-    border-radius: 8px;
-  }
-
-  .streak-count {
-    font-size: 1.5rem;
-    color: #216974;
-    font-weight: 500;
-  }
-
   .dhikr-options {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 0.75rem;
-    margin-bottom: 2rem;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
   }
 
   .dhikr-button {
     background: white;
     border: 1px solid #E0E0E0;
-    padding: 1rem;
+    padding: 0.75rem 0.5rem;
     border-radius: 8px;
     width: 100%;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.25rem;
     transition: all 0.2s ease;
     cursor: pointer;
   }
@@ -930,34 +1012,49 @@
     color: white;
   }
 
-  .arabic {
+  .dhikr-button.add-dhikr {
+    border-style: dashed;
+    color: #216974;
+  }
+
+  .dhikr-button.add-dhikr:hover {
+    background: rgba(33, 105, 116, 0.05);
+    border-color: #216974;
+  }
+
+  .dhikr-button.add-dhikr .arabic {
     font-size: 1.5rem;
+    font-weight: 300;
+  }
+
+  .arabic {
+    font-size: 1.25rem;
     font-weight: 500;
   }
 
   .latin {
-    font-size: 0.875rem;
+    font-size: 0.75rem;
   }
 
   .target-selector {
-    margin-bottom: 2rem;
+    margin-bottom: 1.5rem;
   }
 
   .target-options {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 0.75rem;
-    margin-bottom: 1rem;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
   }
 
   .target-button {
     background: white;
     border: 1px solid #E0E0E0;
-    padding: 0.75rem;
-    border-radius: 8px;
+    padding: 0.5rem;
+    border-radius: 6px;
     cursor: pointer;
     transition: all 0.2s ease;
-    font-size: 1rem;
+    font-size: 0.875rem;
     color: #216974;
   }
 
@@ -976,16 +1073,16 @@
     align-items: center;
     gap: 0.5rem;
     background: white;
-    padding: 0.75rem;
-    border-radius: 8px;
+    padding: 0.5rem;
+    border-radius: 6px;
     border: 1px solid #E0E0E0;
   }
 
   .custom-target input {
-    width: 100px;
+    width: 80px;
     border: none;
-    padding: 0.5rem;
-    font-size: 1rem;
+    padding: 0.375rem;
+    font-size: 0.875rem;
     color: #216974;
     text-align: center;
   }
@@ -998,10 +1095,10 @@
     background: #216974;
     color: white;
     width: 100%;
-    padding: 1rem;
+    padding: 0.75rem;
     border: none;
     border-radius: 8px;
-    font-size: 1.125rem;
+    font-size: 1rem;
     cursor: pointer;
     transition: all 0.2s ease;
   }
@@ -1013,54 +1110,104 @@
     right: 0;
     bottom: 0;
     background: linear-gradient(135deg, #216974, #1a545d);
-    padding: 2rem;
     display: flex;
     flex-direction: column;
     align-items: center;
     color: white;
-    z-index: 1000;
+    z-index: 999999;
+    height: 100vh;
+    min-height: 100vh;
+    max-height: 100vh;
+    overflow: hidden;
+  }
+
+  :global(body.counter-active) {
+    overflow: hidden !important;
+    position: fixed !important;
+    width: 100% !important;
+    height: 100% !important;
+    max-height: 100vh !important;
+  }
+
+  :global(body.counter-active nav),
+  :global(body.counter-active div[style*="position: fixed"]),
+  :global(body.counter-active div[style*="position:fixed"]),
+  :global(body.counter-active *[style*="bottom: 0"]),
+  :global(body.counter-active *[style*="bottom:0"]) {
+    display: none !important;
+    z-index: -1 !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
   }
 
   .exit-button {
     position: absolute;
     top: 1rem;
     left: 1rem;
-    background: rgba(255,255,255,0.2);
+    background: rgba(255,255,255,0.15);
     color: white;
     border: none;
-    padding: 0.5rem 1rem;
-    border-radius: 4px;
+    padding: 0.5rem 1.5rem;
+    border-radius: 8px;
     cursor: pointer;
+    font-size: 0.875rem;
+    transition: all 0.2s ease;
+  }
+
+  .exit-button:hover {
+    background: rgba(255,255,255,0.2);
   }
 
   .counter-content {
     height: 100%;
+    width: 100%;
+    max-width: 400px;
+    margin: 0 auto;
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    gap: 2rem;
+    justify-content: space-between;
+    padding: 4rem 1rem 2rem;
+    box-sizing: border-box;
   }
 
   .dhikr-display {
     text-align: center;
+    width: 100%;
+    padding: 0.75rem;
+    background: rgba(255,255,255,0.1);
+    border-radius: 12px;
+    margin-bottom: 1.5rem;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+    align-items: start;
+  }
+
+  .dhikr-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.5rem;
+    background: rgba(255,255,255,0.05);
+    border-radius: 8px;
   }
 
   .arabic-large {
-    font-size: 3rem;
-    display: block;
-    margin-bottom: 0.5rem;
+    font-size: 1.5rem;
+    font-weight: 500;
+    line-height: 1.2;
   }
 
   .latin-large {
-    font-size: 1.5rem;
-    display: block;
-    margin-bottom: 0.25rem;
+    font-size: 0.875rem;
+    opacity: 0.9;
   }
 
   .meaning {
-    font-size: 1rem;
-    opacity: 0.8;
+    font-size: 0.75rem;
+    opacity: 0.7;
   }
 
   .progress {
@@ -1069,27 +1216,45 @@
     flex-direction: column;
     align-items: center;
     gap: 0.5rem;
+    margin: 1rem 0 2rem;
+  }
+
+  .count-info {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
   }
 
   .count-large {
-    font-size: 5rem;
+    font-size: 4.5rem;
+    font-weight: 600;
+    line-height: 1;
+    color: #fff;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+
+  .sets-display {
+    font-size: 1.125rem;
+    opacity: 0.9;
     font-weight: 500;
   }
 
-  .sets-display, .target-display {
-    font-size: 1.25rem;
-    opacity: 0.8;
+  .target-display {
+    font-size: 1rem;
+    opacity: 0.7;
   }
 
   .total-count {
-    font-size: 1rem;
-    color: #E09453;
-    margin-top: 0.5rem;
+    font-size: 0.875rem;
+    color: rgba(255,255,255,0.9);
+    background: rgba(224, 148, 83, 0.2);
+    padding: 0.375rem 1rem;
+    border-radius: 100px;
   }
 
   .counter-button {
-    width: 200px;
-    height: 200px;
+    width: 130px;
+    height: 130px;
     border-radius: 50%;
     background: rgba(255,255,255,0.1);
     border: 2px solid rgba(255,255,255,0.2);
@@ -1098,80 +1263,82 @@
     justify-content: center;
     cursor: pointer;
     transition: all 0.2s ease;
+    margin-bottom: 1.5rem;
+    flex-shrink: 0;
   }
 
   .inner-circle {
-    width: 80%;
-    height: 80%;
+    width: 85%;
+    height: 85%;
     border-radius: 50%;
     background: rgba(255,255,255,0.15);
     display: flex;
     align-items: center;
     justify-content: center;
+    transition: all 0.15s ease;
   }
 
   .tap-text {
-    font-size: 1.5rem;
+    font-size: 1.125rem;
     opacity: 0.9;
+    font-weight: 500;
   }
 
-  .counter-button:active {
+  .counter-button:active .inner-circle {
     transform: scale(0.95);
-    background: rgba(255,255,255,0.15);
+    background: rgba(255,255,255,0.25);
   }
 
   .reset-button {
     background: rgba(255,255,255,0.1);
     color: white;
     border: none;
-    padding: 0.75rem 1.5rem;
-    border-radius: 4px;
+    padding: 0.625rem 1.5rem;
+    border-radius: 8px;
     cursor: pointer;
-    font-size: 1rem;
+    font-size: 0.875rem;
+    transition: all 0.2s ease;
   }
 
-  @media (max-width: 640px) {
-    .prayer-container {
-      padding: 0;
+  .reset-button:hover {
+    background: rgba(255,255,255,0.15);
+  }
+
+  @media (max-height: 700px) {
+    .counter-content {
+      padding: 3rem 1rem 1.5rem;
     }
 
-    .prayer-times-grid {
-      grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-      gap: 0.75rem;
-      padding: 0.75rem;
-      margin: 0.5rem;
-    }
-
-    .prayer-time-card {
-      padding: 1rem 0.75rem;
+    .dhikr-display {
+      margin-bottom: 1rem;
+      padding: 0.5rem;
       gap: 0.5rem;
     }
 
-    .icon-wrapper {
-      padding: 0.5rem;
+    .arabic-large {
+      font-size: 1.25rem;
     }
 
-    .prayer-name {
-      font-size: 0.875rem;
-    }
-
-    .prayer-time {
-      font-size: 1rem;
-    }
-
-    .tabs {
-      padding: 0.5rem;
-      gap: 0.25rem;
-    }
-
-    .tab-button {
-      padding: 0.5rem;
+    .latin-large {
       font-size: 0.75rem;
     }
 
-    .tab-button :global(svg) {
-      width: 16px;
-      height: 16px;
+    .meaning {
+      font-size: 0.675rem;
+    }
+
+    .progress {
+      margin: 0.75rem 0 1.5rem;
+    }
+
+    .count-large {
+      font-size: 3.5rem;
+    }
+
+    .counter-button {
+      width: 130px;
+      height: 130px;
+      margin-bottom: 1rem;
     }
   }
 
@@ -1287,29 +1454,23 @@
     margin-bottom: 0.5rem;
   }
 
-  .dhikr-slider {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
+  .dhikr-input {
+    margin-bottom: 1rem;
   }
 
-  .dhikr-option {
-    background: white;
-    border: 1px solid #E0E0E0;
+  .text-input {
+    width: 100%;
     padding: 0.75rem;
+    border: 1px solid #E0E0E0;
     border-radius: 8px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.25rem;
-    cursor: pointer;
-    transition: all 0.2s ease;
+    font-size: 1rem;
+    color: #216974;
   }
 
-  .dhikr-option.active {
-    background: #216974;
+  .text-input:focus {
+    outline: none;
     border-color: #216974;
-    color: white;
+    box-shadow: 0 0 0 2px rgba(33, 105, 116, 0.1);
   }
 
   .count-input {

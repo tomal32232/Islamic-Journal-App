@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { fade } from 'svelte/transition';
   import Profile from './Profile.svelte';
   import { iconMap } from '../utils/icons';
@@ -17,13 +17,15 @@
     updatePrayerStatuses,
     saveExcusedPeriod,
     endExcusedPeriod,
-    getActiveExcusedPeriod 
+    getActiveExcusedPeriod,
+    cache as prayerHistoryCache,
+    updatePastPrayerStatuses
   } from '../stores/prayerHistoryStore';
   import WeeklyPrayerHistory from '../components/WeeklyPrayerHistory.svelte';
   import { createEventDispatcher } from 'svelte';
   import Journal from './Journal.svelte';
   import { getTodayReadingTime, formatReadingTime } from '../services/readingTimeService';
-  import { weeklyStatsStore, getWeeklyStats } from '../stores/tasbihStore';
+  import { weeklyStatsStore, getWeeklyStats, initializeTasbihStore, ensureAccurateDailyCount } from '../stores/tasbihStore';
   import { quoteStore, getRandomQuote, syncQuotes } from '../services/quoteService';
   import MoodSelector from '../components/MoodSelector.svelte';
   import { moodHistoryStore, saveMood, getMoodHistory, getMoodForDate, shouldShowMoodSelector } from '../stores/moodStore';
@@ -40,6 +42,7 @@
   import { fetchMoodGuidance } from '../services/moodGuidanceService';
   import QuranReading from '../components/QuranReading.svelte';
   import LocationPermissionDialog from '../components/LocationPermissionDialog.svelte';
+  import MoodPopup from '../components/MoodPopup.svelte';
   const dispatch = createEventDispatcher();
   
   let currentPage = 'home';
@@ -51,6 +54,38 @@
   let showLocationDialog = false;
 
   let isAdmin = false;
+
+  type MoodPeriod = 'morning' | 'evening';
+  type PrayerTime = {
+    name: string;
+    timestamp: string;
+  };
+
+  type WeekMoods = {
+    [date: string]: {
+      morning?: any;
+      evening?: any;
+    };
+  };
+
+  type MoodSelectorResult = {
+    showMorningMood: boolean;
+    showEveningMood: boolean;
+  };
+
+  type PrayerTimesStore = Array<PrayerTime>;
+
+  let showMoodPopup = false;
+  let currentMoodPeriod: MoodPeriod = 'morning';
+  let lastMoodCheck: Date | null = null;
+  let weekMoods: WeekMoods = {};
+
+  // Add a flag to track if an update is already in progress
+  let isUpdatingPrayerStatus = false;
+  // Add a timestamp to track the last update time
+  let lastPrayerStatusUpdate: number = 0;
+  // Minimum time between updates (5 seconds)
+  const MIN_UPDATE_INTERVAL: number = 5000;
 
   async function checkAndSetAdminStatus() {
     const firebaseAuth = getAuth();
@@ -133,15 +168,39 @@
       checkExcusedStatus()
     ]);
     
-    const prayerInterval = setInterval(() => updatePrayerStatus(), 60000);
+    // Increase the interval to 5 minutes to reduce frequency of calls
+    const prayerInterval = setInterval(() => updatePrayerStatus(), 300000);
     const countdownInterval = setInterval(updateCountdown, 1000);
     const notificationInterval = setInterval(checkPrayerNotifications, 60000);
     
+    // Initial check and setup interval
+    checkMoodPopup();
+    const moodCheckInterval = setInterval(checkMoodPopup, 60000);
+
+    // Initialize the tasbih store to ensure accurate daily count
+    if (auth.currentUser) {
+      try {
+        await initializeTasbihStore();
+        // After initialization, ensure we have the most accurate count
+        await ensureAccurateDailyCount();
+        // Update the UI with the latest count from the store
+        const latestStats = await getWeeklyStats();
+        if (latestStats?.dailyCounts) {
+          const todayCount = latestStats.dailyCounts.find(day => day.isToday);
+          todayTasbihCount = todayCount ? todayCount.count : 0;
+          console.log('Home: Updated today\'s tasbih count to', todayTasbihCount);
+        }
+      } catch (error) {
+        console.error('Error initializing tasbih store:', error);
+      }
+    }
+
     return () => {
       cleanup();
       clearInterval(prayerInterval);
       clearInterval(countdownInterval);
       clearInterval(notificationInterval);
+      clearInterval(moodCheckInterval);
       container?.removeEventListener('scroll', handleScroll);
     };
   });
@@ -149,6 +208,31 @@
   function navigateTo(page) {
     currentPage = page;
     dispatch('navigate', page);
+  }
+
+  // Function to refresh the dhikr count
+  async function refreshDhikrCount() {
+    if (!auth.currentUser) return;
+    
+    try {
+      // Ensure we have the most accurate count
+      await ensureAccurateDailyCount();
+      
+      // Update the UI with the latest count from the store
+      const latestStats = await getWeeklyStats();
+      if (latestStats?.dailyCounts) {
+        const todayCount = latestStats.dailyCounts.find(day => day.isToday);
+        todayTasbihCount = todayCount ? todayCount.count : 0;
+        console.log('Home: Refreshed today\'s tasbih count to', todayTasbihCount);
+      }
+    } catch (error) {
+      console.error('Error refreshing dhikr count:', error);
+    }
+  }
+
+  // Refresh the dhikr count when the component becomes visible
+  $: if (currentPage === 'home' && auth.currentUser) {
+    refreshDhikrCount();
   }
 
   function handleTabChange(event) {
@@ -214,7 +298,7 @@
 
   let upcomingPrayer = null;
   let pendingPrayers = [];
-  let isLoadingPrayers = true;
+  let isLoadingPrayers = false;
 
   let upcomingCountdown = '';
   let countdownEnded = false;
@@ -227,8 +311,6 @@
   let showMoodSelector = false;
   let currentMorningMood = null;
   let currentEveningMood = null;
-  let weekMoods = {};
-  let currentMoodPeriod = 'morning';
 
   let selectedHistoryMood = null;
 
@@ -339,10 +421,13 @@
     const diff = prayerDate - now;
     if (diff < 0) {
       // Prayer time has passed
-      countdownEnded = true;
-      // Move to pending and find next upcoming prayer
-      await getPrayerHistory();
-      updatePrayerStatus();
+      // Only update if countdown wasn't already ended
+      if (!countdownEnded) {
+        countdownEnded = true;
+        // Move to pending and find next upcoming prayer
+        await getPrayerHistory();
+        updatePrayerStatus();
+      }
       return;
     }
     
@@ -355,80 +440,73 @@
   }
 
   async function updatePrayerStatus() {
-    console.log('Starting updatePrayerStatus...');
-    console.log('Current prayer times store:', $prayerTimesStore);
-    console.log('Current prayer history store:', $prayerHistoryStore);
+    // Check if document is visible (skip updates when app is in background)
+    if (document.hidden) {
+      console.log('pppp Skipping update - app is in background');
+      return;
+    }
     
+    // Check if an update is already in progress or if it's too soon for another update
+    const now = Date.now();
+    if (isUpdatingPrayerStatus || (now - lastPrayerStatusUpdate < MIN_UPDATE_INTERVAL)) {
+      console.log('pppp Skipping update - already in progress or too soon since last update');
+      return;
+    }
+    
+    // Set the flag to prevent concurrent updates
+    isUpdatingPrayerStatus = true;
     isLoadingPrayers = true;
+    
     try {
+      // Update past prayer statuses first
+      await updatePastPrayerStatuses();
+      
       // Check if we have data in the store
       if (!$prayerTimesStore || $prayerTimesStore.length === 0) {
-        console.log('No prayer times in store, fetching...');
-        // Only fetch if we don't have any data
+        console.log('pppp No prayer times in store, fetching...');
         await fetchPrayerTimes();
-      } else {
-        // Check if we need to fetch new prayer times (after midnight)
-        const now = new Date();
-        const lastFetchDate = $prayerTimesStore[0]?.fetchDate;
-        console.log('Last fetch date:', lastFetchDate);
-        if (lastFetchDate && new Date(lastFetchDate).getDate() !== now.getDate()) {
-          console.log('New day detected, fetching new prayer times...');
-          await fetchPrayerTimes();
-        } else {
-          console.log('Using cached prayer times');
-        }
       }
-
-      // Only update prayer statuses if we have no history data
-      if (!$prayerHistoryStore?.history) {
-        console.log('No prayer history in store, fetching...');
+      
+      // Only fetch prayer history if we don't have it or if it's stale
+      if (!$prayerHistoryStore?.history || !prayerHistoryCache.lastFetched) {
+        console.log('pppp No prayer history in store or cache expired, fetching...');
         await getPrayerHistory();
       } else {
-        console.log('Using cached prayer history');
-      }
-
-      // Skip updatePrayerStatuses if we already have data
-      if (!$prayerHistoryStore?.pendingByDate) {
-        console.log('Updating prayer statuses...');
-        await updatePrayerStatuses();
-      } else {
-        console.log('Using cached prayer statuses');
-      }
-      
-      // Use the same counting logic as NotificationIcon
-      pendingPrayers = Object.values($prayerHistoryStore.pendingByDate)
-        .reduce((prayers, { prayers: datePrayers }) => [...prayers, ...datePrayers], []);
-      
-      upcomingPrayer = null;
-      
-      // Check if all prayers for today have passed
-      let allPrayersPassed = true;
-      if ($prayerTimesStore && $prayerTimesStore.length > 0) {
-        const now = new Date();
-        for (const prayer of $prayerTimesStore) {
-          if (!prayer?.time) continue;
-          const prayerTime = convertPrayerTimeToDate(prayer.time);
-          if (prayerTime > now) {
-            allPrayersPassed = false;
-            if (!upcomingPrayer) {
-              upcomingPrayer = prayer;
-              console.log('Found upcoming prayer:', prayer);
-              break;
-            }
-          }
+        const cacheAge = Number(Date.now()) - Number(prayerHistoryCache.lastFetched);
+        const CACHE_MAX_AGE = 5 * 60 * 1000; // 5 minutes
+        
+        if (cacheAge > CACHE_MAX_AGE) {
+          console.log('pppp Prayer history cache expired, fetching fresh data...');
+          await getPrayerHistory();
+        } else {
+          console.log('pppp Using cached prayer history, age:', Math.round(cacheAge / 1000), 'seconds');
         }
       }
 
-      // If all prayers have passed, set upcomingPrayer to null to show appropriate message
-      if (allPrayersPassed) {
-        console.log('All prayers have passed for today');
-        upcomingPrayer = null;
+      // Update the upcoming prayer
+      console.log('pppp Updating upcoming prayer...');
+      console.log('pppp Prayer times store:', $prayerTimesStore);
+      
+      // Get the next prayer
+      upcomingPrayer = getNextPrayer();
+      console.log('pppp Next prayer:', upcomingPrayer);
+      
+      // Update countdown if we have an upcoming prayer
+      if (upcomingPrayer) {
+        updateCountdown();
+        console.log('pppp Updated countdown:', upcomingCountdown);
+      } else {
+        console.log('pppp No upcoming prayer found');
       }
+      
+      // Update the timestamp of the last successful update
+      lastPrayerStatusUpdate = Date.now();
     } catch (error) {
-      console.error('Error updating prayer status:', error);
+      console.error('pppp Error updating prayer status:', error);
     } finally {
       isLoadingPrayers = false;
-      console.log('Finished updatePrayerStatus');
+      // Reset the flag to allow future updates
+      isUpdatingPrayerStatus = false;
     }
   }
 
@@ -523,10 +601,63 @@
     }
   }
 
-  async function handleMoodSelect(event) {
-    const selectedMood = event.detail;
+  // Function to check if we should show the mood popup
+  function checkMoodPopup(): void {
+    if (!$prayerTimesStore || !Array.isArray($prayerTimesStore) || $prayerTimesStore.length === 0) return;
+
+    const now = new Date();
+    const today = now.toLocaleDateString();
+
+    // Don't check more than once per minute
+    const timeDiff = lastMoodCheck ? now.getTime() - lastMoodCheck.getTime() : Infinity;
+    if (timeDiff < 60000) return;
+    lastMoodCheck = now;
+
+    // Get today's moods
+    const todayMoods = weekMoods[today] || {};
+
+    // Get prayer times
+    const prayerTimes = $prayerTimesStore as PrayerTimesStore;
+    const fajrPrayer = prayerTimes.find(p => p.name === 'Fajr');
+    const maghribPrayer = prayerTimes.find(p => p.name === 'Maghrib');
+    const dhuhrPrayer = prayerTimes.find(p => p.name === 'Dhuhr');
+
+    if (!fajrPrayer || !maghribPrayer || !dhuhrPrayer) return;
+
+    const fajrTime = new Date(fajrPrayer.timestamp);
+    const maghribTime = new Date(maghribPrayer.timestamp);
+    const dhuhrTime = new Date(dhuhrPrayer.timestamp);
+
+    // Check if we're in the morning window (after Fajr, before Dhuhr)
+    const isMorningWindow = now >= fajrTime && now < dhuhrTime;
+    
+    // Check if we're in the evening window (after Maghrib, before midnight)
+    const isEveningWindow = now >= maghribTime && now.getHours() < 24;
+
+    // Show popup for morning if:
+    // 1. It's after Fajr and before Dhuhr
+    // 2. We haven't recorded morning mood yet
+    if (isMorningWindow && !todayMoods.morning) {
+      currentMoodPeriod = 'morning';
+      showMoodPopup = true;
+      return;
+    }
+
+    // Show popup for evening if:
+    // 1. It's after Maghrib and before midnight
+    // 2. We haven't recorded evening mood yet
+    if (isEveningWindow && !todayMoods.evening) {
+      currentMoodPeriod = 'evening';
+      showMoodPopup = true;
+      return;
+    }
+
+    showMoodPopup = false;
+  }
+
+  async function handleMoodSubmit(selectedMood: any, period: MoodPeriod): Promise<void> {
     try {
-      await saveMood(selectedMood, selectedMood.guidance, currentMoodPeriod);
+      await saveMood(selectedMood, selectedMood.guidance, period);
       
       // Use the local mood template to ensure we have the icon
       const matchingMood = moods.find(m => m.value === selectedMood.value);
@@ -539,17 +670,29 @@
           guidance: selectedMood.guidance
         };
 
-        if (currentMoodPeriod === 'morning') {
+        if (period === 'morning') {
           currentMorningMood = moodData;
         } else {
           currentEveningMood = moodData;
         }
       }
-      showMoodSelector = false;
       await loadWeekMoods();
     } catch (error) {
       console.error('Error saving mood:', error);
     }
+  }
+
+  function handleMoodSelect(event: CustomEvent): void {
+    void handleMoodSubmit(event.detail, currentMoodPeriod);
+    showMoodPopup = false;
+  }
+
+  function handleMoodSkip(): void {
+    showMoodPopup = false;
+  }
+
+  function handleMoodClose(): void {
+    showMoodPopup = false;
   }
 
   async function loadWeekMoods() {
@@ -718,7 +861,9 @@
 
   // Function to get the next prayer
   function getNextPrayer() {
-    if (!$prayerTimesStore || $prayerTimesStore.length === 0) return null;
+    if (!$prayerTimesStore || $prayerTimesStore.length === 0) {
+      return null;
+    }
     
     const now = new Date();
     const currentTime = Number(now.getHours()) * 60 + Number(now.getMinutes());
@@ -742,8 +887,19 @@
       }
     }
     
-    // If no prayer is found for today, return the first prayer of tomorrow
-    return $prayerTimesStore[0];
+    // If no prayer is found for today, only return Fajr if it's after midnight
+    const fajr = $prayerTimesStore[0]; // Fajr is always the first prayer
+    const [fajrTime, fajrPeriod] = fajr.time.split(' ');
+    const [fajrHours] = fajrTime.split(':');
+    let fajrHour = parseInt(fajrHours);
+    if (fajrPeriod === 'AM' && fajrHour === 12) fajrHour = 0;
+    
+    // Only show Fajr as next prayer if current time is after midnight and before Fajr
+    if (now.getHours() >= 0 && now.getHours() < fajrHour) {
+      return fajr;
+    }
+    
+    return null; // No next prayer to show
   }
 
   // Function to test notification
@@ -784,13 +940,58 @@
       fetchPrayerTimes();
     }
   }
+
+  function handleTestMoodPopup() {
+    // Toggle between morning and evening
+    currentMoodPeriod = currentMoodPeriod === 'morning' ? 'evening' : 'morning';
+    showMoodPopup = true;
+  }
+
+  // Add this function to handle manual mood tracking
+  function handleManualMoodTracking(period) {
+    // Get prayer times
+    const prayerTimes = $prayerTimesStore;
+    const fajrPrayer = prayerTimes.find(p => p.name === 'Fajr');
+    const maghribPrayer = prayerTimes.find(p => p.name === 'Maghrib');
+    
+    if (!fajrPrayer || !maghribPrayer) return;
+
+    const now = new Date();
+    const fajrTime = new Date(fajrPrayer.timestamp);
+    const maghribTime = new Date(maghribPrayer.timestamp);
+
+    if (period === 'morning' && now < fajrTime) {
+      alert('Please wait until after Fajr prayer to record your morning reflection.');
+      return;
+    }
+
+    if (period === 'evening' && now < maghribTime) {
+      alert('Please wait until after Maghrib prayer to record your evening reflection.');
+      return;
+    }
+
+    currentMoodPeriod = period;
+    showMoodPopup = true;
+  }
+
+  // Update today's tasbih count whenever the weeklyStatsStore changes
+  $: if ($weeklyStatsStore?.dailyCounts) {
+    const todayCount = $weeklyStatsStore.dailyCounts.find(day => day.isToday);
+    if (todayCount) {
+      todayTasbihCount = todayCount.count;
+      console.log('Home: Updated today\'s tasbih count from store to', todayTasbihCount);
+    }
+  }
 </script>
 
 <div class="home-container">
-  <NotificationIcon on:click={() => navigateTo('notifications')} />
+  <div class="top-bar">
+    <NotificationIcon on:click={() => navigateTo('notifications')} />
+  </div>
   <div class="content">
     {#if currentPage === 'home'}
       <div class="home-content">
+        <!-- Add test button at the top -->
         <div class="quote-card" class:scrolled={isScrolled}>
           <div class="greeting-section">
             <div class="greeting-content">
@@ -879,6 +1080,33 @@
                     {/if}
                   </div>
                 {/if}
+                
+                {#if isToday}
+                  <div class="mood-add-buttons">
+                    {#if !weekMoods[fullDate]?.morning}
+                      <button 
+                        class="mood-add-button morning" 
+                        on:click={() => handleManualMoodTracking('morning')}
+                        title="Add morning mood"
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <path d="M12 5v14M5 12h14" />
+                        </svg>
+                      </button>
+                    {/if}
+                    {#if !weekMoods[fullDate]?.evening}
+                      <button 
+                        class="mood-add-button evening" 
+                        on:click={() => handleManualMoodTracking('evening')}
+                        title="Add evening mood"
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <path d="M12 5v14M5 12h14" />
+                        </svg>
+                      </button>
+                    {/if}
+                  </div>
+                {/if}
               </div>
             {/each}
           </div>
@@ -917,7 +1145,14 @@
               </div>
             </div>
 
-            <div class="activity-card" on:click={() => navigateTo('tasbih')}>
+            <div class="activity-card" on:click={() => {
+              // Set the activeTab in Prayer component to 'tasbih' first
+              if (typeof window !== 'undefined') {
+                window.localStorage.setItem('prayer_active_tab', 'tasbih');
+              }
+              // Then navigate to prayer page
+              navigateTo('prayer');
+            }}>
               <div class="activity-icon tasbih">
                 <svelte:component this={iconMap.Timer} size={18} weight="fill" color="#216974" />
               </div>
@@ -937,6 +1172,18 @@
               </div>
             </div>
           </div>
+          
+          {#if $journalStore.todayMorningReflection?.affirmation}
+            <div class="affirmation-card">
+              <div class="affirmation-icon">
+                <svelte:component this={iconMap.Star} size={16} weight="fill" color="#E09453" />
+              </div>
+              <div class="affirmation-content">
+                <span class="affirmation-label">Today's Affirmation</span>
+                <p class="affirmation-text">"{$journalStore.todayMorningReflection.affirmation}"</p>
+              </div>
+            </div>
+          {/if}
         </div>
 
         <div class="next-prayer-card">
@@ -979,12 +1226,6 @@
                   {/if}
                 </div>
               </div>
-              <button 
-                class="test-notification-btn"
-                on:click={testNotification}
-              >
-                Test Notification
-              </button>
             {:else}
               <div class="no-prayer-message">
                 <p>All prayers for today have passed. The next prayer times will be shown after midnight.</p>
@@ -999,7 +1240,6 @@
         </div>
 
         <div class="weekly-prayer-history">
-          <h3 class="section-title">Weekly Prayer History</h3>
           <WeeklyPrayerHistory />
         </div>
       </div>
@@ -1023,6 +1263,15 @@
 
 {#if showLocationDialog}
   <LocationPermissionDialog on:permissionResult={handleLocationResult} />
+{/if}
+
+{#if showMoodPopup}
+  <MoodPopup
+    period={currentMoodPeriod}
+    on:select={handleMoodSelect}
+    on:skip={handleMoodSkip}
+    on:close={handleMoodClose}
+  />
 {/if}
 
 <style>
@@ -1685,7 +1934,6 @@
 
   .mood-icon-button:hover {
     transform: scale(1.1);
-    color: #184f57;
   }
 
   .mood-icon-button :global(svg) {
@@ -1694,7 +1942,7 @@
   }
 
   .next-prayer-card {
-    margin-bottom: 1rem;
+    margin-top: 1rem;
   }
 
   .next-prayer-content {
@@ -1829,27 +2077,6 @@
     font-size: 0.875rem;
   }
 
-  .test-notification-btn {
-    background-color: #4CAF50;
-    color: white;
-    border: none;
-    padding: 8px 16px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 14px;
-    margin-top: 12px;
-    width: 100%;
-    transition: background-color 0.2s ease;
-  }
-  
-  .test-notification-btn:hover {
-    background-color: #45a049;
-  }
-  
-  .test-notification-btn:active {
-    background-color: #3d8b40;
-  }
-  
   .next-prayer-card {
     background: white;
     padding: 16px;
@@ -1894,11 +2121,6 @@
     justify-content: space-between;
     margin: 0;
     padding: 0.25rem 0;
-  }
-
-  /* Remove the old calendar-strip transition styles */
-  .quote-card.scrolled + .calendar-strip {
-    display: none;
   }
 
   .mood-icons {
@@ -1980,6 +2202,135 @@
     display: flex;
     gap: 10px;
     margin-top: 10px;
+  }
+
+  .test-button-container {
+    padding: 0.5rem 0;
+    display: flex;
+    justify-content: center;
+    margin-bottom: 0.5rem;
+  }
+
+  .test-button {
+    background: #216974;
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 12px;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 2px 4px rgba(33, 105, 116, 0.1);
+    flex-grow: 1;
+  }
+
+  .test-button:hover {
+    background-color: #184f57;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 6px rgba(33, 105, 116, 0.15);
+  }
+
+  .test-button:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 2px rgba(33, 105, 116, 0.1);
+  }
+
+  .top-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 1rem;
+    background: transparent;
+    position: absolute;
+    top: 0;
+    right: 0;
+    z-index: 100;
+    gap: 1rem;
+  }
+
+  .mood-add-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 0.25rem;
+    margin-top: 0.25rem;
+  }
+
+  .mood-add-button {
+    width: 1.25rem;
+    height: 1.25rem;
+    border-radius: 50%;
+    border: none;
+    background: #f0f4f5;
+    color: #216974;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .mood-add-button:hover {
+    background: #e0eaec;
+    transform: scale(1.1);
+  }
+
+  .mood-add-button svg {
+    width: 0.75rem;
+    height: 0.75rem;
+  }
+
+  .mood-add-button.morning {
+    border: 1px solid rgba(255, 166, 0, 0.3);
+  }
+
+  .mood-add-button.evening {
+    border: 1px solid rgba(70, 130, 180, 0.3);
+  }
+
+  .next-prayer-card {
+    margin-top: 1rem;
+  }
+  
+  .affirmation-card {
+    background-color: #f8f5f0;
+    border-radius: 12px;
+    padding: 0.75rem;
+    margin-top: 0.75rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  }
+  
+  .affirmation-icon {
+    background-color: #fdf2e9;
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  
+  .affirmation-content {
+    flex: 1;
+  }
+  
+  .affirmation-label {
+    font-size: 0.75rem;
+    color: #666;
+    display: block;
+    margin-bottom: 0.25rem;
+  }
+  
+  .affirmation-text {
+    font-size: 0.875rem;
+    color: #333;
+    font-style: italic;
+    margin: 0;
+    line-height: 1.4;
   }
 </style>
 

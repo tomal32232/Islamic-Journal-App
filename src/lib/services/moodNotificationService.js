@@ -8,7 +8,8 @@ const NOTIFICATION_DELAY = 10;
 
 export async function scheduleMoodNotifications(enabled = true) {
     try {
-        console.log('Starting mood notification scheduling, enabled:', enabled);
+        console.log('=== Starting Mood Notification Setup ===');
+        console.log('Mood notifications enabled:', enabled);
         
         if (!enabled) {
             console.log('Mood notifications disabled, cancelling existing notifications...');
@@ -55,9 +56,72 @@ export async function scheduleMoodNotifications(enabled = true) {
             console.log('Cancelled existing mood notifications');
         }
 
-        const prayerTimes = get(prayerTimesStore);
+        // Try to get prayer times with retries
+        let retries = 0;
+        let prayerTimes = get(prayerTimesStore);
+        
+        while ((!prayerTimes || prayerTimes.length === 0) && retries < 3) {
+            console.log(`Attempt ${retries + 1} to get prayer times...`);
+            await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds between retries
+            prayerTimes = get(prayerTimesStore);
+            retries++;
+        }
+
         if (!prayerTimes || prayerTimes.length === 0) {
-            console.error('Prayer times not available, cannot schedule mood notifications');
+            console.log('Using fallback fixed times for mood notifications');
+            // Schedule default notifications at fixed times if prayer times aren't available
+            const morningTime = new Date();
+            morningTime.setHours(6, 0, 0); // 6:00 AM
+            
+            const eveningTime = new Date();
+            eveningTime.setHours(19, 0, 0); // 7:00 PM
+
+            console.log('Scheduling fixed morning notification for:', morningTime.toLocaleString());
+            // Schedule morning notification
+            await LocalNotifications.schedule({
+                notifications: [{
+                    title: 'Morning Reflection Time',
+                    body: 'Take a moment to reflect and record your mood.',
+                    id: 2001,
+                    schedule: { at: morningTime, every: 'day', allowWhileIdle: true },
+                    smallIcon: 'ic_launcher_foreground',
+                    channelId: 'mood_notifications',
+                    sound: 'notification_sound',
+                    ongoing: false,
+                    autoCancel: true
+                }]
+            });
+            console.log('Fixed morning mood notification scheduled successfully');
+
+            console.log('Scheduling fixed evening notification for:', eveningTime.toLocaleString());
+            // Schedule evening notification
+            await LocalNotifications.schedule({
+                notifications: [{
+                    title: 'Evening Reflection Time',
+                    body: 'Take a moment to reflect on your day and record your mood.',
+                    id: 2002,
+                    schedule: { at: eveningTime, every: 'day', allowWhileIdle: true },
+                    smallIcon: 'ic_launcher_foreground',
+                    channelId: 'mood_notifications',
+                    sound: 'notification_sound',
+                    ongoing: false,
+                    autoCancel: true
+                }]
+            });
+            console.log('Fixed evening mood notification scheduled successfully');
+            
+            // Log all scheduled mood notifications
+            const pending = await LocalNotifications.getPending();
+            console.log('Currently scheduled mood notifications:', 
+                pending.notifications
+                    .filter(n => n.id === 2001 || n.id === 2002)
+                    .map(n => ({
+                        id: n.id,
+                        title: n.title,
+                        scheduledTime: new Date(n.schedule.at).toLocaleString()
+                    }))
+            );
+            console.log('=== Mood Notification Setup Complete (Fixed Times) ===');
             return;
         }
 
@@ -114,10 +178,23 @@ export async function scheduleMoodNotifications(enabled = true) {
             }]
         });
         console.log('Evening mood notification scheduled');
-        console.log('Successfully scheduled all mood notifications');
+
+        // After scheduling both notifications, log the final status
+        const finalPending = await LocalNotifications.getPending();
+        console.log('All scheduled mood notifications:', 
+            finalPending.notifications
+                .filter(n => n.id === 2001 || n.id === 2002)
+                .map(n => ({
+                    id: n.id,
+                    title: n.title,
+                    scheduledTime: new Date(n.schedule.at).toLocaleString()
+                }))
+        );
+        console.log('=== Mood Notification Setup Complete (Prayer-based Times) ===');
 
     } catch (error) {
-        console.error('Error scheduling mood notifications:', error);
-        throw error; // Re-throw to handle in the calling function
+        console.error('=== Error in Mood Notification Setup ===');
+        console.error('Error details:', error);
+        throw error;
     }
 } 

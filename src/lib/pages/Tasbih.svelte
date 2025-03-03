@@ -382,7 +382,7 @@
     right: 0;
     bottom: 0;
     background: linear-gradient(135deg, #216974, #1a545d);
-    padding: 2rem;
+    padding: 1rem;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -397,8 +397,9 @@
     color: white;
     border: none;
     padding: 0.5rem 1rem;
-    border-radius: 4px;
+    border-radius: 8px;
     cursor: pointer;
+    font-size: 0.875rem;
   }
 
   .counter-content {
@@ -406,50 +407,79 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    gap: 2rem;
+    justify-content: space-between;
+    padding: 3rem 1rem 2rem 1rem;
+    max-width: 600px;
+    margin: 0 auto;
+    width: 100%;
   }
 
   .dhikr-display {
     text-align: center;
-    margin-bottom: 2rem;
+    width: 100%;
+    max-width: 90%;
+    margin: 0 auto;
   }
 
   .arabic-large {
-    font-size: 2.5rem;
+    font-size: min(4vw, 1.75rem);
     display: block;
     margin-bottom: 0.5rem;
+    line-height: 1.3;
   }
 
   .latin-large {
-    font-size: 1.25rem;
+    font-size: min(4vw, 1rem);
     display: block;
     margin-bottom: 0.25rem;
+    opacity: 0.9;
+  }
+
+  .meaning {
+    font-size: min(3.5vw, 0.875rem);
+    display: block;
+    opacity: 0.7;
+    margin-bottom: 0.5rem;
   }
 
   .progress {
     text-align: center;
-    margin-bottom: 2rem;
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 0.25rem;
+    margin: 1rem 0;
   }
 
-  .count-large {
-    font-size: 4rem;
-    font-weight: 500;
+  .sets-display {
+    font-size: min(3.5vw, 1rem);
+    opacity: 0.8;
     display: block;
   }
 
+  .count-large {
+    font-size: min(12vw, 4rem);
+    font-weight: 500;
+    display: block;
+    line-height: 1;
+  }
+
   .target-display {
-    font-size: 1.25rem;
+    font-size: min(4vw, 1rem);
     opacity: 0.8;
   }
 
+  .total-count {
+    display: block;
+    font-size: min(3.5vw, 0.875rem);
+    opacity: 0.8;
+    color: #E09453;
+    margin-top: 0.25rem;
+  }
+
   .counter-button {
-    width: 200px;
-    height: 200px;
+    width: min(60vw, 180px);
+    height: min(60vw, 180px);
     border-radius: 50%;
     background: rgba(255,255,255,0.1);
     border: 2px solid rgba(255,255,255,0.2);
@@ -458,52 +488,59 @@
     justify-content: center;
     cursor: pointer;
     transition: all 0.2s ease;
+    margin: 1rem 0;
   }
 
   .inner-circle {
-    width: 80%;
-    height: 80%;
+    width: 85%;
+    height: 85%;
     border-radius: 50%;
     background: rgba(255,255,255,0.15);
     display: flex;
     align-items: center;
     justify-content: center;
+    transition: all 0.2s ease;
   }
 
   .tap-text {
-    font-size: 1.5rem;
+    font-size: min(4vw, 1.25rem);
     color: white;
     opacity: 0.9;
   }
 
-  .counter-button:active {
+  .counter-button:active .inner-circle {
     transform: scale(0.95);
-    background: rgba(255,255,255,0.15);
+    background: rgba(255,255,255,0.25);
   }
 
   .reset-button {
     background: rgba(255,255,255,0.1);
     color: white;
     border: none;
-    padding: 0.75rem 1.5rem;
-    border-radius: 4px;
+    padding: 0.75rem 2rem;
+    border-radius: 100px;
     cursor: pointer;
-    font-size: 1rem;
+    font-size: 0.875rem;
+    transition: all 0.2s ease;
   }
 
-  .sets-display {
-    font-size: 1.25rem;
-    opacity: 0.8;
-    display: block;
-    margin-bottom: 0.5rem;
+  .reset-button:hover {
+    background: rgba(255,255,255,0.15);
   }
 
-  .total-count {
-    display: block;
-    font-size: 1rem;
-    opacity: 0.8;
-    margin-top: 0.5rem;
-    color: #E09453;  /* Using the accent color from your theme */
+  /* Add responsive container for better layout on larger screens */
+  @media (min-width: 768px) {
+    .counter-content {
+      gap: 3rem;
+    }
+
+    .dhikr-display {
+      margin-bottom: 0;
+    }
+
+    .progress {
+      margin: 0;
+    }
   }
 
   .streak-display {

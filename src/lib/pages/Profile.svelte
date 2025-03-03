@@ -3,15 +3,18 @@
   import { prayerHistoryStore } from '../stores/prayerHistoryStore';
   import { weeklyStatsStore } from '../stores/tasbihStore';
   import { badgeStore } from '../stores/badgeStore';
-  import { SignOut, CaretRight, PencilSimple, Camera } from 'phosphor-svelte';
+  import { SignOut, CaretRight, PencilSimple, Camera, Lock } from 'phosphor-svelte';
   import { currentPage } from '../stores/pageStore';
   import { onMount, onDestroy } from 'svelte';
   import { fade } from 'svelte/transition';
   import { getTodayReadingTime } from '../services/readingTimeService';
   import { getFirestore, collection, query, where, getDocs } from 'firebase/firestore';
+  import { signOut } from 'firebase/auth';
+  import { subscriptionStore } from '../services/revenuecat';
+  import { trialStore, getTrialTimeRemaining, formatTrialTimeRemaining } from '../services/trialService';
 
   interface StatItem {
-    value: () => number;
+    value: () => number | string;
     yesterdayValue?: () => number;
     label: string;
   }
@@ -23,7 +26,13 @@
     stats?: StatItem[];
   }
 
-  const user = auth.currentUser;
+  // Helper function for type-safe value conversion
+  function getNumberValue(value: () => number | string): number {
+    const val = value();
+    return typeof val === 'number' ? val : 0;
+  }
+
+  let user = auth.currentUser;
   let prayerStats = { onTime: 0, late: 0, missed: 0, total: 0 };
   let todayReadingTime = 0;
   let todayDhikrCount = 0;
@@ -36,6 +45,7 @@
   let displayName = localStorage.getItem('user_display_name') || user?.displayName || 'User';
   let profilePicture = '';
   let fileInput: HTMLInputElement;
+  let isLoading = true;
 
   // Calculate prayer statistics when prayerHistoryStore changes
   $: if ($prayerHistoryStore?.history) {
@@ -86,6 +96,12 @@
     earnedBadges = badgeStore.getEarnedBadges($badgeStore.earnedBadges);
   }
 
+  // Subscribe to subscription and trial status
+  $: isSubscribed = $subscriptionStore?.isSubscribed || false;
+  $: isInTrial = $trialStore?.isInTrial || false;
+  $: hasTrialEnded = $trialStore?.hasTrialEnded || false;
+  $: trialTimeRemaining = getTrialTimeRemaining();
+
   const menuItems: MenuItem[] = [
     {
       title: 'Your Progress',
@@ -124,6 +140,27 @@
       title: 'Notifications',
       description: 'Manage prayer and journal reminder settings',
       path: 'notifications'
+    },
+    {
+      title: 'Subscription',
+      description: isSubscribed 
+        ? 'Manage your subscription'
+        : isInTrial
+          ? `Free trial - ${formatTrialTimeRemaining(trialTimeRemaining)}`
+          : hasTrialEnded
+            ? 'Free trial ended - Upgrade now'
+            : 'Begin Your Spiritual Journey',
+      path: 'subscription',
+      stats: [
+        {
+          value: () => isSubscribed 
+            ? 'Active' 
+            : isInTrial
+              ? 'Trial'
+              : 'Free',
+          label: 'Status'
+        }
+      ]
     }
   ];
 
@@ -153,35 +190,17 @@
 
   export let navigateTo: (path: string) => void;
 
-  // Get yesterday's reading time on mount
-  let cleanup: (() => void) | undefined;
-
-  onMount(async () => {
-    // Get the stored profile picture or user's photoURL
-    profilePicture = localStorage.getItem('user_profile_picture') || user?.photoURL || '';
-
-    const container = document.querySelector('.profile-container');
-    if (container) {
-      container.addEventListener('scroll', handleScroll);
-      cleanup = () => container.removeEventListener('scroll', handleScroll);
-    }
-
-    // Initialize badge store
-    if (user?.uid) {
-      badgeStore.init(user.uid);
-    }
-
-    // Initialize async operations
+  // Initialize data
+  async function initializeData() {
     todayReadingTime = await getTodayReadingTime();
     
-    // Get yesterday's reading time
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    yesterday.setHours(0, 0, 0, 0);
-    const yesterdayEnd = new Date(yesterday);
-    yesterdayEnd.setHours(23, 59, 59, 999);
-
     try {
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      yesterday.setHours(0, 0, 0, 0);
+      const yesterdayEnd = new Date(yesterday);
+      yesterdayEnd.setHours(23, 59, 59, 999);
+
       const db = getFirestore();
       const readingSessionsRef = collection(db, 'reading_sessions');
       const q = query(
@@ -206,15 +225,41 @@
       console.error('Error fetching yesterday\'s reading time:', error);
       yesterdayReadingTime = 0;
     }
-  });
+  }
 
-  onDestroy(() => {
-    if (cleanup) cleanup();
+  onMount(() => {
+    // Get the stored profile picture or user's photoURL
+    profilePicture = localStorage.getItem('user_profile_picture') || user?.photoURL || '';
+
+    const container = document.querySelector('.profile-container');
+    if (container) {
+      container.addEventListener('scroll', handleScroll);
+    }
+
+    // Initialize reading time
+    initializeData().catch(console.error);
+
+    // Initialize badge store
+    if (user?.uid) {
+      badgeStore.init(user.uid);
+    }
+
+    const unsubscribe = auth.onAuthStateChanged((authUser) => {
+      user = authUser;
+      isLoading = false;
+    });
+
+    return () => {
+      if (container) {
+        container.removeEventListener('scroll', handleScroll);
+      }
+      unsubscribe();
+    };
   });
 
   async function handleLogout() {
     try {
-      await auth.signOut();
+      await signOut(auth);
       currentPage.set('home');
     } catch (error) {
       console.error("Error signing out:", error);
@@ -275,12 +320,14 @@
                 <div class="stat-item">
                   <div class="stat-header">
                     <span class="stat-value">{stat.value()}</span>
-                    {#if stat.yesterdayValue}
-                      <span class="stat-change {stat.value() > stat.yesterdayValue() ? 'positive' : stat.value() < stat.yesterdayValue() ? 'negative' : ''}">
-                        {#if stat.value() > stat.yesterdayValue()}
-                          +{stat.value() - stat.yesterdayValue()}
-                        {:else if stat.value() < stat.yesterdayValue()}
-                          {stat.value() - stat.yesterdayValue()}
+                    {#if stat.yesterdayValue && typeof stat.value() === 'number'}
+                      {@const currentValue = getNumberValue(stat.value)}
+                      {@const yesterdayValue = stat.yesterdayValue()}
+                      <span class="stat-change {currentValue > yesterdayValue ? 'positive' : currentValue < yesterdayValue ? 'negative' : ''}">
+                        {#if currentValue > yesterdayValue}
+                          +{currentValue - yesterdayValue}
+                        {:else if currentValue < yesterdayValue}
+                          {currentValue - yesterdayValue}
                         {/if}
                       </span>
                     {/if}

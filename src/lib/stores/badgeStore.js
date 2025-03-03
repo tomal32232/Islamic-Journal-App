@@ -3,6 +3,8 @@ import { badges } from '../data/badges';
 import { auth } from '../firebase';
 import { db } from '../firebase';
 import { doc, setDoc, getDoc, onSnapshot } from 'firebase/firestore';
+import { achievementStore } from './achievementStore';
+import { notificationStore } from './notificationStore';
 
 // Debounce helper function
 function debounce(func, wait) {
@@ -45,6 +47,8 @@ function createBadgeStore() {
     progress: {},
     lastUpdated: null
   });
+
+  let initialized = false;
 
   // Helper function to check if a badge should be earned
   const checkBadgeEarned = (badge, progress) => {
@@ -101,157 +105,123 @@ function createBadgeStore() {
   return {
     subscribe,
     
-    // Initialize the store with user's badges from Firestore
-    async init(userId) {
-      const userDoc = doc(db, 'users', userId, 'achievements', 'badges');
-      
-      // Set up real-time listener with rate limiting
-      onSnapshot(userDoc, (doc) => {
-        const now = Date.now();
-        if (now - lastUpdate < RATE_LIMIT_WINDOW) {
-          return; // Skip update if within rate limit window
-        }
-        lastUpdate = now;
+    init: async (userId) => {
+      if (!userId) {
+        set({ earnedBadges: [], progress: {}, lastUpdated: null });
+        return;
+      }
 
-        if (doc.exists()) {
-          const data = doc.data();
-          const { earnedBadges, newlyEarnedBadges } = verifyEarnedBadges(data.progress || {}, data.earnedBadges || []);
-          
-          if (newlyEarnedBadges.length > 0) {
-            const updatedData = {
-              ...data,
-              earnedBadges,
-              progress: data.progress || {},
-              lastUpdated: new Date()
-            };
-            
-            // Use debounced update
-            debouncedUpdate(updatedData, userDoc);
-            
-            set(updatedData);
-          } else {
-            set({ 
-              earnedBadges: data.earnedBadges || [], 
-              progress: data.progress || {}, 
-              lastUpdated: new Date() 
-            });
-          }
-        } else {
-          const initialData = { earnedBadges: [], progress: {}, lastUpdated: new Date() };
-          debouncedUpdate(initialData, userDoc);
-          set(initialData);
+      console.log('Initializing badge store for user:', userId);
+      
+      try {
+        // Get initial badge data
+        const userDoc = doc(db, 'users', userId, 'achievements', 'badges');
+        const docSnap = await getDoc(userDoc);
+        
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          set({
+            earnedBadges: data.earnedBadges || [],
+            progress: data.progress || {},
+            lastUpdated: data.lastUpdated || null
+          });
         }
-      });
+
+        // Set up real-time listener for badge updates
+        const unsubscribe = onSnapshot(userDoc, (doc) => {
+          if (!doc.exists()) return;
+          
+          const data = doc.data();
+          console.log('Badge data updated:', data);
+          
+          set({
+            earnedBadges: data.earnedBadges || [],
+            progress: data.progress || {},
+            lastUpdated: data.lastUpdated || null
+          });
+        });
+
+        initialized = true;
+        return unsubscribe;
+      } catch (error) {
+        console.error('Error initializing badge store:', error);
+      }
     },
     
     // Update progress for a specific badge type with rate limiting
     async updateProgress(type, value, silent = false) {
       const now = Date.now();
       if (now - lastUpdate < RATE_LIMIT_WINDOW) {
-        return; // Skip update if within rate limit window
+        console.log('Skipping update due to rate limiting');
+        return;
       }
       lastUpdate = now;
 
       const userId = auth.currentUser?.uid;
-      if (!userId) return;
+      if (!userId) {
+        console.log('No user ID found for badge update');
+        return;
+      }
 
       const userDoc = doc(db, 'users', userId, 'achievements', 'badges');
-      const docSnap = await getDoc(userDoc);
-      const exists = docSnap.exists();
-
-      update(state => {
-        const progress = exists ? { ...docSnap.data().progress } : {};
-        const earnedBadges = exists ? [...docSnap.data().earnedBadges] : [];
+      
+      try {
+        console.log(`Updating badge progress for ${type}:`, value);
+        const docSnap = await getDoc(userDoc);
+        const exists = docSnap.exists();
+        const currentData = exists ? docSnap.data() : { earnedBadges: [], progress: {} };
         
-        progress[type] = value;
-        
-        const newlyEarnedBadges = [];
-        
-        // Helper function to check if badge should be earned
-        const checkAndAddBadge = (badge) => {
-          if (earnedBadges.includes(badge.id)) {
-            // console.log(`Badge ${badge.id} already earned`);
-            return;
-          }
-          
-          let earned = false;
-          // Try both formats for progress value
-          const currentValue = progress[badge.requirement.type] || 
-                           progress[`${badge.requirement.type}_progress`] || 0;
-          
-          // console.log(`Checking badge ${badge.id}:`, {
-          //   currentValue,
-          //   requirement: badge.requirement
-          // });
-
-          switch (badge.requirement.type) {
-            case 'streak':
-              earned = currentValue >= badge.requirement.count;
-              break;
-            case 'ontime_fajr':
-              earned = currentValue >= badge.requirement.count;
-              break;
-            case 'daily_reading':
-              earned = currentValue >= badge.requirement.minutes;
-              break;
-            case 'juz_completion':
-              earned = currentValue >= badge.requirement.count;
-              break;
-            case 'daily_dhikr':
-              earned = currentValue >= badge.requirement.count;
-              break;
-            case 'dhikr_streak':
-              earned = currentValue >= badge.requirement.days;
-              break;
-            case 'journal_entries':
-              earned = currentValue >= badge.requirement.count;
-              break;
-            case 'journal_streak':
-              earned = currentValue >= badge.requirement.days;
-              break;
-          }
-
-          if (earned) {
-            // console.log(`Badge ${badge.id} earned!`);
-            earnedBadges.push(badge.id);
-            newlyEarnedBadges.push(badge);
-          }
+        // Update progress
+        const updatedProgress = {
+          ...currentData.progress,
+          [type]: value
         };
+        
+        // Check for newly earned badges
+        const { earnedBadges, newlyEarnedBadges } = verifyEarnedBadges(
+          updatedProgress,
+          currentData.earnedBadges || []
+        );
 
-        // Check all badge categories
-        Object.values(badges).forEach(category => {
-          Object.values(category).forEach(badgeList => {
-            badgeList.forEach(badge => {
-              if (badge.requirement.type === type) {
-                checkAndAddBadge(badge);
-              }
-            });
-          });
+        // Log badge verification results
+        console.log('Badge verification results:', {
+          currentBadges: currentData.earnedBadges || [],
+          newBadges: newlyEarnedBadges.map(b => b.id),
+          totalEarned: earnedBadges.length
         });
 
-        // Show notifications for newly earned badges
-        if (!silent && newlyEarnedBadges.length > 0) {
-          // console.log('New badges earned:', newlyEarnedBadges);
+        // Update Firestore
+        const updatedData = {
+          earnedBadges,
+          progress: updatedProgress,
+          lastUpdated: new Date()
+        };
+
+        await setDoc(userDoc, updatedData, { merge: true });
+        
+        // Update local store
+        set(updatedData);
+
+        // Trigger notifications for newly earned badges
+        if (newlyEarnedBadges.length > 0 && !silent) {
+          console.log('Triggering notifications for new badges:', 
+            newlyEarnedBadges.map(badge => ({
+              id: badge.id,
+              name: badge.name,
+              notification: badge.notification
+            }))
+          );
           newlyEarnedBadges.forEach(badge => {
-            toastStore.addToast({
-              type: 'badge',
-              title: 'New Badge Earned!',
-              message: `Congratulations! You've earned the "${badge.name}" badge!`,
-              badge: badge
-            });
+            const message = badge.notification || `🎉 New achievement unlocked: ${badge.name}!`;
+            console.log('Showing notification with message:', message);
+            notificationStore.showNotification(message, 'achievement');
           });
         }
 
-        // Use debounced update for Firestore
-        const updatedData = { 
-          earnedBadges, 
-          progress,
-          lastUpdated: new Date()
-        };
-        debouncedUpdate(updatedData, userDoc);
-
-        return updatedData;
-      });
+        return newlyEarnedBadges;
+      } catch (error) {
+        console.error('Error updating badge progress:', error);
+      }
     },
 
     // Get all available badges

@@ -5,6 +5,8 @@
   import { journalStore } from '../stores/journalStore';
   import { fade, fly } from 'svelte/transition';
   import { quintOut } from 'svelte/easing';
+  import { notificationStore } from '../stores/notificationStore';
+  import Notification from '../components/Notification.svelte';
 
   // Get current week days
   function getCurrentWeek() {
@@ -178,26 +180,26 @@
 
   const deenReflectionQuestions = [
     {
-      question: "Duas you want Allah to accept",
-      placeholder: "Write the duas that are close to your heart...",
+      question: "Duas You Are Praying For",
+      placeholder: "write down the duas that are close to your heart—whether for yourself, your loved ones, or the Ummah. Keep track of what you're asking Allah (SWT) for and reflect on them over time.",
       field: "duas",
       rows: 4
     },
     {
-      question: "Surahs you know/want to know",
-      placeholder: "List the surahs you're learning or wish to learn...",
+      question: "Surahs You're Learning or Want to Learn",
+      placeholder: "Keep a list of the Surahs you are currently memorizing or plan to learn in the future. This will help track your progress and keep you motivated on your Quran memorization journey.",
       field: "surahs",
       rows: 3
     },
     {
-      question: "Resonating Quranic quotes",
-      placeholder: "Note down Quranic verses that touched your heart...",
+      question: "Quranic Verses That Resonate With You",
+      placeholder: "Jot down the Quranic verses that deeply inspire you, bring you comfort, or serve as a reminder in your daily life. This section helps you reflect on their meanings and how they apply to your journey",
       field: "quranQuotes",
       rows: 4
     },
     {
-      question: "Gratitude List to Allah",
-      placeholder: "Express your gratitude to Allah...",
+      question: "Gratitude List for Allah (SWT)",
+      placeholder: "A space to list the blessings in your life that you are thankful to Allah (SWT) for. Practicing gratitude strengthens faith and reminds us of Allah's endless mercy and kindness.",
       field: "gratitude",
       rows: 4
     }
@@ -305,7 +307,10 @@
 
   let isSubmitting = false;
 
-  async function handleSubmit() {
+  async function handleSubmit(event) {
+    // Prevent default only if it's a form submission
+    if (event) event.preventDefault();
+    
     if (isLastQuestion) {
       isSubmitting = true;
       try {
@@ -351,26 +356,80 @@
   $: challengeMessage = getChallengeMessage();
   $: console.log('Challenge message updated:', challengeMessage, 'Completed days:', $journalStore.completedDays);
 
+  // Add achievement checking function
+  function checkAchievements() {
+    const completedDays = $journalStore.completedDays;
+    const streakDays = $journalStore.streak?.days || 0;
+    
+    console.log('Checking achievements:', {
+      completedDays,
+      streakDays,
+      streak: $journalStore.streak,
+      store: $journalStore
+    });
+    
+    // Journal streak achievements
+    if (completedDays === 1) {
+      console.log('🎯 Triggering first entry achievement');
+      notificationStore.showNotification('🎉 First journal entry complete! Your journey begins now!');
+    } else if (completedDays === 7) {
+      console.log('🎯 Triggering week completion achievement');
+      notificationStore.showNotification('🏆 Amazing! You\'ve completed your first week of journaling!');
+    } else if (completedDays === 30) {
+      console.log('🎯 Triggering month completion achievement');
+      notificationStore.showNotification('⭐ Incredible milestone! You\'ve journaled for 30 days!');
+    }
+    
+    // Streak achievements
+    if (streakDays === 3) {
+      console.log('🎯 Triggering 3-day streak achievement');
+      notificationStore.showNotification('🔥 3-day streak! You\'re building a beautiful habit!');
+    } else if (streakDays === 7) {
+      console.log('🎯 Triggering week streak achievement');
+      notificationStore.showNotification('🌟 Wonderful! A full week streak achieved!');
+    } else if (streakDays === 30) {
+      console.log('🎯 Triggering month streak achievement');
+      notificationStore.showNotification('👑 Mastery achieved! 30-day streak completed!');
+    }
+  }
+
+  // Modify the save functions to check achievements
   async function saveMorningReflection() {
+    console.log('Saving morning reflection...');
     await journalStore.saveMorningReflection(morningReflection);
-    await journalStore.loadTodayReflections(); // Refresh the store data
-    weekDays = getCurrentWeek(); // Refresh the week display
-    morningReflection = { plans: '', newThing: '', affirmation: '' }; // Reset form
+    await journalStore.loadTodayReflections();
+    weekDays = getCurrentWeek();
+    morningReflection = { plans: '', newThing: '', affirmation: '' };
+    console.log('Checking achievements after morning reflection...');
+    checkAchievements();
   }
 
   async function saveEveningReflection() {
+    console.log('Saving evening reflection...');
     await journalStore.saveEveningReflection(eveningReflection);
-    await journalStore.loadTodayReflections(); // Refresh the store data
-    weekDays = getCurrentWeek(); // Refresh the week display
-    eveningReflection = { highlights: '', learnings: '', satisfaction: '', barriers: '' }; // Reset form
+    await journalStore.loadTodayReflections();
+    weekDays = getCurrentWeek();
+    eveningReflection = { highlights: '', learnings: '', satisfaction: '', barriers: '' };
+    console.log('Checking achievements after evening reflection...');
+    checkAchievements();
   }
 
   async function saveDeenReflection() {
+    console.log('Saving deen reflection...');
     isSubmitting = true;
     try {
-      await journalStore.saveDeenReflection(deenReflections);
-      deenReflections = { duas: '', surahs: '', quranQuotes: '', gratitude: '' }; // Reset form
+      // Ensure all fields exist even if they're empty
+      const completeDeenReflections = {
+        duas: deenReflections.duas || '',
+        surahs: deenReflections.surahs || '',
+        quranQuotes: deenReflections.quranQuotes || '',
+        gratitude: deenReflections.gratitude || ''
+      };
+      await journalStore.saveDeenReflection(completeDeenReflections);
+      deenReflections = { duas: '', surahs: '', quranQuotes: '', gratitude: '' };
       selectedReflection = null;
+      console.log('Checking achievements after deen reflection...');
+      checkAchievements();
     } catch (error) {
       console.error('Error saving deen reflection:', error);
     } finally {
@@ -379,11 +438,14 @@
   }
 
   async function saveFreeWrite() {
+    console.log('Saving free write...');
     isSubmitting = true;
     try {
       await journalStore.saveFreeWrite(freeWriteContent);
-      freeWriteContent = ''; // Reset the content
+      freeWriteContent = '';
       selectedReflection = null;
+      console.log('Checking achievements after free write...');
+      checkAchievements();
     } catch (error) {
       console.error('Error saving free write:', error);
     } finally {
@@ -403,6 +465,10 @@
     if (container) {
       container.addEventListener('scroll', handleScroll);
     }
+    
+    // Initialize textarea heights
+    initTextareaHeights();
+    
     // ... rest of onMount code ...
 
     return () => {
@@ -410,9 +476,36 @@
       container?.removeEventListener('scroll', handleScroll);
     };
   });
+
+  function autoExpand(event) {
+    const textarea = event.target;
+    // Reset height to auto first to handle text deletion
+    textarea.style.height = 'auto';
+    // Set height based on scroll height (content height)
+    textarea.style.height = `${textarea.scrollHeight}px`;
+  }
+
+  // Function to initialize textarea heights after they're rendered
+  function initTextareaHeights() {
+    setTimeout(() => {
+      const textareas = document.querySelectorAll('.auto-expand');
+      textareas.forEach(textarea => {
+        if (textarea instanceof HTMLTextAreaElement) {
+          textarea.style.height = 'auto';
+          textarea.style.height = `${textarea.scrollHeight}px`;
+        }
+      });
+    }, 0);
+  }
+  
+  // Call initTextareaHeights when currentQuestion changes
+  $: if (currentQuestion) {
+    initTextareaHeights();
+  }
 </script>
 
 <div class="journal-container">
+  <Notification />
   <div class="journal-header">
     <div class="week-strip" class:scrolled={scrollY > 50}>
       {#each weekDays as { day, date, isToday, fullDate }}
@@ -544,16 +637,22 @@
           </div>
         {:else if selectedReflection === 'freeWrite'}
           <!-- Free Write input mode -->
-          <div class="modal-body">
+          <div class="modal-body free-write-body">
             <form on:submit|preventDefault={saveFreeWrite}>
-              <div class="question-content">
-                <textarea 
-                  bind:value={freeWriteContent}
-                  placeholder="Express your thoughts freely..."
-                  rows="8"
-                  autofocus
-                  required
-                ></textarea>
+              <div class="question-content full-width">
+                <div class="auto-expand-container full-width">
+                  <textarea 
+                    bind:value={freeWriteContent}
+                    placeholder="Express your thoughts freely..."
+                    maxlength="500"
+                    autofocus
+                    class="auto-expand free-write-textarea"
+                    on:input={autoExpand}
+                  ></textarea>
+                  <div class="character-count">
+                    {freeWriteContent ? freeWriteContent.length : 0}/500
+                  </div>
+                </div>
               </div>
 
               <div class="modal-footer">
@@ -579,16 +678,22 @@
           </div>
 
           <div class="modal-body">
-            <form on:submit|preventDefault={handleSubmit}>
+            <form on:submit={handleSubmit}>
               <div class="question-content">
                 <label>{currentQuestion.question}</label>
-                <textarea 
-                  bind:value={currentReflectionValue.value}
-                  placeholder={currentQuestion.placeholder}
-                  rows={currentQuestion.rows}
-                  autofocus
-                  required
-                ></textarea>
+                <div class="auto-expand-container">
+                  <textarea 
+                    bind:value={currentReflectionValue.value}
+                    placeholder={currentQuestion.placeholder}
+                    maxlength="500"
+                    autofocus
+                    class="auto-expand"
+                    on:input={autoExpand}
+                  ></textarea>
+                  <div class="character-count">
+                    {currentReflectionValue.value ? currentReflectionValue.value.length : 0}/500
+                  </div>
+                </div>
               </div>
 
               <div class="modal-footer">
@@ -989,17 +1094,21 @@
   }
 
   textarea {
-    width: 90%;
+    width: 100%;
     padding: 1rem;
     border: 1px solid #e0e0e0;
     border-radius: 16px;
     background: white;
     color: #333;
-    resize: none;
     font-family: inherit;
     font-size: 1rem;
     line-height: 1.5;
     min-height: 120px;
+  }
+  
+  textarea::placeholder {
+    font-size: 0.85rem;
+    opacity: 0.7;
   }
 
   textarea:focus {
@@ -1013,22 +1122,23 @@
     justify-content: center;
     margin-top: 2rem;
     width: 100%;
+    padding: 0 1rem;
   }
 
   .submit-btn {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    padding: 1rem 2rem;
+    padding: 0.75rem 1.5rem;
     border: none;
     border-radius: 100px;
     background: #216974;
     color: white;
     font-weight: 500;
-    font-size: 1.125rem;
+    font-size: 1rem;
     cursor: pointer;
     transition: all 0.2s;
-    min-width: 200px;
+    min-width: 120px;
     justify-content: center;
   }
 
@@ -1045,13 +1155,13 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    padding: 0.75rem 1.5rem;
+    padding: 0.6rem 1rem;
     border: none;
     border-radius: 100px;
     background: #f5f5f5;
     color: #666;
     font-weight: 500;
-    font-size: 1rem;
+    font-size: 0.9rem;
     cursor: pointer;
     transition: all 0.2s;
   }
@@ -1431,5 +1541,51 @@
 
   .deen-question:last-child {
     margin-bottom: 0;
+  }
+
+  .auto-expand-container {
+    position: relative;
+    width: 90%;
+    margin-bottom: 1.5rem;
+  }
+  
+  .auto-expand {
+    resize: none;
+    overflow: hidden;
+    min-height: 120px;
+    transition: height 0.1s ease;
+  }
+  
+  .auto-expand::placeholder {
+    font-size: 0.85rem;
+    opacity: 0.7;
+  }
+
+  .auto-expand:focus {
+    outline: none;
+    border-color: #216974;
+    box-shadow: 0 0 0 2px rgba(33, 105, 116, 0.1);
+  }
+
+  .character-count {
+    position: absolute;
+    bottom: -20px;
+    right: 0;
+    font-size: 0.75rem;
+    color: #999;
+    padding: 2px 0;
+  }
+
+  .full-width {
+    width: 100%;
+    padding: 0 1rem;
+  }
+
+  .free-write-textarea {
+    min-height: 180px;
+  }
+
+  .free-write-body {
+    padding: 1.5rem 0;
   }
 </style> 

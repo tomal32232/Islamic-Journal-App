@@ -25,6 +25,7 @@
     "@capacitor/ios": "^6.2.0",
     "@capacitor/local-notifications": "^6.1.1",
     "@codetrix-studio/capacitor-google-auth": "^3.4.0-rc.4",
+    "@revenuecat/purchases-capacitor": "^10.0.2",
     "firebase": "^11.0.2",
     "firebase-admin": "^13.0.2",
     "lottie-web": "^5.12.2",
