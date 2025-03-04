@@ -152,13 +152,17 @@
       let accountCreationDate = trialDoc.exists() ? trialDoc.data().startDate.toDate() : new Date();
       accountCreationDate = new Date(accountCreationDate.toLocaleDateString()); // Reset to midnight in local timezone
 
+      // Create a date object for one day before account creation
+      const oneDayBeforeCreation = new Date(accountCreationDate);
+      oneDayBeforeCreation.setDate(accountCreationDate.getDate() - 1);
+
       // Convert prayer date to local date for comparison
       const prayerDate = new Date(day.date);
       const prayerDateLocal = new Date(prayerDate.toLocaleDateString());
 
-      // Check if prayer is before account creation
-      if (prayerDateLocal.getTime() < accountCreationDate.getTime()) {
-        console.log(`Cannot mark prayer before account creation date (${accountCreationDate.toLocaleDateString('en-CA')})`);
+      // Check if prayer is before one day before account creation
+      if (prayerDateLocal.getTime() < oneDayBeforeCreation.getTime()) {
+        console.log(`Cannot mark prayer before one day prior to account creation date (${oneDayBeforeCreation.toLocaleDateString('en-CA')})`);
         return;
       }
       
@@ -604,9 +608,14 @@
       let accountCreationDate = trialDoc.exists() ? trialDoc.data().startDate.toDate() : new Date();
       accountCreationDate = new Date(accountCreationDate.toLocaleDateString()); // Reset to midnight in local timezone
       
+      // Create a date object for one day before account creation
+      const oneDayBeforeCreation = new Date(accountCreationDate);
+      oneDayBeforeCreation.setDate(accountCreationDate.getDate() - 1);
+      
       console.log('=== Prayer History Account Check ===');
       console.log('Raw Account Creation Date:', trialDoc.exists() ? trialDoc.data().startDate.toDate().toISOString() : 'N/A');
       console.log('Adjusted Account Creation Date:', accountCreationDate.toISOString());
+      console.log('One Day Before Creation Date:', oneDayBeforeCreation.toISOString());
       console.log('Account Creation Local Date:', accountCreationDate.toLocaleDateString('en-CA'));
       console.log('Today:', todayStr);
       console.log('Seven Days Ago:', sevenDaysAgoStr);
@@ -634,13 +643,13 @@
             status = prayerRecord.status;
           } else if (day.date < todayStr) {
             // Past days without a record should be marked as missed
-            // Only if on or after account creation
+            // Only if on or after one day before account creation
             const prayerDate = new Date(day.date);
             const prayerDateLocal = new Date(prayerDate.toLocaleDateString()); // Reset to midnight in local timezone
             
-            // Compare using local dates - use >= to include account creation date
-            if (prayerDateLocal.getTime() >= accountCreationDate.getTime()) {
-              console.log(`Marking ${prayer} as missed for ${day.date} (on/after account creation: ${accountCreationDate.toLocaleDateString('en-CA')})`);
+            // Compare using local dates - use >= to include one day before account creation date
+            if (prayerDateLocal.getTime() >= oneDayBeforeCreation.getTime()) {
+              console.log(`Marking ${prayer} as missed for ${day.date} (on/after one day before account creation: ${oneDayBeforeCreation.toLocaleDateString('en-CA')})`);
               status = 'missed';
               
               // Add this prayer to the list to save to the database
@@ -652,7 +661,7 @@
                 time: prayerTime
               });
             } else {
-              console.log(`Skipping ${prayer} for ${day.date} (before account creation: ${accountCreationDate.toLocaleDateString('en-CA')})`);
+              console.log(`Skipping ${prayer} for ${day.date} (before one day prior to account creation: ${oneDayBeforeCreation.toLocaleDateString('en-CA')})`);
             }
           } else if (day.date === todayStr) {
             // For today, check if prayer time has passed

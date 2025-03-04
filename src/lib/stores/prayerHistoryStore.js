@@ -558,8 +558,13 @@ export async function savePrayerStatus(prayerData) {
       accountCreationDate.setHours(0, 0, 0, 0);
       prayerDate.setHours(0, 0, 0, 0);
       
-      if (prayerDate < accountCreationDate) {
-        alert('You cannot mark prayers for dates before your account was created.');
+      // Create a date object for one day before account creation
+      const oneDayBeforeCreation = new Date(accountCreationDate);
+      oneDayBeforeCreation.setDate(accountCreationDate.getDate() - 1);
+      
+      // Allow prayers from one day before account creation
+      if (prayerDate < oneDayBeforeCreation) {
+        alert('You cannot mark prayers for dates before one day prior to your account creation date.');
         return;
       }
     }
