@@ -1345,9 +1345,9 @@
           </div>
           
           {#if $journalStore.todayMorningReflection?.affirmation}
-            <div class="affirmation-card">
+            <div class="affirmation-card" on:click={() => navigateTo('journal')}>
               <div class="affirmation-icon">
-                <svelte:component this={iconMap.Star} size={16} weight="fill" color="#E09453" />
+                <svelte:component this={iconMap.Star} size={20} weight="fill" color="#E09453" />
               </div>
               <div class="affirmation-content">
                 <span class="affirmation-label">Today's Affirmation</span>
@@ -1355,13 +1355,13 @@
               </div>
             </div>
           {:else}
-            <div class="affirmation-card">
+            <div class="affirmation-card" on:click={() => navigateTo('journal')}>
               <div class="affirmation-icon">
-                <svelte:component this={iconMap.Star} size={16} weight="fill" color="#E09453" />
+                <svelte:component this={iconMap.Star} size={20} weight="fill" color="#E09453" />
               </div>
               <div class="affirmation-content">
                 <span class="affirmation-label">Today's Affirmation</span>
-                <p class="affirmation-text reminder">Don't forget to write your affirmation for today!</p>
+                <p class="affirmation-text reminder">Take a moment to set your daily affirmation and watch how it shapes your day. Write your morning reflection to ground yourself before the day unfolds.</p>
               </div>
             </div>
           {/if}
@@ -2520,17 +2520,26 @@
     align-items: flex-start;
     gap: 0.75rem;
     box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  
+  .affirmation-card:hover {
+    background-color: #f5f0e8;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    transform: translateY(-1px);
   }
   
   .affirmation-icon {
     background-color: #fdf2e9;
     border-radius: 50%;
-    width: 32px;
-    height: 32px;
+    width: 36px;
+    height: 36px;
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
+    margin-top: 4px;
   }
   
   .affirmation-content {
@@ -2556,6 +2565,8 @@
     color: #E09453;
     font-style: normal;
     font-weight: 500;
+    font-size: 0.8rem;
+    line-height: 1.5;
   }
 
   .mood-calendar-button {
