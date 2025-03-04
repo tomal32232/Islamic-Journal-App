@@ -2540,7 +2540,7 @@
   .mood-calendar-button {
     width: 3.5rem;
     height: 100%;
-    background: #F8FAFC;
+    background: #E6F7F9;
     border: 1px solid #E2E8F0;
     border-left: none;
     border-radius: 0 12px 12px 0;
@@ -2558,7 +2558,7 @@
   }
 
   .mood-calendar-button:hover {
-    background: #E6F7F9;
+    background: #D1EFF2;
   }
 </style>
 
