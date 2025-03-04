@@ -3,7 +3,7 @@
   import { prayerHistoryStore } from '../stores/prayerHistoryStore';
   import { weeklyStatsStore } from '../stores/tasbihStore';
   import { badgeStore } from '../stores/badgeStore';
-  import { SignOut, CaretRight, PencilSimple, Camera, Lock } from 'phosphor-svelte';
+  import { SignOut, CaretRight, PencilSimple, Camera, Lock, Bug } from 'phosphor-svelte';
   import { currentPage } from '../stores/pageStore';
   import { onMount, onDestroy } from 'svelte';
   import { fade } from 'svelte/transition';
@@ -265,6 +265,11 @@
       console.error("Error signing out:", error);
     }
   }
+
+  // Handle bug report
+  function handleBugReport() {
+    window.open('https://discord.gg/QnmekZcX', '_blank');
+  }
 </script>
 
 <div class="profile-container" class:scrolled={scrollY > 10} on:scroll={handleScroll}>
@@ -341,6 +346,14 @@
         <CaretRight weight="bold" />
       </button>
     {/each}
+
+    <button class="menu-item" on:click={handleBugReport}>
+      <div class="menu-content">
+        <h2>Report a Bug</h2>
+        <p>Help us improve by reporting issues</p>
+      </div>
+      <Bug weight="bold" />
+    </button>
 
     <button class="menu-item sign-out" on:click={handleLogout}>
       <div class="menu-content">
