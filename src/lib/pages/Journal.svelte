@@ -1180,6 +1180,9 @@
   .modal-header {
     text-align: left;
     margin-bottom: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
   }
 
   .modal-header h3 {
@@ -1775,11 +1778,13 @@
   .history-modal {
     max-width: 600px;
     max-height: 80vh;
+    padding: 1.5rem;
   }
 
   .history-body {
     overflow-y: auto;
     padding: 0;
+    max-height: 60vh;
   }
 
   .loading-container {
@@ -1795,6 +1800,8 @@
     height: 40px;
     border-width: 3px;
     margin-bottom: 1rem;
+    border: 3px solid #216974;
+    border-top-color: transparent;
   }
 
   .empty-history {
@@ -1829,12 +1836,12 @@
   }
 
   .history-item:hover {
-    background: #f5f5f5;
+    background: #f0f9fa;
   }
 
   .history-item-date {
     font-weight: 500;
-    color: #333;
+    color: #216974;
   }
 
   .history-item-content {
@@ -1845,9 +1852,10 @@
 
   .history-tag {
     font-size: 0.75rem;
-    padding: 0.25rem 0.5rem;
+    padding: 0.25rem 0.75rem;
     border-radius: 100px;
     font-weight: 500;
+    display: inline-block;
   }
 
   .history-tag.morning {
@@ -1867,11 +1875,11 @@
 
   .history-tag.deen {
     background: #f9eee6;
-    color: #8c4c2c;
+    color: #E09453;
   }
 
   .history-entry-view {
-    padding: 1.5rem;
+    padding: 1rem 0;
   }
 
   .back-to-history {
@@ -1885,6 +1893,10 @@
     padding: 0;
     margin-bottom: 1.5rem;
     cursor: pointer;
+  }
+
+  .back-to-history:hover {
+    opacity: 0.8;
   }
 
   .history-date {
@@ -1911,6 +1923,8 @@
     font-weight: 500;
     margin: 0 0 1rem 0;
     color: #216974;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #e6f7f9;
   }
 
   .history-question {
@@ -1925,17 +1939,19 @@
     font-size: 0.875rem;
     font-weight: 600;
     margin: 0 0 0.5rem 0;
-    color: #666;
+    color: #555;
   }
 
   .history-question p {
     margin: 0;
     line-height: 1.5;
     white-space: pre-line;
+    color: #333;
   }
 
   .history-free-write {
     white-space: pre-line;
     line-height: 1.5;
+    color: #333;
   }
 </style> 
