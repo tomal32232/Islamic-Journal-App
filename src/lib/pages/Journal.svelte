@@ -574,8 +574,14 @@
           </div>
         {/each}
       </div>
+    </div>
+
+    <div class="history-button-container">
       <button class="history-button" on:click={showHistory} aria-label="View journal history">
-        <ClockCounterClockwise size={22} weight="bold" />
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="white" viewBox="0 0 256 256">
+          <path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm64-88a8,8,0,0,1-8,8H128a8,8,0,0,1-8-8V72a8,8,0,0,1,16,0v48h48A8,8,0,0,1,192,128Z"></path>
+        </svg>
+        <span class="history-button-text">View History</span>
       </button>
     </div>
 
@@ -915,7 +921,7 @@
     align-items: center;
     background: #216974;
     padding: 0.5rem 1rem;
-    margin: 0 10px 1.25rem 10px;
+    margin: 0 10px 0.75rem 10px;
     border-radius: 12px;
     position: sticky;
     top: 10px;
@@ -929,11 +935,16 @@
     justify-content: space-between;
   }
 
+  .history-button-container {
+    display: flex;
+    justify-content: center;
+    margin: 0 10px 1.25rem 10px;
+  }
+
   .history-button {
-    background: rgba(255, 255, 255, 0.25);
+    background: #216974;
     border: none;
-    border-radius: 50%;
-    width: 40px;
+    border-radius: 20px;
     height: 40px;
     display: flex;
     align-items: center;
@@ -941,12 +952,12 @@
     color: white;
     cursor: pointer;
     transition: all 0.2s ease;
-    margin-left: 12px;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+    padding: 0 1.25rem;
   }
 
   .history-button:hover {
-    background: rgba(255, 255, 255, 0.4);
+    background: #1a5761;
     transform: translateY(-1px);
     box-shadow: 0 3px 6px rgba(0, 0, 0, 0.2);
   }
@@ -954,6 +965,18 @@
   .history-button:active {
     transform: translateY(0);
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+  }
+
+  .history-button svg {
+    width: 24px;
+    height: 24px;
+    fill: white;
+    margin-right: 8px;
+  }
+
+  .history-button-text {
+    font-size: 0.9rem;
+    font-weight: 500;
   }
 
   .week-strip.scrolled {
@@ -1962,5 +1985,12 @@
     white-space: pre-line;
     line-height: 1.5;
     color: #333;
+  }
+
+  .history-text-icon {
+    color: white;
+    font-size: 22px;
+    font-weight: bold;
+    line-height: 1;
   }
 </style> 
