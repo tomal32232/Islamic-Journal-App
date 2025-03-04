@@ -576,15 +576,6 @@
       </div>
     </div>
 
-    <div class="history-button-container">
-      <button class="history-button" on:click={showHistory} aria-label="View journal history">
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="white" viewBox="0 0 256 256">
-          <path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm64-88a8,8,0,0,1-8,8H128a8,8,0,0,1-8-8V72a8,8,0,0,1,16,0v48h48A8,8,0,0,1,192,128Z"></path>
-        </svg>
-        <span class="history-button-text">View History</span>
-      </button>
-    </div>
-
     <div class="date-header">
       <span class="current-date">{new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</span>
       <h1>{greeting}</h1>
@@ -637,6 +628,15 @@
         <span class="status">{$journalStore.todayDeenReflection ? 'Completed' : ''}</span>
       </div>
     </div>
+  </div>
+
+  <div class="history-button-container">
+    <button class="history-button" on:click={showHistory} aria-label="View journal history">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="white" viewBox="0 0 256 256">
+        <path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm64-88a8,8,0,0,1-8,8H128a8,8,0,0,1-8-8V72a8,8,0,0,1,16,0v48h48A8,8,0,0,1,192,128Z"></path>
+      </svg>
+      <span class="history-button-text">View History</span>
+    </button>
   </div>
 
   <div class="challenge-card">
@@ -1169,10 +1169,10 @@
 
   .circle-number.morning-only {
     background: linear-gradient(
-      to right,
-      #216974 50%,
-      #e0e0e0 50%
-    );
+    to right,
+    #216974 50%,
+    #e0e0e0 50%
+  );
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
