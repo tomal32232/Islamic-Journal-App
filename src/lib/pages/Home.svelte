@@ -1354,6 +1354,16 @@
                 <p class="affirmation-text">"{$journalStore.todayMorningReflection.affirmation}"</p>
               </div>
             </div>
+          {:else}
+            <div class="affirmation-card">
+              <div class="affirmation-icon">
+                <svelte:component this={iconMap.Star} size={16} weight="fill" color="#E09453" />
+              </div>
+              <div class="affirmation-content">
+                <span class="affirmation-label">Today's Affirmation</span>
+                <p class="affirmation-text reminder">Don't forget to write your affirmation for today!</p>
+              </div>
+            </div>
           {/if}
         </div>
 
@@ -2540,6 +2550,12 @@
     font-style: italic;
     margin: 0;
     line-height: 1.4;
+  }
+  
+  .affirmation-text.reminder {
+    color: #E09453;
+    font-style: normal;
+    font-weight: 500;
   }
 
   .mood-calendar-button {
