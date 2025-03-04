@@ -938,7 +938,7 @@
   .history-button-container {
     display: flex;
     justify-content: center;
-    margin: 0 10px 1.25rem 10px;
+    margin: 0.5rem 10px 1.25rem 10px;
   }
 
   .history-button {
