@@ -611,6 +611,9 @@
       console.log('Today:', todayStr);
       console.log('Seven Days Ago:', sevenDaysAgoStr);
 
+      // Track prayers that need to be saved to the database
+      const prayersToSave = [];
+
       // Process each prayer
       for (const prayer of prayers) {
         const row = {
@@ -639,6 +642,15 @@
             if (prayerDateLocal.getTime() >= accountCreationDate.getTime()) {
               console.log(`Marking ${prayer} as missed for ${day.date} (on/after account creation: ${accountCreationDate.toLocaleDateString('en-CA')})`);
               status = 'missed';
+              
+              // Add this prayer to the list to save to the database
+              const prayerTime = $prayerTimesStore.find(p => p.name === prayer)?.time || '00:00';
+              prayersToSave.push({
+                prayerName: prayer,
+                date: day.date,
+                status: 'missed',
+                time: prayerTime
+              });
             } else {
               console.log(`Skipping ${prayer} for ${day.date} (before account creation: ${accountCreationDate.toLocaleDateString('en-CA')})`);
             }
@@ -661,6 +673,19 @@
           });
         }
         grid.push(row);
+      }
+
+      // Save missed prayers to the database
+      if (prayersToSave.length > 0) {
+        console.log(`Saving ${prayersToSave.length} missed prayers to the database`);
+        // Use Promise.all to save all prayers in parallel
+        await Promise.all(prayersToSave.map(prayer => savePrayerStatus(prayer)));
+        
+        // After saving, refresh the prayer history to update the store
+        await getPrayerHistory();
+        
+        // Update weekly stats after saving prayers
+        updateWeeklyStats();
       }
 
       // Update cache with new data
@@ -723,6 +748,9 @@
       if (needsFreshData) {
         console.log('Fetching fresh prayer history data');
         await getPrayerHistory();
+        
+        // Update weekly stats after refreshing prayer history
+        updateWeeklyStats();
       }
       
       // Generate the grid
@@ -775,6 +803,9 @@
       
       // Force fetch fresh prayer history
       await getPrayerHistory();
+      
+      // Update weekly stats after refreshing prayer history
+      updateWeeklyStats();
       
       // Update the grid
       const result = await updateGrid();

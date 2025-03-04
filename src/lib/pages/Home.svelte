@@ -158,6 +158,8 @@
           })
         ]).then(() => {
           updatePrayerStatus();
+          // Also update past prayer statuses to ensure they're properly marked as missed
+          updatePastPrayerStatuses();
         });
       }
     });
@@ -173,6 +175,8 @@
     
     // Increase the interval to 5 minutes to reduce frequency of calls
     const prayerInterval = setInterval(() => updatePrayerStatus(), 300000);
+    // Add an interval to update past prayer statuses every hour
+    const pastPrayerInterval = setInterval(() => updatePastPrayerStatuses(), 3600000);
     const countdownInterval = setInterval(updateCountdown, 1000);
     const notificationInterval = setInterval(checkPrayerNotifications, 60000);
     
@@ -201,6 +205,7 @@
     return () => {
       cleanup();
       clearInterval(prayerInterval);
+      clearInterval(pastPrayerInterval);
       clearInterval(countdownInterval);
       clearInterval(notificationInterval);
       clearInterval(moodCheckInterval);

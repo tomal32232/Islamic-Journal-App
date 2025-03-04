@@ -14,6 +14,16 @@
   let weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   let moodsByDate = {};
 
+  // Mood icons mapping
+  const moodIcons = {
+    grateful: '😊',
+    seeking_peace: '⭕',
+    hopeful: '↑',
+    anxious: '😐',
+    reflecting: '🔄',
+    blessed: '✨'
+  };
+
   onMount(async () => {
     await loadMoodHistory();
     generateCalendar();
