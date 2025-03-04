@@ -575,7 +575,7 @@
         {/each}
       </div>
       <button class="history-button" on:click={showHistory} aria-label="View journal history">
-        <ClockCounterClockwise size={20} weight="bold" />
+        <ClockCounterClockwise size={22} weight="bold" />
       </button>
     </div>
 
@@ -915,11 +915,12 @@
     align-items: center;
     background: #216974;
     padding: 0.5rem 1rem;
-    margin: 0 10px;
+    margin: 0 10px 1.25rem 10px;
     border-radius: 12px;
     position: sticky;
     top: 10px;
     z-index: 100;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   }
 
   .week-strip-content {
@@ -929,22 +930,30 @@
   }
 
   .history-button {
-    background: rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.25);
     border: none;
     border-radius: 50%;
-    width: 36px;
-    height: 36px;
+    width: 40px;
+    height: 40px;
     display: flex;
     align-items: center;
     justify-content: center;
     color: white;
     cursor: pointer;
-    transition: background 0.2s ease;
-    margin-left: 8px;
+    transition: all 0.2s ease;
+    margin-left: 12px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
   }
 
   .history-button:hover {
-    background: rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.4);
+    transform: translateY(-1px);
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.2);
+  }
+
+  .history-button:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
   }
 
   .week-strip.scrolled {
