@@ -24,7 +24,8 @@
       .filter(prayer => {
         // Create date object with the correct timezone handling
         const prayerDate = new Date(prayer.date + 'T00:00:00');
-        return prayerDate >= filterDate;
+        // Only include prayers from the past up to today (exclude future dates)
+        return prayerDate >= filterDate && prayerDate <= today;
       })
       .sort((a, b) => {
         // Sort by date (newest first) and then by prayer order

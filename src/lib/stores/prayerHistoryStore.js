@@ -702,6 +702,11 @@ async function fetchFreshPrayerHistory(user) {
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
       const sevenDaysAgoStr = sevenDaysAgo.toLocaleDateString('en-CA');
       
+      // Get today's date for filtering out future dates
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // Set to start of day
+      const todayStr = today.toLocaleDateString('en-CA');
+      
       // Query prayer_history collection
       const prayerHistoryRef = collection(db, 'prayer_history');
       
@@ -713,6 +718,7 @@ async function fetchFreshPrayerHistory(user) {
           prayerHistoryRef,
           where('userId', '==', user.uid),
           where('date', '>=', sevenDaysAgoStr),
+          where('date', '<=', todayStr), // Only include dates up to today
           orderBy('date', 'desc')
         );
         
@@ -730,11 +736,12 @@ async function fetchFreshPrayerHistory(user) {
         
         const filteredDocs = snapshot.docs.filter(doc => {
           const data = doc.data();
-          return data.date >= sevenDaysAgoStr;
+          // Filter by date range - only include dates from 7 days ago up to today
+          return data.date >= sevenDaysAgoStr && data.date <= todayStr;
         }).sort((a, b) => b.data().date.localeCompare(a.data().date));
         
         querySnapshot = { docs: filteredDocs };
-        console.log(`Filtered to ${filteredDocs.length} prayer records within last 7 days`);
+        console.log(`Filtered to ${filteredDocs.length} prayer records within date range`);
       }
 
       const result = processQueryResults(querySnapshot);
@@ -809,10 +816,18 @@ function processQueryResults(querySnapshot) {
   const pendingByDate = {};
   const missedByDate = {};
   
+  // Get today's date for filtering out future dates
+  const today = new Date();
+  today.setHours(0, 0, 0, 0); // Set to start of day
+  const todayStr = today.toLocaleDateString('en-CA');
+  
   if (querySnapshot && querySnapshot.docs) {
     querySnapshot.docs.forEach((doc) => {
       const data = doc.data();
       if (!data) return;
+      
+      // Skip future dates - only include dates up to today
+      if (data.date > todayStr) return;
       
       history.push({ id: doc.id, ...data });
       
