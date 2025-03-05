@@ -238,9 +238,37 @@
     }
   }
 
+  // Add a function to force refresh prayer history
+  async function refreshPrayerHistory() {
+    if (!auth.currentUser) return;
+    
+    try {
+      console.log('Home: Force refreshing prayer history');
+      // Invalidate the prayer history cache
+      prayerHistoryCache.prayerHistory = null;
+      prayerHistoryCache.lastFetched = null;
+      
+      // Fetch fresh prayer history data
+      await getPrayerHistory();
+      
+      // Update the prayer count
+      const today = new Date().toISOString().split('T')[0];
+      if ($prayerHistoryStore?.history) {
+        const todayPrayers = $prayerHistoryStore.history.filter(p => 
+          p.date === today && (p.status === 'ontime' || p.status === 'late' || p.status === 'excused')
+        );
+        completedPrayersToday = todayPrayers.length;
+        console.log('Home: Updated completed prayers count to', completedPrayersToday);
+      }
+    } catch (error) {
+      console.error('Error refreshing prayer history:', error);
+    }
+  }
+
   // Refresh the dhikr count when the component becomes visible
   $: if (currentPage === 'home' && auth.currentUser) {
     refreshDhikrCount();
+    refreshPrayerHistory(); // Also refresh prayer history
   }
 
   function handleTabChange(event) {
@@ -249,6 +277,8 @@
     if (currentPage === 'home') {
       // Always update stats when returning to home
       updateStats();
+      // Refresh prayer history data
+      refreshPrayerHistory();
       // Refresh weekly stats
       weeklyStatsStore.set({ dailyCounts: [], streak: 0 }); // Reset store first
       getWeeklyStats().then((stats) => {
@@ -1108,6 +1138,47 @@
     selectedHistoryMood = selectedMood;
     showMoodCalendarPopup = false;
   }
+
+  // Add this function to the script section
+  async function refreshActivities() {
+    console.log('Manually refreshing activities');
+    
+    // Show a small loading indicator or feedback
+    const activitiesSection = document.querySelector('.reading-stats');
+    if (activitiesSection) {
+      activitiesSection.classList.add('refreshing');
+    }
+    
+    try {
+      // Refresh all activity data
+      await Promise.all([
+        refreshPrayerHistory(),
+        getTodayReadingTime().then(time => {
+          todayReadingTime = time;
+        }),
+        refreshDhikrCount()
+      ]);
+      
+      // Update journal count (this is reactive so no need to fetch)
+      todayJournalCount = $journalStore.streak?.morning && $journalStore.streak?.evening ? 2 : 
+                         $journalStore.streak?.morning || $journalStore.streak?.evening ? 1 : 0;
+                         
+      console.log('Activities refreshed successfully');
+    } catch (error) {
+      console.error('Error refreshing activities:', error);
+    } finally {
+      // Remove loading indicator
+      if (activitiesSection) {
+        activitiesSection.classList.remove('refreshing');
+        
+        // Add a brief "refreshed" indicator
+        activitiesSection.classList.add('refreshed');
+        setTimeout(() => {
+          activitiesSection.classList.remove('refreshed');
+        }, 1000);
+      }
+    }
+  }
 </script>
 
 <div class="home-container">
@@ -1290,7 +1361,19 @@
         />
 
         <div class="reading-stats">
-          <h3 class="section-title">Today's Activities</h3>
+          <h3 class="section-title">
+            Today's Activities
+            <button class="refresh-button" on:click={refreshActivities} aria-label="Refresh activities">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                <path d="M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" />
+                <path d="M16 12C16 14.2091 14.2091 16 12 16C9.79086 16 8 14.2091 8 12C8 9.79086 9.79086 8 12 8C14.2091 8 16 9.79086 16 12Z" />
+                <path d="M12 2V4" />
+                <path d="M12 20V22" />
+                <path d="M4 12H2" />
+                <path d="M22 12H20" />
+              </svg>
+            </button>
+          </h3>
           <div class="activities-row">
             <div class="activity-card" on:click={() => navigateTo('prayer')}>
               <div class="activity-icon prayer">
@@ -1901,7 +1984,48 @@
     font-weight: normal;
     text-align: center;
     width: 100%;
-    display: block;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .refresh-button {
+    background: none;
+    border: none;
+    color: #666;
+    cursor: pointer;
+    padding: 4px;
+    margin-left: 6px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .refresh-button:hover {
+    background: rgba(0, 0, 0, 0.05);
+  }
+  
+  .refresh-button:active {
+    background: rgba(0, 0, 0, 0.1);
+  }
+  
+  .refreshing .refresh-button {
+    animation: spin 1s linear infinite;
+  }
+  
+  .refreshed .activities-row {
+    animation: flash 0.5s ease-out;
+  }
+  
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+  
+  @keyframes flash {
+    0% { opacity: 0.5; }
+    100% { opacity: 1; }
   }
 
   .activities-row {
