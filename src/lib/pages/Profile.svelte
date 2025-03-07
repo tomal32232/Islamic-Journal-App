@@ -1,8 +1,9 @@
 <script lang="ts">
   import { auth } from '../firebase';
-  import { prayerHistoryStore } from '../stores/prayerHistoryStore';
+  import { prayerHistoryStore, saveExcusedPeriod, getActiveExcusedPeriod, endExcusedPeriod, getPrayerHistory } from '../stores/prayerHistoryStore';
   import { weeklyStatsStore } from '../stores/tasbihStore';
   import { badgeStore } from '../stores/badgeStore';
+  import { toast } from '../stores/toastStore';
   import { SignOut, CaretRight, PencilSimple, Camera, Lock, Bug } from 'phosphor-svelte';
   import { currentPage } from '../stores/pageStore';
   import { onMount, onDestroy } from 'svelte';
@@ -24,6 +25,7 @@
     description: string;
     path: string;
     stats?: StatItem[];
+    action?: () => void;
   }
 
   // Helper function for type-safe value conversion
@@ -46,6 +48,11 @@
   let profilePicture = '';
   let fileInput: HTMLInputElement;
   let isLoading = true;
+  
+  // Excused period state
+  let isExcusedPeriodActive = false;
+  let activeExcusedPeriod = null;
+  let isSubmittingExcusedPeriod = false;
 
   // Calculate prayer statistics when prayerHistoryStore changes
   $: if ($prayerHistoryStore?.history) {
@@ -142,6 +149,20 @@
       path: 'notifications'
     },
     {
+      title: 'Excused Period',
+      description: isExcusedPeriodActive 
+        ? 'Currently active - Prayers are excused' 
+        : 'Manage your excused prayer periods',
+      path: 'excused-period',
+      stats: [
+        {
+          value: () => isExcusedPeriodActive ? 'Active' : 'Inactive',
+          label: 'Status'
+        }
+      ],
+      action: toggleExcusedPeriod
+    },
+    {
       title: 'Subscription',
       description: isSubscribed 
         ? 'Manage your subscription'
@@ -227,6 +248,46 @@
     }
   }
 
+  function handleBugReport() {
+    window.open('https://discord.gg/QnmekZcX', '_blank');
+  }
+
+  // Excused period functions
+  async function toggleExcusedPeriod() {
+    if (isSubmittingExcusedPeriod) return;
+    
+    isSubmittingExcusedPeriod = true;
+    try {
+      const today = new Date().toLocaleDateString('en-CA');
+      if (!isExcusedPeriodActive) {
+        // Start a new excused period
+        await saveExcusedPeriod(today, null, 'Fajr', null);
+        toast.show('Excused period started', 'success');
+      } else if (activeExcusedPeriod?.id) {
+        // End the current excused period
+        await endExcusedPeriod(activeExcusedPeriod.id, today, 'Isha');
+        toast.show('Excused period ended', 'success');
+      }
+      await getPrayerHistory();
+      await updateExcusedStatus();
+    } catch (error) {
+      console.error('Error toggling excused period:', error);
+      toast.show('Error toggling excused period', 'error');
+    } finally {
+      isSubmittingExcusedPeriod = false;
+    }
+  }
+
+  async function updateExcusedStatus() {
+    activeExcusedPeriod = await getActiveExcusedPeriod();
+    isExcusedPeriodActive = !!activeExcusedPeriod;
+  }
+
+  async function checkExcusedStatus() {
+    activeExcusedPeriod = await getActiveExcusedPeriod();
+    isExcusedPeriodActive = !!activeExcusedPeriod;
+  }
+
   onMount(() => {
     // Get the stored profile picture or user's photoURL
     profilePicture = localStorage.getItem('user_profile_picture') || user?.photoURL || '';
@@ -243,6 +304,9 @@
     if (user?.uid) {
       badgeStore.init(user.uid);
     }
+
+    // Check excused period status
+    checkExcusedStatus().catch(console.error);
 
     const unsubscribe = auth.onAuthStateChanged((authUser) => {
       user = authUser;
@@ -264,11 +328,6 @@
     } catch (error) {
       console.error("Error signing out:", error);
     }
-  }
-
-  // Handle bug report
-  function handleBugReport() {
-    window.open('https://discord.gg/QnmekZcX', '_blank');
   }
 </script>
 
@@ -315,7 +374,7 @@
 
   <div class="menu-container">
     {#each menuItems as item}
-      <button class="menu-item" on:click={() => navigateTo(item.path)}>
+      <button class="menu-item" on:click={() => item.action ? item.action() : navigateTo(item.path)}>
         <div class="menu-content">
           <h2>{item.title}</h2>
           <p>{item.description}</p>
@@ -343,7 +402,24 @@
             </div>
           {/if}
         </div>
-        <CaretRight weight="bold" />
+        {#if item.title === 'Excused Period'}
+          <div class="toggle-switch-container">
+            <label class="toggle-switch">
+              <input
+                type="checkbox"
+                checked={isExcusedPeriodActive}
+                on:change={toggleExcusedPeriod}
+                disabled={isSubmittingExcusedPeriod}
+              />
+              <span class="slider"></span>
+              {#if isSubmittingExcusedPeriod}
+                <div class="loading-spinner"></div>
+              {/if}
+            </label>
+          </div>
+        {:else}
+          <CaretRight weight="bold" />
+        {/if}
       </button>
     {/each}
 
@@ -595,5 +671,79 @@
 
   .upload-button:hover {
     color: #184f57;
+  }
+
+  .toggle-switch-container {
+    display: flex;
+    align-items: center;
+  }
+
+  .toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 52px;
+    height: 28px;
+  }
+
+  .toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+
+  .slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #E5E7EB;
+    transition: .3s ease-in-out;
+    border-radius: 34px;
+    border: 2px solid transparent;
+  }
+
+  .slider:before {
+    position: absolute;
+    content: "";
+    height: 20px;
+    width: 20px;
+    left: 4px;
+    bottom: 2px;
+    background-color: white;
+    transition: .3s ease-in-out;
+    border-radius: 50%;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+
+  input:checked + .slider {
+    background-color: #216974;
+  }
+
+  input:checked + .slider:before {
+    transform: translateX(24px);
+  }
+
+  .loading-spinner {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top-color: white;
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    from {
+      transform: translate(-50%, -50%) rotate(0deg);
+    }
+    to {
+      transform: translate(-50%, -50%) rotate(360deg);
+    }
   }
 </style> 
