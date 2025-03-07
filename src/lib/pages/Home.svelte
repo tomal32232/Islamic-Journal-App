@@ -1363,16 +1363,6 @@
         <div class="reading-stats">
           <h3 class="section-title">
             Today's Activities
-            <button class="refresh-button" on:click={refreshActivities} aria-label="Refresh activities">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                <path d="M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" />
-                <path d="M16 12C16 14.2091 14.2091 16 12 16C9.79086 16 8 14.2091 8 12C8 9.79086 9.79086 8 12 8C14.2091 8 16 9.79086 16 12Z" />
-                <path d="M12 2V4" />
-                <path d="M12 20V22" />
-                <path d="M4 12H2" />
-                <path d="M22 12H20" />
-              </svg>
-            </button>
           </h3>
           <div class="activities-row">
             <div class="activity-card" on:click={() => navigateTo('prayer')}>
@@ -1955,7 +1945,7 @@
   }
 
   .reading-stats {
-    margin-top: 0.5rem;
+    margin-top: 30px;
   }
 
   .stats-card {
