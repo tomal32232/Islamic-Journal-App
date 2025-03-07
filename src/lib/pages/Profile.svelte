@@ -1,6 +1,12 @@
 <script lang="ts">
   import { auth } from '../firebase';
-  import { prayerHistoryStore, saveExcusedPeriod, getActiveExcusedPeriod, endExcusedPeriod, getPrayerHistory } from '../stores/prayerHistoryStore';
+  import { 
+    prayerHistoryStore, 
+    saveExcusedPeriod, 
+    getActiveExcusedPeriod, 
+    endExcusedPeriod, 
+    getPrayerHistory
+  } from '../stores/prayerHistoryStore';
   import { weeklyStatsStore } from '../stores/tasbihStore';
   import { badgeStore } from '../stores/badgeStore';
   import { toast } from '../stores/toastStore';
@@ -258,15 +264,36 @@
     
     isSubmittingExcusedPeriod = true;
     try {
-      const today = new Date().toLocaleDateString('en-CA');
+      const now = new Date();
+      const today = now.toLocaleDateString('en-CA');
+      
+      // Determine the current prayer based on time of day
+      // This is a simplified approach that doesn't require actual prayer times
+      const currentHour = now.getHours();
+      const currentMinute = now.getMinutes();
+      
+      let currentPrayer;
+      // Approximate prayer times based on typical prayer schedule
+      if (currentHour < 7) {
+        currentPrayer = 'Fajr';
+      } else if (currentHour < 13) {
+        currentPrayer = 'Dhuhr';
+      } else if (currentHour < 16) {
+        currentPrayer = 'Asr';
+      } else if (currentHour < 19) {
+        currentPrayer = 'Maghrib';
+      } else {
+        currentPrayer = 'Isha';
+      }
+      
       if (!isExcusedPeriodActive) {
-        // Start a new excused period
-        await saveExcusedPeriod(today, null, 'Fajr', null);
-        toast.show('Excused period started', 'success');
+        // Start a new excused period from the current prayer
+        await saveExcusedPeriod(today, null, currentPrayer, null);
+        toast.show(`Excused period started from ${currentPrayer} prayer onwards`, 'success');
       } else if (activeExcusedPeriod?.id) {
-        // End the current excused period
-        await endExcusedPeriod(activeExcusedPeriod.id, today, 'Isha');
-        toast.show('Excused period ended', 'success');
+        // End the current excused period at the current prayer
+        await endExcusedPeriod(activeExcusedPeriod.id, today, currentPrayer);
+        toast.show(`Excused period ended. ${currentPrayer} is the last excused prayer.`, 'success');
       }
       await getPrayerHistory();
       await updateExcusedStatus();
