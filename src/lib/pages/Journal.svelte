@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { Book, Sun, Moon, X, CaretRight, CaretLeft } from 'phosphor-svelte';
+  import { Book, Sun, Moon, X, CaretRight, CaretLeft, ClockCounterClockwise } from 'phosphor-svelte';
   import { auth } from '../firebase';
   import { journalStore } from '../stores/journalStore';
   import { fade, fly } from 'svelte/transition';
@@ -453,18 +453,8 @@
     }
   }
 
-  let scrollY = 0;
-
-  function handleScroll(event) {
-    const container = event.target;
-    scrollY = container.scrollTop;
-  }
-
   onMount(() => {
     const container = document.querySelector('.journal-container');
-    if (container) {
-      container.addEventListener('scroll', handleScroll);
-    }
     
     // Initialize textarea heights
     initTextareaHeights();
@@ -473,7 +463,6 @@
 
     return () => {
       // ... existing cleanup ...
-      container?.removeEventListener('scroll', handleScroll);
     };
   });
 
@@ -502,24 +491,89 @@
   $: if (currentQuestion) {
     initTextareaHeights();
   }
+
+  // Add state for history modal
+  let showHistoryModal = false;
+  let historyEntries = [];
+  let selectedHistoryDate = null;
+  let isLoadingHistory = false;
+
+  // Function to handle showing history
+  async function showHistory() {
+    showHistoryModal = true;
+    isLoadingHistory = true;
+    try {
+      // Load history entries from journalStore
+      historyEntries = await journalStore.getJournalHistory();
+      console.log('Loaded history entries:', historyEntries);
+    } catch (error) {
+      console.error('Error loading journal history:', error);
+    } finally {
+      isLoadingHistory = false;
+    }
+  }
+
+  // Function to view a specific history entry
+  function viewHistoryEntry(date) {
+    selectedHistoryDate = date;
+  }
+
+  // Function to close history view and return to main view
+  function closeHistoryView() {
+    selectedHistoryDate = null;
+  }
+
+  // Function to format date for display
+  function formatDate(dateString) {
+    try {
+      // Handle Firestore timestamp objects
+      if (dateString && typeof dateString === 'object' && dateString.toDate) {
+        return dateString.toDate().toLocaleDateString('en-US', { 
+          weekday: 'short', 
+          day: 'numeric', 
+          month: 'short', 
+          year: 'numeric' 
+        });
+      }
+      
+      // Handle string dates
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        console.error('Invalid date:', dateString);
+        return 'Unknown Date';
+      }
+      
+      return date.toLocaleDateString('en-US', { 
+        weekday: 'short', 
+        day: 'numeric', 
+        month: 'short', 
+        year: 'numeric' 
+      });
+    } catch (error) {
+      console.error('Error formatting date:', error, dateString);
+      return 'Unknown Date';
+    }
+  }
 </script>
 
 <div class="journal-container">
   <Notification />
   <div class="journal-header">
-    <div class="week-strip" class:scrolled={scrollY > 50}>
-      {#each weekDays as { day, date, isToday, fullDate }}
-        {@const hasCompletion = $journalStore.dailyProgress.find(d => d.date === fullDate)}
-        {@const isTodayComplete = isToday && $journalStore.streak?.morning && $journalStore.streak?.evening}
-        {@const shouldShowTick = (hasCompletion?.morning && hasCompletion?.evening) || isTodayComplete}
-        <div class="day-item {isToday ? 'active' : ''}">
-          <span class="day-name">{day}</span>
-          <span class="day-number">{date}</span>
-          {#if shouldShowTick}
-            <div class="completion-mark">✓</div>
-          {/if}
-        </div>
-      {/each}
+    <div class="week-strip">
+      <div class="week-strip-content">
+        {#each weekDays as { day, date, isToday, fullDate }}
+          {@const hasCompletion = $journalStore.dailyProgress.find(d => d.date === fullDate)}
+          {@const isTodayComplete = isToday && $journalStore.streak?.morning && $journalStore.streak?.evening}
+          {@const shouldShowTick = (hasCompletion?.morning && hasCompletion?.evening) || isTodayComplete}
+          <div class="day-item {isToday ? 'active' : ''}">
+            <span class="day-name">{day}</span>
+            <span class="day-number">{date}</span>
+            {#if shouldShowTick}
+              <div class="completion-mark">✓</div>
+            {/if}
+          </div>
+        {/each}
+      </div>
     </div>
 
     <div class="date-header">
@@ -574,6 +628,15 @@
         <span class="status">{$journalStore.todayDeenReflection ? 'Completed' : ''}</span>
       </div>
     </div>
+  </div>
+
+  <div class="history-button-container">
+    <button class="history-button" on:click={showHistory} aria-label="View journal history">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="white" viewBox="0 0 256 256">
+        <path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm64-88a8,8,0,0,1-8,8H128a8,8,0,0,1-8-8V72a8,8,0,0,1,16,0v48h48A8,8,0,0,1,192,128Z"></path>
+      </svg>
+      <span class="history-button-text">View History</span>
+    </button>
   </div>
 
   <div class="challenge-card">
@@ -721,6 +784,112 @@
       </div>
     </div>
   {/if}
+
+  {#if showHistoryModal}
+    <div class="modal-overlay" transition:fade={{ duration: 200 }}>
+      <div 
+        class="modal-content history-modal"
+        transition:fly={{ y: 20, duration: 300, easing: quintOut }}
+      >
+        <div class="modal-header">
+          <h3>Journal History</h3>
+          <button class="close-btn" on:click={() => showHistoryModal = false}>
+            <X weight="regular" size={32} />
+          </button>
+        </div>
+
+        <div class="modal-body history-body">
+          {#if isLoadingHistory}
+            <div class="loading-container">
+              <div class="loading-spinner history-spinner"></div>
+              <p>Loading your journal history...</p>
+            </div>
+          {:else if selectedHistoryDate}
+            <div class="history-entry-view">
+              <button class="back-to-history" on:click={closeHistoryView}>
+                <CaretLeft size={16} /> Back to history
+              </button>
+              
+              <h4 class="history-date">{formatDate(selectedHistoryDate)}</h4>
+              
+              {#if true}
+                {@const currentEntry = historyEntries.find(entry => 
+                  entry.date === selectedHistoryDate || 
+                  (entry.date && entry.date.toDate && entry.date.toDate().toISOString().split('T')[0] === selectedHistoryDate)
+                )}
+                
+                {#if currentEntry?.morning}
+                  <div class="history-section">
+                    <h5>Morning Reflection</h5>
+                    {#each morningQuestions as question}
+                      <div class="history-question">
+                        <h6>{question.question}</h6>
+                        <p>{currentEntry.morning[question.field] || 'Not answered'}</p>
+                      </div>
+                    {/each}
+                  </div>
+                {/if}
+                
+                {#if currentEntry?.evening}
+                  <div class="history-section">
+                    <h5>Evening Reflection</h5>
+                    {#each eveningQuestions as question}
+                      <div class="history-question">
+                        <h6>{question.question}</h6>
+                        <p>{currentEntry.evening[question.field] || 'Not answered'}</p>
+                      </div>
+                    {/each}
+                  </div>
+                {/if}
+                
+                {#if currentEntry?.freeWrite}
+                  <div class="history-section">
+                    <h5>Free Write</h5>
+                    <p class="history-free-write">{currentEntry.freeWrite}</p>
+                  </div>
+                {/if}
+                
+                {#if currentEntry?.deenReflections}
+                  <div class="history-section">
+                    <h5>Deen Reflections</h5>
+                    {#each deenReflectionQuestions as question}
+                      <div class="history-question">
+                        <h6>{question.question}</h6>
+                        <p>{currentEntry.deenReflections[question.field] || 'Not answered'}</p>
+                      </div>
+                    {/each}
+                  </div>
+                {/if}
+              {/if}
+            </div>
+          {:else if historyEntries.length === 0}
+            <div class="empty-history">
+              <p>You haven't created any journal entries yet.</p>
+              <p>Start your journaling journey today!</p>
+            </div>
+          {:else}
+            <div class="history-list">
+              {#each historyEntries as entry}
+                {#if true}
+                  {@const entryDate = entry.date && entry.date.toDate ? entry.date.toDate().toISOString().split('T')[0] : entry.date}
+                  <button class="history-item" on:click={() => viewHistoryEntry(entryDate)}>
+                    <div class="history-item-date">{formatDate(entry.date)}</div>
+                    <div class="history-item-content">
+                      {#if entry.morning}<span class="history-tag morning">Morning</span>{/if}
+                      {#if entry.evening}<span class="history-tag evening">Evening</span>{/if}
+                      {#if entry.freeWrite}<span class="history-tag free-write">Free Write</span>{/if}
+                      {#if entry.deenReflections}<span class="history-tag deen">Deen</span>{/if}
+                    </div>
+                    <CaretRight size={16} />
+                  </button>
+                {/if}
+              {/each}
+            </div>
+          {/if}
+        </div>
+      </div>
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -749,31 +918,77 @@
   .week-strip {
     display: flex;
     justify-content: space-between;
+    align-items: center;
     background: #216974;
-    padding: 1rem;
-    margin: 10px;
+    padding: 0.5rem 1rem;
+    margin: 0 10px 0.75rem 10px;
     border-radius: 12px;
     position: sticky;
     top: 10px;
     z-index: 100;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+
+  .week-strip-content {
+    display: flex;
+    flex: 1;
+    justify-content: space-between;
+  }
+
+  .history-button-container {
+    display: flex;
+    justify-content: center;
+    margin: 0.5rem 10px 1.25rem 10px;
+  }
+
+  .history-button {
+    background: #216974;
+    border: none;
+    border-radius: 20px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+    padding: 0 1.25rem;
+  }
+
+  .history-button:hover {
+    background: #1a5761;
+    transform: translateY(-1px);
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.2);
+  }
+
+  .history-button:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+  }
+
+  .history-button svg {
+    width: 24px;
+    height: 24px;
+    fill: white;
+    margin-right: 8px;
+  }
+
+  .history-button-text {
+    font-size: 0.9rem;
+    font-weight: 500;
   }
 
   .week-strip.scrolled {
-    padding: 0.5rem 1rem;
-    margin: 0 10px;
-    border-radius: 12px;
+    /* Removed */
   }
 
   .week-strip.scrolled .day-item {
-    padding: 0.25rem 0.5rem;
+    /* Removed */
   }
 
   .week-strip.scrolled .day-name {
-    height: 0;
-    opacity: 0;
-    margin: 0;
-    overflow: hidden;
+    /* Removed */
   }
 
   .day-item {
@@ -781,11 +996,10 @@
     flex-direction: column;
     align-items: center;
     gap: 0.25rem;
-    padding: 0.5rem;
+    padding: 0.25rem 0.5rem;
     color: rgba(255, 255, 255, 0.8);
     position: relative;
     border-radius: 8px;
-    transition: all 0.2s ease;
   }
 
   .day-item.active {
@@ -795,8 +1009,9 @@
 
   .day-name {
     font-size: 0.75rem;
+    font-weight: 400;
     text-transform: uppercase;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    letter-spacing: 0.5px;
   }
 
   .day-number {
@@ -954,10 +1169,10 @@
 
   .circle-number.morning-only {
     background: linear-gradient(
-      to right,
-      #216974 50%,
-      #e0e0e0 50%
-    );
+    to right,
+    #216974 50%,
+    #e0e0e0 50%
+  );
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -997,6 +1212,9 @@
   .modal-header {
     text-align: left;
     margin-bottom: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
   }
 
   .modal-header h3 {
@@ -1587,5 +1805,192 @@
 
   .free-write-body {
     padding: 1.5rem 0;
+  }
+
+  .history-modal {
+    max-width: 600px;
+    max-height: 80vh;
+    padding: 1.5rem;
+  }
+
+  .history-body {
+    overflow-y: auto;
+    padding: 0;
+    max-height: 60vh;
+  }
+
+  .loading-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem 0;
+  }
+
+  .history-spinner {
+    width: 40px;
+    height: 40px;
+    border-width: 3px;
+    margin-bottom: 1rem;
+    border: 3px solid #216974;
+    border-top-color: transparent;
+  }
+
+  .empty-history {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: #666;
+  }
+
+  .empty-history p {
+    margin: 0.5rem 0;
+  }
+
+  .history-list {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .history-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid #eee;
+    background: none;
+    border-left: none;
+    border-right: none;
+    border-top: none;
+    width: 100%;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.2s ease;
+  }
+
+  .history-item:hover {
+    background: #f0f9fa;
+  }
+
+  .history-item-date {
+    font-weight: 500;
+    color: #216974;
+  }
+
+  .history-item-content {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .history-tag {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 100px;
+    font-weight: 500;
+    display: inline-block;
+  }
+
+  .history-tag.morning {
+    background: #e6f7f9;
+    color: #216974;
+  }
+
+  .history-tag.evening {
+    background: #e6eef9;
+    color: #2c4c8c;
+  }
+
+  .history-tag.free-write {
+    background: #f0f9e6;
+    color: #4c8c2c;
+  }
+
+  .history-tag.deen {
+    background: #f9eee6;
+    color: #E09453;
+  }
+
+  .history-entry-view {
+    padding: 1rem 0;
+  }
+
+  .back-to-history {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: none;
+    border: none;
+    color: #216974;
+    font-weight: 500;
+    padding: 0;
+    margin-bottom: 1.5rem;
+    cursor: pointer;
+  }
+
+  .back-to-history:hover {
+    opacity: 0.8;
+  }
+
+  .history-date {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin: 0 0 1.5rem 0;
+    color: #216974;
+  }
+
+  .history-section {
+    margin-bottom: 2rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid #eee;
+  }
+
+  .history-section:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+  }
+
+  .history-section h5 {
+    font-size: 1.125rem;
+    font-weight: 500;
+    margin: 0 0 1rem 0;
+    color: #216974;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #e6f7f9;
+  }
+
+  .history-question {
+    margin-bottom: 1.5rem;
+  }
+
+  .history-question:last-child {
+    margin-bottom: 0;
+  }
+
+  .history-question h6 {
+    font-size: 0.875rem;
+    font-weight: 600;
+    margin: 0 0 0.5rem 0;
+    color: #555;
+  }
+
+  .history-question p {
+    margin: 0;
+    line-height: 1.5;
+    white-space: pre-line;
+    color: #333;
+  }
+
+  .history-free-write {
+    white-space: pre-line;
+    line-height: 1.5;
+    color: #333;
+  }
+
+  .history-text-icon {
+    color: white;
+    font-size: 22px;
+    font-weight: bold;
+    line-height: 1;
   }
 </style> 

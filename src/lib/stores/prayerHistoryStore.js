@@ -251,6 +251,28 @@ export async function initializeTodaysPrayers() {
                     };
                     
                     promises.push(setDoc(docRef, prayerData));
+                } else {
+                    // Prayer exists, check if it has a final status
+                    const existingData = docSnap.data();
+                    
+                    // Only update if it doesn't have a final status
+                    if (!['ontime', 'late', 'excused'].includes(existingData.status)) {
+                        // For today's prayers that have passed, mark as missed if not already marked
+                        if (dateStr === today.toLocaleDateString('en-CA')) {
+                            const prayerDateTime = getPrayerDateTime(dateStr, prayerTime);
+                            const now = new Date();
+                            
+                            if (prayerDateTime < now && existingData.status !== 'missed') {
+                                console.log(`Updating past prayer ${prayer} on ${dateStr} to missed status`);
+                                promises.push(updateDoc(docRef, {
+                                    status: 'missed',
+                                    lastUpdated: serverTimestamp()
+                                }));
+                            }
+                        }
+                    } else {
+                        console.log(`Skipping update for ${prayer} on ${dateStr} - already has final status: ${existingData.status}`);
+                    }
                 }
             }
         }
@@ -558,8 +580,13 @@ export async function savePrayerStatus(prayerData) {
       accountCreationDate.setHours(0, 0, 0, 0);
       prayerDate.setHours(0, 0, 0, 0);
       
-      if (prayerDate < accountCreationDate) {
-        alert('You cannot mark prayers for dates before your account was created.');
+      // Create a date object for one day before account creation
+      const oneDayBeforeCreation = new Date(accountCreationDate);
+      oneDayBeforeCreation.setDate(accountCreationDate.getDate() - 1);
+      
+      // Allow prayers from one day before account creation
+      if (prayerDate < oneDayBeforeCreation) {
+        alert('You cannot mark prayers for dates before one day prior to your account creation date.');
         return;
       }
     }
@@ -571,6 +598,18 @@ export async function savePrayerStatus(prayerData) {
     
     // Create a document reference with a predictable ID
     const prayerRef = doc(db, 'prayer_history', `${user.uid}_${prayerId}`);
+    
+    // Check if prayer already exists with a final status
+    const existingDoc = await getDoc(prayerRef);
+    if (existingDoc.exists()) {
+      const existingData = existingDoc.data();
+      
+      // If trying to mark as missed but it already has a final status, don't overwrite
+      if (prayerData.status === 'missed' && ['ontime', 'late', 'excused'].includes(existingData.status)) {
+        console.log(`Not overwriting prayer ${prayerName} on ${prayerData.date} with status ${existingData.status} to missed`);
+        return true;
+      }
+    }
     
     // Save to Firestore with timezone information
     await setDoc(prayerRef, {
@@ -595,7 +634,7 @@ export async function savePrayerStatus(prayerData) {
     return true;
   } catch (error) {
     console.error('Error saving prayer status:', error);
-    throw error;
+    return false;
   }
 }
 
@@ -702,6 +741,11 @@ async function fetchFreshPrayerHistory(user) {
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
       const sevenDaysAgoStr = sevenDaysAgo.toLocaleDateString('en-CA');
       
+      // Get today's date for filtering out future dates
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // Set to start of day
+      const todayStr = today.toLocaleDateString('en-CA');
+      
       // Query prayer_history collection
       const prayerHistoryRef = collection(db, 'prayer_history');
       
@@ -713,6 +757,7 @@ async function fetchFreshPrayerHistory(user) {
           prayerHistoryRef,
           where('userId', '==', user.uid),
           where('date', '>=', sevenDaysAgoStr),
+          where('date', '<=', todayStr), // Only include dates up to today
           orderBy('date', 'desc')
         );
         
@@ -730,11 +775,12 @@ async function fetchFreshPrayerHistory(user) {
         
         const filteredDocs = snapshot.docs.filter(doc => {
           const data = doc.data();
-          return data.date >= sevenDaysAgoStr;
+          // Filter by date range - only include dates from 7 days ago up to today
+          return data.date >= sevenDaysAgoStr && data.date <= todayStr;
         }).sort((a, b) => b.data().date.localeCompare(a.data().date));
         
         querySnapshot = { docs: filteredDocs };
-        console.log(`Filtered to ${filteredDocs.length} prayer records within last 7 days`);
+        console.log(`Filtered to ${filteredDocs.length} prayer records within date range`);
       }
 
       const result = processQueryResults(querySnapshot);
@@ -809,10 +855,18 @@ function processQueryResults(querySnapshot) {
   const pendingByDate = {};
   const missedByDate = {};
   
+  // Get today's date for filtering out future dates
+  const today = new Date();
+  today.setHours(0, 0, 0, 0); // Set to start of day
+  const todayStr = today.toLocaleDateString('en-CA');
+  
   if (querySnapshot && querySnapshot.docs) {
     querySnapshot.docs.forEach((doc) => {
       const data = doc.data();
       if (!data) return;
+      
+      // Skip future dates - only include dates up to today
+      if (data.date > todayStr) return;
       
       history.push({ id: doc.id, ...data });
       
@@ -1426,12 +1480,14 @@ export async function updatePastPrayerStatuses() {
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
   const sevenDaysAgoStr = formatDate(sevenDaysAgo);
   
+  // Modified query to only get prayers with status 'none' or 'pending'
+  // This prevents overwriting prayers that already have a final status
   const prayerQuery = query(
     collection(db, 'prayer_history'),
     where('userId', '==', user.uid),
     where('date', '>=', sevenDaysAgoStr),
     where('date', '<', todayStr),
-    where('status', 'not-in', ['ontime', 'late', 'excused'])
+    where('status', 'in', ['none', 'pending', 'upcoming'])
   );
   
   const querySnapshot = await getDocs(prayerQuery);

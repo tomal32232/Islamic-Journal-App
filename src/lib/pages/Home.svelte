@@ -39,10 +39,11 @@
   import { notificationPermissionStore, checkNotificationPermission } from '../services/notificationService';
   import NotificationPermissionDialog from '../components/NotificationPermissionDialog.svelte';
   import { checkAdminStatus } from '../services/adminService';
-  import { fetchMoodGuidance } from '../services/moodGuidanceService';
+  import { fetchMoodGuidance, addSeekingPeaceGuidance } from '../services/moodGuidanceService';
   import QuranReading from '../components/QuranReading.svelte';
   import LocationPermissionDialog from '../components/LocationPermissionDialog.svelte';
   import MoodPopup from '../components/MoodPopup.svelte';
+  import MoodCalendarPopup from '../components/MoodCalendarPopup.svelte';
   const dispatch = createEventDispatcher();
   
   let currentPage = 'home';
@@ -87,6 +88,8 @@
   // Minimum time between updates (5 seconds)
   const MIN_UPDATE_INTERVAL: number = 5000;
 
+  let showMoodCalendarPopup = false;
+
   async function checkAndSetAdminStatus() {
     const firebaseAuth = getAuth();
     const user = firebaseAuth.currentUser;
@@ -126,6 +129,10 @@
       if ($locationStore === 'Location unavailable') {
         showLocationDialog = true;
       }
+      
+      // Ensure prayer history is loaded and update stats
+      await getPrayerHistory();
+      updateStats();
     } catch (error) {
       console.error('Error in onMount:', error);
     }
@@ -155,6 +162,8 @@
           })
         ]).then(() => {
           updatePrayerStatus();
+          // Also update past prayer statuses to ensure they're properly marked as missed
+          updatePastPrayerStatuses();
         });
       }
     });
@@ -170,6 +179,8 @@
     
     // Increase the interval to 5 minutes to reduce frequency of calls
     const prayerInterval = setInterval(() => updatePrayerStatus(), 300000);
+    // Add an interval to update past prayer statuses every hour
+    const pastPrayerInterval = setInterval(() => updatePastPrayerStatuses(), 3600000);
     const countdownInterval = setInterval(updateCountdown, 1000);
     const notificationInterval = setInterval(checkPrayerNotifications, 60000);
     
@@ -198,6 +209,7 @@
     return () => {
       cleanup();
       clearInterval(prayerInterval);
+      clearInterval(pastPrayerInterval);
       clearInterval(countdownInterval);
       clearInterval(notificationInterval);
       clearInterval(moodCheckInterval);
@@ -230,9 +242,38 @@
     }
   }
 
+  // Add a function to force refresh prayer history
+  async function refreshPrayerHistory() {
+    try {
+      // Fetch fresh prayer history data
+      await getPrayerHistory();
+      
+      // Update the prayer count with more robust date comparison
+      const today = new Date();
+      const todayISO = today.toISOString().split('T')[0]; // YYYY-MM-DD
+      const todayLocal = today.toLocaleDateString('en-CA'); // YYYY-MM-DD in local timezone
+      
+      if ($prayerHistoryStore?.history) {
+        const todayPrayers = $prayerHistoryStore.history.filter(p => {
+          // Check if the prayer date matches today in any format
+          const prayerDate = p.date;
+          const isToday = prayerDate === todayISO || prayerDate === todayLocal;
+          const isCompleted = p.status === 'ontime' || p.status === 'late' || p.status === 'excused';
+          return isToday && isCompleted;
+        });
+        
+        completedPrayersToday = todayPrayers.length;
+        console.log('Home: Updated completed prayers count to', completedPrayersToday, 'with prayers:', todayPrayers);
+      }
+    } catch (error) {
+      console.error('Error refreshing prayer history:', error);
+    }
+  }
+
   // Refresh the dhikr count when the component becomes visible
   $: if (currentPage === 'home' && auth.currentUser) {
     refreshDhikrCount();
+    refreshPrayerHistory(); // Also refresh prayer history
   }
 
   function handleTabChange(event) {
@@ -241,6 +282,8 @@
     if (currentPage === 'home') {
       // Always update stats when returning to home
       updateStats();
+      // Refresh prayer history data
+      refreshPrayerHistory();
       // Refresh weekly stats
       weeklyStatsStore.set({ dailyCounts: [], streak: 0 }); // Reset store first
       getWeeklyStats().then((stats) => {
@@ -258,12 +301,22 @@
 
   async function updateStats() {
     todayReadingTime = await getTodayReadingTime();
-    const today = new Date().toISOString().split('T')[0];
+    // Get today's date in different formats to ensure we catch all prayers
+    const today = new Date();
+    const todayISO = today.toISOString().split('T')[0]; // YYYY-MM-DD
+    const todayLocal = today.toLocaleDateString('en-CA'); // YYYY-MM-DD in local timezone
+    
     if ($prayerHistoryStore?.history) {
-      const todayPrayers = $prayerHistoryStore.history.filter(p => 
-        p.date === today && (p.status === 'ontime' || p.status === 'late' || p.status === 'excused')
-      );
+      const todayPrayers = $prayerHistoryStore.history.filter(p => {
+        // Check if the prayer date matches today in any format
+        const prayerDate = p.date;
+        const isToday = prayerDate === todayISO || prayerDate === todayLocal;
+        const isCompleted = p.status === 'ontime' || p.status === 'late' || p.status === 'excused';
+        return isToday && isCompleted;
+      });
+      
       completedPrayersToday = todayPrayers.length;
+      console.log('Home: Updated completed prayers count to', completedPrayersToday, 'with prayers:', todayPrayers);
     }
   }
 
@@ -389,6 +442,10 @@
       value: 'blessed'
     }
   ];
+
+  // Add this right after the moods array definition
+  console.log('Moods array in Home.svelte:', moods);
+  console.log('Seeking peace mood in Home.svelte:', moods.find(m => m.value === 'seeking_peace'));
 
   $: {
     const today = new Date().toISOString().split('T')[0];
@@ -657,10 +714,13 @@
 
   async function handleMoodSubmit(selectedMood: any, period: MoodPeriod): Promise<void> {
     try {
+      console.log('handleMoodSubmit called with mood:', selectedMood.value, 'period:', period);
       await saveMood(selectedMood, selectedMood.guidance, period);
       
       // Use the local mood template to ensure we have the icon
       const matchingMood = moods.find(m => m.value === selectedMood.value);
+      console.log('Found matching mood:', matchingMood ? matchingMood.value : 'none');
+      
       if (matchingMood) {
         const moodData = {
           value: selectedMood.value,
@@ -669,11 +729,15 @@
           description: matchingMood.description,
           guidance: selectedMood.guidance
         };
+        
+        console.log('Created mood data:', moodData.value);
 
         if (period === 'morning') {
           currentMorningMood = moodData;
+          console.log('Set currentMorningMood');
         } else {
           currentEveningMood = moodData;
+          console.log('Set currentEveningMood');
         }
       }
       await loadWeekMoods();
@@ -699,24 +763,76 @@
     try {
       await getMoodHistory(7);
       const moodsFromDb = get(moodHistoryStore);
-      weekMoods = moodsFromDb.reduce((acc, mood) => {
+      console.log('Raw moods from DB:', JSON.stringify(moodsFromDb));
+      
+      // Check for duplicate mood entries (same date and period)
+      const moodsByDateAndPeriod: Record<string, any[]> = {};
+      moodsFromDb.forEach(mood => {
+        const key = `${mood.date}_${mood.period}`;
+        if (!moodsByDateAndPeriod[key]) {
+          moodsByDateAndPeriod[key] = [];
+        }
+        moodsByDateAndPeriod[key].push(mood);
+      });
+      
+      // Log any duplicates found
+      Object.entries(moodsByDateAndPeriod).forEach(([key, moods]) => {
+        if (moods.length > 1) {
+          console.log(`Found ${moods.length} duplicate moods for ${key}:`, moods);
+        }
+      });
+      
+      // Use the most recent mood for each date and period
+      const uniqueMoods = Object.values(moodsByDateAndPeriod).map(moods => {
+        // Sort by timestamp descending and take the first one
+        return moods.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
+      });
+      
+      console.log('Unique moods after deduplication:', uniqueMoods);
+      
+      weekMoods = uniqueMoods.reduce((acc, mood) => {
         if (!acc[mood.date]) {
           acc[mood.date] = {};
         }
         acc[mood.date][mood.period] = mood;
+        console.log(`Setting mood for ${mood.date}, period ${mood.period}:`, mood);
         return acc;
       }, {});
 
+      console.log('Processed weekMoods:', JSON.stringify(weekMoods));
+
       // Check if we have moods for today
       const today = new Date().toLocaleDateString();
+      console.log('Today is:', today);
       const todayMoods = weekMoods[today] || {};
+      console.log('Today moods:', JSON.stringify(todayMoods));
       
       // Get prayer times to determine which mood selector to show
       const prayerTimes = get(prayerTimesStore);
-      const { showMorningMood, showEveningMood } = shouldShowMoodSelector(prayerTimes);
+      const selectorInfo = shouldShowMoodSelector(prayerTimes);
+      const showMorningMood = selectorInfo ? selectorInfo.showMorningMood : false;
+      const showEveningMood = selectorInfo ? selectorInfo.showEveningMood : false;
 
       if (todayMoods.morning) {
-        const matchingMood = moods.find(m => m.value === todayMoods.morning.mood);
+        console.log('Found morning mood:', todayMoods.morning.mood);
+        // Try to find a direct match first
+        let matchingMood = moods.find(m => m.value === todayMoods.morning.mood);
+        
+        // If no match found, try converting spaces to underscores
+        if (!matchingMood) {
+          const normalizedValue = todayMoods.morning.mood.replace(/\s+/g, '_');
+          console.log('Trying normalized value with underscores:', normalizedValue);
+          matchingMood = moods.find(m => m.value === normalizedValue);
+        }
+        
+        // If still no match, try converting underscores to spaces
+        if (!matchingMood) {
+          const denormalizedValue = todayMoods.morning.mood.replace(/_+/g, ' ');
+          console.log('Trying denormalized value with spaces:', denormalizedValue);
+          matchingMood = moods.find(m => m.value === denormalizedValue);
+        }
+        
+        console.log('Matching mood from array:', matchingMood ? matchingMood.value : 'none');
         if (matchingMood) {
           currentMorningMood = {
             value: todayMoods.morning.mood,
@@ -724,11 +840,30 @@
             icon: matchingMood.icon,
             description: matchingMood.description
           };
+          console.log('Set currentMorningMood:', currentMorningMood.value);
         }
       }
 
       if (todayMoods.evening) {
-        const matchingMood = moods.find(m => m.value === todayMoods.evening.mood);
+        console.log('Found evening mood:', todayMoods.evening.mood);
+        // Try to find a direct match first
+        let matchingMood = moods.find(m => m.value === todayMoods.evening.mood);
+        
+        // If no match found, try converting spaces to underscores
+        if (!matchingMood) {
+          const normalizedValue = todayMoods.evening.mood.replace(/\s+/g, '_');
+          console.log('Trying normalized value with underscores:', normalizedValue);
+          matchingMood = moods.find(m => m.value === normalizedValue);
+        }
+        
+        // If still no match, try converting underscores to spaces
+        if (!matchingMood) {
+          const denormalizedValue = todayMoods.evening.mood.replace(/_+/g, ' ');
+          console.log('Trying denormalized value with spaces:', denormalizedValue);
+          matchingMood = moods.find(m => m.value === denormalizedValue);
+        }
+        
+        console.log('Matching mood from array:', matchingMood ? matchingMood.value : 'none');
         if (matchingMood) {
           currentEveningMood = {
             value: todayMoods.evening.mood,
@@ -736,6 +871,7 @@
             icon: matchingMood.icon,
             description: matchingMood.description
           };
+          console.log('Set currentEveningMood:', currentEveningMood.value);
         }
       }
 
@@ -982,6 +1118,94 @@
       console.log('Home: Updated today\'s tasbih count from store to', todayTasbihCount);
     }
   }
+
+  // Add this function to test the seeking_peace mood specifically
+  function testSeekingPeaceMood() {
+    console.log('Testing seeking_peace mood specifically');
+    const seekingPeaceMood = moods.find(m => m.value === 'seeking_peace');
+    if (seekingPeaceMood) {
+      console.log('Found seeking_peace mood in moods array:', seekingPeaceMood);
+      currentMoodPeriod = 'morning';
+      void handleMoodSubmit(seekingPeaceMood, currentMoodPeriod);
+    } else {
+      console.error('Could not find seeking_peace mood in moods array');
+    }
+  }
+
+  // Add this function to the Home.svelte component
+  async function handleAddSeekingPeaceGuidance() {
+    console.log('Adding seeking_peace guidance');
+    const result = await addSeekingPeaceGuidance();
+    console.log('Result of adding seeking_peace guidance:', result);
+  }
+
+  function handleMoodCalendarClick() {
+    showMoodCalendarPopup = true;
+  }
+
+  function handleMoodCalendarClose() {
+    showMoodCalendarPopup = false;
+  }
+
+  function handleMoodCalendarSelect(event) {
+    // Handle mood selection from calendar
+    const selectedMood = event.detail;
+    selectedHistoryMood = selectedMood;
+    showMoodCalendarPopup = false;
+  }
+
+  // Add this function to the script section
+  async function refreshActivities() {
+    console.log('Manually refreshing activities');
+    
+    // Show a small loading indicator or feedback
+    const activitiesSection = document.querySelector('.reading-stats');
+    if (activitiesSection) {
+      activitiesSection.classList.add('refreshing');
+    }
+    
+    try {
+      // Refresh all activity data
+      await Promise.all([
+        refreshPrayerHistory(),
+        getTodayReadingTime().then(time => {
+          todayReadingTime = time;
+        }),
+        refreshDhikrCount()
+      ]);
+      
+      // Update journal count (this is reactive so no need to fetch)
+      todayJournalCount = $journalStore.streak?.morning && $journalStore.streak?.evening ? 2 : 
+                         $journalStore.streak?.morning || $journalStore.streak?.evening ? 1 : 0;
+                         
+      console.log('Activities refreshed successfully');
+    } catch (error) {
+      console.error('Error refreshing activities:', error);
+    } finally {
+      // Remove loading indicator
+      if (activitiesSection) {
+        activitiesSection.classList.remove('refreshing');
+        
+        // Add a brief "refreshed" indicator
+        activitiesSection.classList.add('refreshed');
+        setTimeout(() => {
+          activitiesSection.classList.remove('refreshed');
+        }, 1000);
+      }
+    }
+  }
+
+  // Subscribe to changes in the prayerHistoryStore
+  $: if ($prayerHistoryStore) {
+    // Update the prayer count whenever the prayer history changes
+    updateStats();
+  }
+
+  // Update when returning to home page
+  $: if (currentPage === 'home' && auth.currentUser) {
+    refreshDhikrCount();
+    refreshPrayerHistory(); // Also refresh prayer history
+  }
 </script>
 
 <div class="home-container">
@@ -1055,7 +1279,13 @@
                 {#if weekMoods[fullDate]}
                   <div class="mood-buttons">
                     {#if weekMoods[fullDate].morning}
-                      {@const morningMood = moods.find(m => m.value === weekMoods[fullDate].morning.mood)}
+                      <!-- Try to find a direct match first -->
+                      {@const moodValue = weekMoods[fullDate].morning.mood}
+                      {@const morningMood = moods.find(m => 
+                        m.value === moodValue || 
+                        m.value === moodValue.replace(/\s+/g, '_') || 
+                        m.value === moodValue.replace(/_+/g, ' ')
+                      )}
                       {#if morningMood}
                         <button 
                           class="mood-icon-button morning" 
@@ -1063,11 +1293,28 @@
                           title={`Morning: ${morningMood.name}`}
                         >
                           {@html morningMood.icon}
+                          <span class="debug-info" style="display: none;">
+                            {console.log(`Rendering morning mood for ${fullDate}:`, weekMoods[fullDate].morning.mood)}
+                          </span>
                         </button>
+                      {:else}
+                        <span class="debug-info" style="display: none;">
+                          {console.log(`No matching morning mood found for ${fullDate}. Value:`, weekMoods[fullDate].morning.mood)}
+                        </span>
                       {/if}
+                    {:else}
+                      <span class="debug-info" style="display: none;">
+                        {console.log(`No morning mood data for ${fullDate}`)}
+                      </span>
                     {/if}
                     {#if weekMoods[fullDate].evening}
-                      {@const eveningMood = moods.find(m => m.value === weekMoods[fullDate].evening.mood)}
+                      <!-- Try to find a direct match first -->
+                      {@const moodValue = weekMoods[fullDate].evening.mood}
+                      {@const eveningMood = moods.find(m => 
+                        m.value === moodValue || 
+                        m.value === moodValue.replace(/\s+/g, '_') || 
+                        m.value === moodValue.replace(/_+/g, ' ')
+                      )}
                       {#if eveningMood}
                         <button 
                           class="mood-icon-button evening" 
@@ -1075,8 +1322,19 @@
                           title={`Evening: ${eveningMood.name}`}
                         >
                           {@html eveningMood.icon}
+                          <span class="debug-info" style="display: none;">
+                            {console.log(`Rendering evening mood for ${fullDate}:`, weekMoods[fullDate].evening.mood)}
+                          </span>
                         </button>
+                      {:else}
+                        <span class="debug-info" style="display: none;">
+                          {console.log(`No matching evening mood found for ${fullDate}. Value:`, weekMoods[fullDate].evening.mood)}
+                        </span>
                       {/if}
+                    {:else}
+                      <span class="debug-info" style="display: none;">
+                        {console.log(`No evening mood data for ${fullDate}`)}
+                      </span>
                     {/if}
                   </div>
                 {/if}
@@ -1109,6 +1367,17 @@
                 {/if}
               </div>
             {/each}
+            
+            <!-- Mood Calendar Button -->
+            <button class="mood-calendar-button" on:click={handleMoodCalendarClick} title="View Mood Calendar">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                <line x1="16" y1="2" x2="16" y2="6" />
+                <line x1="8" y1="2" x2="8" y2="6" />
+                <line x1="3" y1="10" x2="21" y2="10" />
+                <circle cx="12" cy="15" r="2" />
+              </svg>
+            </button>
           </div>
         </div>
 
@@ -1119,7 +1388,9 @@
         />
 
         <div class="reading-stats">
-          <h3 class="section-title">Today's Activities</h3>
+          <h3 class="section-title">
+            Today's Activities
+          </h3>
           <div class="activities-row">
             <div class="activity-card" on:click={() => navigateTo('prayer')}>
               <div class="activity-icon prayer">
@@ -1174,13 +1445,23 @@
           </div>
           
           {#if $journalStore.todayMorningReflection?.affirmation}
-            <div class="affirmation-card">
+            <div class="affirmation-card" on:click={() => navigateTo('journal')}>
               <div class="affirmation-icon">
-                <svelte:component this={iconMap.Star} size={16} weight="fill" color="#E09453" />
+                <svelte:component this={iconMap.Star} size={20} weight="fill" color="#E09453" />
               </div>
               <div class="affirmation-content">
                 <span class="affirmation-label">Today's Affirmation</span>
                 <p class="affirmation-text">"{$journalStore.todayMorningReflection.affirmation}"</p>
+              </div>
+            </div>
+          {:else}
+            <div class="affirmation-card" on:click={() => navigateTo('journal')}>
+              <div class="affirmation-icon">
+                <svelte:component this={iconMap.Star} size={20} weight="fill" color="#E09453" />
+              </div>
+              <div class="affirmation-content">
+                <span class="affirmation-label">Today's Affirmation</span>
+                <p class="affirmation-text reminder">Take a moment to set your daily affirmation and watch how it shapes your day. Write your morning reflection to ground yourself before the day unfolds.</p>
               </div>
             </div>
           {/if}
@@ -1274,6 +1555,23 @@
   />
 {/if}
 
+{#if isAdmin}
+  <div class="admin-controls">
+    <button on:click={handleSync}>Sync Quotes</button>
+    <button on:click={handleTestMoodPopup}>Test Mood Popup</button>
+    <button on:click={testSeekingPeaceMood}>Test Seeking Peace</button>
+    <button on:click={handleAddSeekingPeaceGuidance}>Add Seeking Peace Guidance</button>
+  </div>
+{/if}
+
+{#if showMoodCalendarPopup}
+  <MoodCalendarPopup 
+    moods={moods}
+    onClose={handleMoodCalendarClose}
+    on:select={handleMoodCalendarSelect}
+  />
+{/if}
+
 <style>
   .home-container {
     padding: 0;
@@ -1346,8 +1644,7 @@
     justify-content: space-between;
     margin: 0;
     padding: 0.25rem 0;
-    transition: opacity 0.3s ease, transform 0.3s ease;
-    transform-origin: top center;
+    align-items: flex-start;
   }
 
   .quote-card.scrolled + .calendar-strip {
@@ -1420,7 +1717,9 @@
     align-items: center;
     gap: 0.125rem;
     padding: 0.25rem;
-    min-width: 2rem;
+    min-width: 2.5rem;
+    position: relative;
+    height: 6rem; /* Fixed height to ensure consistent alignment */
   }
 
   .day {
@@ -1431,6 +1730,7 @@
   .date-num {
     font-size: 1rem;
     color: #000;
+    margin-bottom: 0.25rem;
   }
 
   .day-item.active .date-num {
@@ -1672,7 +1972,7 @@
   }
 
   .reading-stats {
-    margin-top: 0.5rem;
+    margin-top: 30px;
   }
 
   .stats-card {
@@ -1701,7 +2001,48 @@
     font-weight: normal;
     text-align: center;
     width: 100%;
-    display: block;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .refresh-button {
+    background: none;
+    border: none;
+    color: #666;
+    cursor: pointer;
+    padding: 4px;
+    margin-left: 6px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .refresh-button:hover {
+    background: rgba(0, 0, 0, 0.05);
+  }
+  
+  .refresh-button:active {
+    background: rgba(0, 0, 0, 0.1);
+  }
+  
+  .refreshing .refresh-button {
+    animation: spin 1s linear infinite;
+  }
+  
+  .refreshed .activities-row {
+    animation: flash 0.5s ease-out;
+  }
+  
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+  
+  @keyframes flash {
+    0% { opacity: 0.5; }
+    100% { opacity: 1; }
   }
 
   .activities-row {
@@ -1919,13 +2260,12 @@
   }
 
   .mood-icon-button {
-    width: 1.25rem;
-    height: 1.25rem;
+    width: 1.5rem;
+    height: 1.5rem;
     padding: 0;
     background: none;
     border: none;
     cursor: pointer;
-    color: #216974;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1934,6 +2274,14 @@
 
   .mood-icon-button:hover {
     transform: scale(1.1);
+  }
+
+  .mood-icon-button.morning {
+    color: #216974;
+  }
+
+  .mood-icon-button.evening {
+    color: #E09453;
   }
 
   .mood-icon-button :global(svg) {
@@ -2152,13 +2500,23 @@
 
   .mood-buttons {
     display: flex;
-    gap: 0.25rem;
+    flex-direction: column;
     align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.25rem;
+  }
+
+  .mood-add-buttons {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.25rem;
   }
 
   .mood-icon-button {
-    width: 1.25rem;
-    height: 1.25rem;
+    width: 1.5rem;
+    height: 1.5rem;
     padding: 0;
     background: none;
     border: none;
@@ -2256,8 +2614,8 @@
   }
 
   .mood-add-button {
-    width: 1.25rem;
-    height: 1.25rem;
+    width: 1.5rem;
+    height: 1.5rem;
     border-radius: 50%;
     border: none;
     background: #f0f4f5;
@@ -2268,24 +2626,26 @@
     padding: 0;
     cursor: pointer;
     transition: all 0.2s;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
   }
 
   .mood-add-button:hover {
     background: #e0eaec;
     transform: scale(1.1);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.15);
   }
 
   .mood-add-button svg {
-    width: 0.75rem;
-    height: 0.75rem;
+    width: 1.25rem;
+    height: 1.25rem;
   }
 
   .mood-add-button.morning {
-    border: 1px solid rgba(255, 166, 0, 0.3);
+    border: 1px solid rgba(33, 105, 116, 0.3);
   }
 
   .mood-add-button.evening {
-    border: 1px solid rgba(70, 130, 180, 0.3);
+    border: 1px solid rgba(224, 148, 83, 0.3);
   }
 
   .next-prayer-card {
@@ -2301,17 +2661,26 @@
     align-items: flex-start;
     gap: 0.75rem;
     box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  
+  .affirmation-card:hover {
+    background-color: #f5f0e8;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    transform: translateY(-1px);
   }
   
   .affirmation-icon {
     background-color: #fdf2e9;
     border-radius: 50%;
-    width: 32px;
-    height: 32px;
+    width: 36px;
+    height: 36px;
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
+    margin-top: 4px;
   }
   
   .affirmation-content {
@@ -2331,6 +2700,38 @@
     font-style: italic;
     margin: 0;
     line-height: 1.4;
+  }
+  
+  .affirmation-text.reminder {
+    color: #E09453;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 0.8rem;
+    line-height: 1.5;
+  }
+
+  .mood-calendar-button {
+    width: 3.5rem;
+    height: 100%;
+    background: #E6F7F9;
+    border: 1px solid #E2E8F0;
+    border-left: none;
+    border-radius: 0 12px 12px 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: #216974;
+    transition: all 0.2s;
+  }
+
+  .mood-calendar-button svg {
+    width: 1.5rem;
+    height: 1.5rem;
+  }
+
+  .mood-calendar-button:hover {
+    background: #D1EFF2;
   }
 </style>
 

@@ -152,13 +152,17 @@
       let accountCreationDate = trialDoc.exists() ? trialDoc.data().startDate.toDate() : new Date();
       accountCreationDate = new Date(accountCreationDate.toLocaleDateString()); // Reset to midnight in local timezone
 
+      // Create a date object for one day before account creation
+      const oneDayBeforeCreation = new Date(accountCreationDate);
+      oneDayBeforeCreation.setDate(accountCreationDate.getDate() - 1);
+
       // Convert prayer date to local date for comparison
       const prayerDate = new Date(day.date);
       const prayerDateLocal = new Date(prayerDate.toLocaleDateString());
 
-      // Check if prayer is before account creation
-      if (prayerDateLocal.getTime() < accountCreationDate.getTime()) {
-        console.log(`Cannot mark prayer before account creation date (${accountCreationDate.toLocaleDateString('en-CA')})`);
+      // Check if prayer is before one day before account creation
+      if (prayerDateLocal.getTime() < oneDayBeforeCreation.getTime()) {
+        console.log(`Cannot mark prayer before one day prior to account creation date (${oneDayBeforeCreation.toLocaleDateString('en-CA')})`);
         return;
       }
       
@@ -604,12 +608,24 @@
       let accountCreationDate = trialDoc.exists() ? trialDoc.data().startDate.toDate() : new Date();
       accountCreationDate = new Date(accountCreationDate.toLocaleDateString()); // Reset to midnight in local timezone
       
+      // Create a date object for one day before account creation
+      const oneDayBeforeCreation = new Date(accountCreationDate);
+      oneDayBeforeCreation.setDate(accountCreationDate.getDate() - 1);
+      
       console.log('=== Prayer History Account Check ===');
       console.log('Raw Account Creation Date:', trialDoc.exists() ? trialDoc.data().startDate.toDate().toISOString() : 'N/A');
       console.log('Adjusted Account Creation Date:', accountCreationDate.toISOString());
+      console.log('One Day Before Creation Date:', oneDayBeforeCreation.toISOString());
       console.log('Account Creation Local Date:', accountCreationDate.toLocaleDateString('en-CA'));
       console.log('Today:', todayStr);
       console.log('Seven Days Ago:', sevenDaysAgoStr);
+
+      // Track prayers that need to be saved to the database
+      const prayersToSave = [];
+      
+      // First, let's ensure we have the most up-to-date prayer history from the database
+      // This helps prevent race conditions where the store might not be fully populated
+      await getPrayerHistory();
 
       // Process each prayer
       for (const prayer of prayers) {
@@ -631,16 +647,52 @@
             status = prayerRecord.status;
           } else if (day.date < todayStr) {
             // Past days without a record should be marked as missed
-            // Only if on or after account creation
+            // Only if on or after one day before account creation
             const prayerDate = new Date(day.date);
             const prayerDateLocal = new Date(prayerDate.toLocaleDateString()); // Reset to midnight in local timezone
             
-            // Compare using local dates - use >= to include account creation date
-            if (prayerDateLocal.getTime() >= accountCreationDate.getTime()) {
-              console.log(`Marking ${prayer} as missed for ${day.date} (on/after account creation: ${accountCreationDate.toLocaleDateString('en-CA')})`);
-              status = 'missed';
+            // Compare using local dates - use >= to include one day before account creation date
+            if (prayerDateLocal.getTime() >= oneDayBeforeCreation.getTime()) {
+              // Before marking as missed, check if this prayer exists in the database
+              // with a status other than 'none' or 'pending'
+              const prayerId = `${day.date}_${prayer}`;
+              const prayerDocRef = doc(db, 'prayer_history', `${user.uid}_${prayerId}`);
+              const prayerDocSnap = await getDoc(prayerDocRef);
+              
+              if (prayerDocSnap.exists()) {
+                const dbPrayerData = prayerDocSnap.data();
+                // If the prayer exists in the database with a final status, use that status
+                if (['ontime', 'late', 'excused'].includes(dbPrayerData.status)) {
+                  console.log(`Found existing prayer ${prayer} for ${day.date} with status ${dbPrayerData.status}, using that instead of marking as missed`);
+                  status = dbPrayerData.status;
+                } else {
+                  console.log(`Marking ${prayer} as missed for ${day.date} (existing record with non-final status: ${dbPrayerData.status})`);
+                  status = 'missed';
+                  
+                  // Add this prayer to the list to save to the database
+                  const prayerTime = $prayerTimesStore.find(p => p.name === prayer)?.time || '00:00';
+                  prayersToSave.push({
+                    prayerName: prayer,
+                    date: day.date,
+                    status: 'missed',
+                    time: prayerTime
+                  });
+                }
+              } else {
+                console.log(`Marking ${prayer} as missed for ${day.date} (no existing record found)`);
+                status = 'missed';
+                
+                // Add this prayer to the list to save to the database
+                const prayerTime = $prayerTimesStore.find(p => p.name === prayer)?.time || '00:00';
+                prayersToSave.push({
+                  prayerName: prayer,
+                  date: day.date,
+                  status: 'missed',
+                  time: prayerTime
+                });
+              }
             } else {
-              console.log(`Skipping ${prayer} for ${day.date} (before account creation: ${accountCreationDate.toLocaleDateString('en-CA')})`);
+              console.log(`Skipping ${prayer} for ${day.date} (before one day prior to account creation: ${oneDayBeforeCreation.toLocaleDateString('en-CA')})`);
             }
           } else if (day.date === todayStr) {
             // For today, check if prayer time has passed
@@ -661,6 +713,19 @@
           });
         }
         grid.push(row);
+      }
+
+      // Save missed prayers to the database
+      if (prayersToSave.length > 0) {
+        console.log(`Saving ${prayersToSave.length} missed prayers to the database`);
+        // Use Promise.all to save all prayers in parallel
+        await Promise.all(prayersToSave.map(prayer => savePrayerStatus(prayer)));
+        
+        // After saving, refresh the prayer history to update the store
+        await getPrayerHistory();
+        
+        // Update weekly stats after saving prayers
+        updateWeeklyStats();
       }
 
       // Update cache with new data
@@ -723,6 +788,9 @@
       if (needsFreshData) {
         console.log('Fetching fresh prayer history data');
         await getPrayerHistory();
+        
+        // Update weekly stats after refreshing prayer history
+        updateWeeklyStats();
       }
       
       // Generate the grid
@@ -775,6 +843,9 @@
       
       // Force fetch fresh prayer history
       await getPrayerHistory();
+      
+      // Update weekly stats after refreshing prayer history
+      updateWeeklyStats();
       
       // Update the grid
       const result = await updateGrid();

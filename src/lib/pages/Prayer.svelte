@@ -360,12 +360,17 @@
       // Force a UI update by creating a new array
       $prayerTimesStore = [...$prayerTimesStore];
       
-      // Invalidate the prayer history cache to force a fresh fetch
+      // Completely invalidate the prayer history cache to force a fresh fetch
       prayerHistoryCache.prayerHistory = null;
       prayerHistoryCache.lastFetched = null;
       
       // Fetch fresh data
       await getPrayerHistory();
+      
+      // Force an update of the prayerHistoryStore to ensure reactivity
+      prayerHistoryStore.update(store => ({ ...store }));
+      
+      console.log('Prayer marked as', status, 'and prayer history updated');
     } finally {
       isLoadingPrayerData = false;
     }

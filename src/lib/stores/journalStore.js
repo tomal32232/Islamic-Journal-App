@@ -348,6 +348,7 @@ function createJournalStore() {
 
       try {
         if (existingDoc.exists()) {
+          // Update existing document
           await setDoc(docRef, {
             ...existingDoc.data(),
             deenReflections: {
@@ -356,6 +357,7 @@ function createJournalStore() {
             }
           }, { merge: true });
         } else {
+          // Create new document
           await setDoc(docRef, {
             userId: auth.currentUser.uid,
             date: today,
@@ -371,9 +373,62 @@ function createJournalStore() {
           ...state,
           todayDeenReflection: reflections
         }));
+
+        await calculateProgress();
+        return true;
       } catch (error) {
         console.error('Error saving deen reflections:', error);
         throw error;
+      }
+    },
+
+    async getJournalHistory() {
+      if (!auth.currentUser) return [];
+      
+      try {
+        // Query all reflections for the current user, ordered by date descending
+        const reflectionsQuery = query(
+          collection(db, 'reflections'),
+          where('userId', '==', auth.currentUser.uid),
+          orderBy('date', 'desc')
+        );
+        
+        const querySnapshot = await getDocs(reflectionsQuery);
+        
+        // Transform the data into a more usable format
+        const historyEntries = [];
+        querySnapshot.forEach(doc => {
+          const data = doc.data();
+          
+          // Extract the date string if it's a Firestore timestamp
+          let dateValue = data.date;
+          if (dateValue && typeof dateValue === 'object' && dateValue.toDate) {
+            try {
+              // Keep the original Firestore timestamp for proper display
+              dateValue = data.date;
+            } catch (error) {
+              console.error('Error processing date:', error);
+              dateValue = 'Invalid Date';
+            }
+          }
+          
+          historyEntries.push({
+            id: doc.id,
+            date: dateValue,
+            morning: data.morning || null,
+            evening: data.evening || null,
+            freeWrite: data.freeWrite?.content || null,
+            deenReflections: data.deenReflections || null,
+            createdAt: data.createdAt,
+            updatedAt: data.updatedAt
+          });
+        });
+        
+        console.log('Loaded journal history:', historyEntries.length, 'entries');
+        return historyEntries;
+      } catch (error) {
+        console.error('Error loading journal history:', error);
+        return [];
       }
     }
   };
