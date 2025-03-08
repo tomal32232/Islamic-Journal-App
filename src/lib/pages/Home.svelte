@@ -129,6 +129,10 @@
       if ($locationStore === 'Location unavailable') {
         showLocationDialog = true;
       }
+      
+      // Ensure prayer history is loaded and update stats
+      await getPrayerHistory();
+      updateStats();
     } catch (error) {
       console.error('Error in onMount:', error);
     }
@@ -240,25 +244,26 @@
 
   // Add a function to force refresh prayer history
   async function refreshPrayerHistory() {
-    if (!auth.currentUser) return;
-    
     try {
-      console.log('Home: Force refreshing prayer history');
-      // Invalidate the prayer history cache
-      prayerHistoryCache.prayerHistory = null;
-      prayerHistoryCache.lastFetched = null;
-      
       // Fetch fresh prayer history data
       await getPrayerHistory();
       
-      // Update the prayer count
-      const today = new Date().toISOString().split('T')[0];
+      // Update the prayer count with more robust date comparison
+      const today = new Date();
+      const todayISO = today.toISOString().split('T')[0]; // YYYY-MM-DD
+      const todayLocal = today.toLocaleDateString('en-CA'); // YYYY-MM-DD in local timezone
+      
       if ($prayerHistoryStore?.history) {
-        const todayPrayers = $prayerHistoryStore.history.filter(p => 
-          p.date === today && (p.status === 'ontime' || p.status === 'late' || p.status === 'excused')
-        );
+        const todayPrayers = $prayerHistoryStore.history.filter(p => {
+          // Check if the prayer date matches today in any format
+          const prayerDate = p.date;
+          const isToday = prayerDate === todayISO || prayerDate === todayLocal;
+          const isCompleted = p.status === 'ontime' || p.status === 'late' || p.status === 'excused';
+          return isToday && isCompleted;
+        });
+        
         completedPrayersToday = todayPrayers.length;
-        console.log('Home: Updated completed prayers count to', completedPrayersToday);
+        console.log('Home: Updated completed prayers count to', completedPrayersToday, 'with prayers:', todayPrayers);
       }
     } catch (error) {
       console.error('Error refreshing prayer history:', error);
@@ -296,12 +301,22 @@
 
   async function updateStats() {
     todayReadingTime = await getTodayReadingTime();
-    const today = new Date().toISOString().split('T')[0];
+    // Get today's date in different formats to ensure we catch all prayers
+    const today = new Date();
+    const todayISO = today.toISOString().split('T')[0]; // YYYY-MM-DD
+    const todayLocal = today.toLocaleDateString('en-CA'); // YYYY-MM-DD in local timezone
+    
     if ($prayerHistoryStore?.history) {
-      const todayPrayers = $prayerHistoryStore.history.filter(p => 
-        p.date === today && (p.status === 'ontime' || p.status === 'late' || p.status === 'excused')
-      );
+      const todayPrayers = $prayerHistoryStore.history.filter(p => {
+        // Check if the prayer date matches today in any format
+        const prayerDate = p.date;
+        const isToday = prayerDate === todayISO || prayerDate === todayLocal;
+        const isCompleted = p.status === 'ontime' || p.status === 'late' || p.status === 'excused';
+        return isToday && isCompleted;
+      });
+      
       completedPrayersToday = todayPrayers.length;
+      console.log('Home: Updated completed prayers count to', completedPrayersToday, 'with prayers:', todayPrayers);
     }
   }
 
@@ -1178,6 +1193,18 @@
         }, 1000);
       }
     }
+  }
+
+  // Subscribe to changes in the prayerHistoryStore
+  $: if ($prayerHistoryStore) {
+    // Update the prayer count whenever the prayer history changes
+    updateStats();
+  }
+
+  // Update when returning to home page
+  $: if (currentPage === 'home' && auth.currentUser) {
+    refreshDhikrCount();
+    refreshPrayerHistory(); // Also refresh prayer history
   }
 </script>
 
