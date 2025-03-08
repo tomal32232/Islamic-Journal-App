@@ -622,6 +622,10 @@
 
       // Track prayers that need to be saved to the database
       const prayersToSave = [];
+      
+      // First, let's ensure we have the most up-to-date prayer history from the database
+      // This helps prevent race conditions where the store might not be fully populated
+      await getPrayerHistory();
 
       // Process each prayer
       for (const prayer of prayers) {
@@ -649,17 +653,44 @@
             
             // Compare using local dates - use >= to include one day before account creation date
             if (prayerDateLocal.getTime() >= oneDayBeforeCreation.getTime()) {
-              console.log(`Marking ${prayer} as missed for ${day.date} (on/after one day before account creation: ${oneDayBeforeCreation.toLocaleDateString('en-CA')})`);
-              status = 'missed';
+              // Before marking as missed, check if this prayer exists in the database
+              // with a status other than 'none' or 'pending'
+              const prayerId = `${day.date}_${prayer}`;
+              const prayerDocRef = doc(db, 'prayer_history', `${user.uid}_${prayerId}`);
+              const prayerDocSnap = await getDoc(prayerDocRef);
               
-              // Add this prayer to the list to save to the database
-              const prayerTime = $prayerTimesStore.find(p => p.name === prayer)?.time || '00:00';
-              prayersToSave.push({
-                prayerName: prayer,
-                date: day.date,
-                status: 'missed',
-                time: prayerTime
-              });
+              if (prayerDocSnap.exists()) {
+                const dbPrayerData = prayerDocSnap.data();
+                // If the prayer exists in the database with a final status, use that status
+                if (['ontime', 'late', 'excused'].includes(dbPrayerData.status)) {
+                  console.log(`Found existing prayer ${prayer} for ${day.date} with status ${dbPrayerData.status}, using that instead of marking as missed`);
+                  status = dbPrayerData.status;
+                } else {
+                  console.log(`Marking ${prayer} as missed for ${day.date} (existing record with non-final status: ${dbPrayerData.status})`);
+                  status = 'missed';
+                  
+                  // Add this prayer to the list to save to the database
+                  const prayerTime = $prayerTimesStore.find(p => p.name === prayer)?.time || '00:00';
+                  prayersToSave.push({
+                    prayerName: prayer,
+                    date: day.date,
+                    status: 'missed',
+                    time: prayerTime
+                  });
+                }
+              } else {
+                console.log(`Marking ${prayer} as missed for ${day.date} (no existing record found)`);
+                status = 'missed';
+                
+                // Add this prayer to the list to save to the database
+                const prayerTime = $prayerTimesStore.find(p => p.name === prayer)?.time || '00:00';
+                prayersToSave.push({
+                  prayerName: prayer,
+                  date: day.date,
+                  status: 'missed',
+                  time: prayerTime
+                });
+              }
             } else {
               console.log(`Skipping ${prayer} for ${day.date} (before one day prior to account creation: ${oneDayBeforeCreation.toLocaleDateString('en-CA')})`);
             }
