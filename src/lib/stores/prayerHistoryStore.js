@@ -198,94 +198,193 @@ export async function ensurePrayerData() {
 export async function initializeTodaysPrayers() {
     try {
         const user = auth.currentUser;
-        if (!user) return;
+        if (!user) {
+            console.log('No authenticated user, skipping prayer initialization');
+            return;
+        }
 
         const today = new Date();
         const userTimezoneOffset = today.getTimezoneOffset();
         console.log(`User's timezone offset for initializing prayers: ${userTimezoneOffset} minutes`);
+        console.log('Initializing prayers for today and the next 7 days...');
         
         // Initialize prayers for today and the next 7 days
         const promises = [];
+        const createdPrayers = [];
+        
+        // Use batch writes for better performance and atomicity
+        const batch = writeBatch(db);
+        let batchCount = 0;
+        const MAX_BATCH_SIZE = 450; // Firestore limit is 500
+        
         for (let i = 0; i < 7; i++) {
             const date = new Date();
             date.setDate(date.getDate() + i);
             const dateStr = date.toLocaleDateString('en-CA');
             
+            console.log(`Initializing prayers for date: ${dateStr}`);
+            
             // Get prayer times for this date
-            const prayerTimes = await getPrayerTimes(date);
-            if (!prayerTimes) continue;
-            
-            const prayers = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
-            
-            for (const prayer of prayers) {
-                const prayerTime = prayerTimes[prayer.toLowerCase()];
-                if (!prayerTime) continue;
+            try {
+                const prayerTimes = await getPrayerTimes(date);
+                if (!prayerTimes) {
+                    console.log(`No prayer times available for ${dateStr}, skipping`);
+                    continue;
+                }
                 
-                // Check if prayer already exists
-                const prayerId = `${dateStr}_${prayer}`;
-                const docRef = doc(db, 'prayer_history', `${user.uid}_${prayerId}`);
-                const docSnap = await getDoc(docRef);
+                const prayers = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
                 
-                if (!docSnap.exists()) {
-                    // Create new prayer document
-                    const prayerDateTime = getPrayerDateTime(dateStr, prayerTime);
-                    const now = new Date();
-                    
-                    // Determine initial status
-                    let status = 'none';
-                    if (dateStr === today.toLocaleDateString('en-CA')) {
-                        if (prayerDateTime < now) {
-                            status = 'missed'; // Past prayers today are missed by default
-                        }
+                for (const prayer of prayers) {
+                    const prayerTime = prayerTimes[prayer.toLowerCase()];
+                    if (!prayerTime) {
+                        console.log(`No time available for ${prayer} on ${dateStr}, skipping`);
+                        continue;
                     }
                     
-                    const prayerData = {
-                        userId: user.uid,
-                        prayerId,
-                        prayerName: prayer,
-                        time: prayerTime,
-                        status,
-                        date: dateStr,
-                        timestamp: Timestamp.now(),
-                        timezoneOffset: userTimezoneOffset
-                    };
+                    // Create a unique ID for the prayer document
+                    const prayerId = `${dateStr}_${prayer}`;
+                    const docRef = doc(db, 'prayer_history', `${user.uid}_${prayerId}`);
                     
-                    promises.push(setDoc(docRef, prayerData));
-                } else {
-                    // Prayer exists, check if it has a final status
-                    const existingData = docSnap.data();
-                    
-                    // Only update if it doesn't have a final status
-                    if (!['ontime', 'late', 'excused'].includes(existingData.status)) {
-                        // For today's prayers that have passed, mark as missed if not already marked
-                        if (dateStr === today.toLocaleDateString('en-CA')) {
+                    try {
+                        // Check if prayer already exists
+                        const docSnap = await getDoc(docRef);
+                        
+                        if (!docSnap.exists()) {
+                            // Create new prayer document
                             const prayerDateTime = getPrayerDateTime(dateStr, prayerTime);
                             const now = new Date();
                             
-                            if (prayerDateTime < now && existingData.status !== 'missed') {
-                                console.log(`Updating past prayer ${prayer} on ${dateStr} to missed status`);
-                                promises.push(updateDoc(docRef, {
-                                    status: 'missed',
-                                    lastUpdated: serverTimestamp()
-                                }));
+                            // Determine initial status
+                            let status = 'none';
+                            if (dateStr === today.toLocaleDateString('en-CA')) {
+                                if (prayerDateTime < now) {
+                                    status = 'missed'; // Past prayers today are missed by default
+                                }
+                            }
+                            
+                            const prayerData = {
+                                userId: user.uid,
+                                prayerId,
+                                prayerName: prayer,
+                                time: prayerTime,
+                                status,
+                                date: dateStr,
+                                timestamp: Timestamp.now(),
+                                timezoneOffset: userTimezoneOffset
+                            };
+                            
+                            batch.set(docRef, prayerData);
+                            batchCount++;
+                            createdPrayers.push(`${prayer} on ${dateStr}`);
+                            
+                            // If batch is getting too large, commit it and start a new one
+                            if (batchCount >= MAX_BATCH_SIZE) {
+                                await batch.commit();
+                                console.log(`Committed batch of ${batchCount} prayer records`);
+                                batch = writeBatch(db);
+                                batchCount = 0;
+                            }
+                        } else {
+                            // Prayer exists, check if it has a final status
+                            const existingData = docSnap.data();
+                            
+                            // Only update if it doesn't have a final status
+                            if (!['ontime', 'late', 'excused'].includes(existingData.status)) {
+                                // For today's prayers that have passed, mark as missed if not already marked
+                                if (dateStr === today.toLocaleDateString('en-CA')) {
+                                    const prayerDateTime = getPrayerDateTime(dateStr, prayerTime);
+                                    const now = new Date();
+                                    
+                                    if (prayerDateTime < now && existingData.status !== 'missed') {
+                                        console.log(`Updating past prayer ${prayer} on ${dateStr} to missed status`);
+                                        batch.update(docRef, {
+                                            status: 'missed',
+                                            lastUpdated: serverTimestamp()
+                                        });
+                                        batchCount++;
+                                        
+                                        // If batch is getting too large, commit it and start a new one
+                                        if (batchCount >= MAX_BATCH_SIZE) {
+                                            await batch.commit();
+                                            console.log(`Committed batch of ${batchCount} prayer records`);
+                                            batch = writeBatch(db);
+                                            batchCount = 0;
+                                        }
+                                    }
+                                }
+                            } else {
+                                console.log(`Skipping update for ${prayer} on ${dateStr} - already has final status: ${existingData.status}`);
                             }
                         }
-                    } else {
-                        console.log(`Skipping update for ${prayer} on ${dateStr} - already has final status: ${existingData.status}`);
+                    } catch (docError) {
+                        // Handle permission errors gracefully
+                        if (docError.code === 'permission-denied') {
+                            console.log(`Permission denied when checking ${prayer} on ${dateStr}, creating new document anyway`);
+                            
+                            // Create new prayer document without checking if it exists
+                            const prayerDateTime = getPrayerDateTime(dateStr, prayerTime);
+                            const now = new Date();
+                            
+                            // Determine initial status
+                            let status = 'none';
+                            if (dateStr === today.toLocaleDateString('en-CA')) {
+                                if (prayerDateTime < now) {
+                                    status = 'missed'; // Past prayers today are missed by default
+                                }
+                            }
+                            
+                            const prayerData = {
+                                userId: user.uid,
+                                prayerId,
+                                prayerName: prayer,
+                                time: prayerTime,
+                                status,
+                                date: dateStr,
+                                timestamp: Timestamp.now(),
+                                timezoneOffset: userTimezoneOffset
+                            };
+                            
+                            batch.set(docRef, prayerData);
+                            batchCount++;
+                            createdPrayers.push(`${prayer} on ${dateStr} (after permission error)`);
+                            
+                            // If batch is getting too large, commit it and start a new one
+                            if (batchCount >= MAX_BATCH_SIZE) {
+                                await batch.commit();
+                                console.log(`Committed batch of ${batchCount} prayer records`);
+                                batch = writeBatch(db);
+                                batchCount = 0;
+                            }
+                        } else {
+                            console.error(`Error checking prayer document for ${prayer} on ${dateStr}:`, docError);
+                        }
                     }
                 }
+            } catch (prayerTimesError) {
+                console.error(`Error getting prayer times for ${dateStr}:`, prayerTimesError);
+                // Continue with the next date
             }
         }
         
-        if (promises.length > 0) {
-            await Promise.all(promises);
-            console.log(`Initialized ${promises.length} prayers`);
+        // Commit any remaining batch operations
+        if (batchCount > 0) {
+            await batch.commit();
+            console.log(`Committed final batch of ${batchCount} prayer records`);
+        }
+        
+        if (createdPrayers.length > 0) {
+            console.log(`Initialized ${createdPrayers.length} prayers: ${createdPrayers.join(', ')}`);
             
             // Refresh the prayer history
             await getPrayerHistory();
+        } else {
+            console.log('No new prayers needed to be initialized');
         }
+        
+        return createdPrayers.length;
     } catch (error) {
         console.error('Error initializing prayers:', error);
+        return 0;
     }
 }
 
@@ -556,16 +655,26 @@ async function getPrayerRecord(prayerName, date) {
 
 export async function savePrayerStatus(prayerData) {
   const user = auth.currentUser;
-  if (!user) return;
+  if (!user) {
+    console.error('No authenticated user, cannot save prayer status');
+    return false;
+  }
 
   if (!prayerData?.name && !prayerData?.prayerName) {
     console.error('Prayer name is undefined:', prayerData);
-    return;
+    return false;
+  }
+
+  if (!prayerData?.date) {
+    console.error('Prayer date is undefined:', prayerData);
+    return false;
   }
 
   const prayerName = prayerData.prayerName || prayerData.name;
 
   try {
+    console.log(`Saving prayer status for ${prayerName} on ${prayerData.date} as ${prayerData.status}`);
+    
     // Check if the prayer date is before account creation
     const db = getFirestore();
     const trialRef = doc(db, 'trials', user.uid);
@@ -586,54 +695,120 @@ export async function savePrayerStatus(prayerData) {
       
       // Allow prayers from one day before account creation
       if (prayerDate < oneDayBeforeCreation) {
+        console.error(`Cannot mark prayer for ${prayerData.date} as it's before one day prior to account creation date (${oneDayBeforeCreation.toLocaleDateString('en-CA')})`);
         alert('You cannot mark prayers for dates before one day prior to your account creation date.');
-        return;
+        return false;
       }
     }
 
     const prayerId = `${prayerData.date}_${prayerName}`;
     
     // Get current timezone offset in minutes
-    const timezoneOffset = new Date().getTimezoneOffset();
+    const timezoneOffset = prayerData.timezoneOffset !== undefined ? 
+      prayerData.timezoneOffset : 
+      new Date().getTimezoneOffset();
     
     // Create a document reference with a predictable ID
     const prayerRef = doc(db, 'prayer_history', `${user.uid}_${prayerId}`);
     
-    // Check if prayer already exists with a final status
-    const existingDoc = await getDoc(prayerRef);
-    if (existingDoc.exists()) {
-      const existingData = existingDoc.data();
-      
-      // If trying to mark as missed but it already has a final status, don't overwrite
-      if (prayerData.status === 'missed' && ['ontime', 'late', 'excused'].includes(existingData.status)) {
-        console.log(`Not overwriting prayer ${prayerName} on ${prayerData.date} with status ${existingData.status} to missed`);
-        return true;
+    let shouldSave = true;
+    
+    try {
+      // Check if prayer already exists with a final status
+      const existingDoc = await getDoc(prayerRef);
+      if (existingDoc.exists()) {
+        const existingData = existingDoc.data();
+        console.log(`Found existing prayer record for ${prayerName} on ${prayerData.date} with status: ${existingData.status}`);
+        
+        // If trying to mark as missed but it already has a final status, don't overwrite
+        if (prayerData.status === 'missed' && ['ontime', 'late', 'excused'].includes(existingData.status)) {
+          console.log(`Not overwriting prayer ${prayerName} on ${prayerData.date} with status ${existingData.status} to missed`);
+          shouldSave = false;
+        }
+      } else {
+        console.log(`No existing prayer record found for ${prayerName} on ${prayerData.date}, creating new record`);
+      }
+    } catch (docError) {
+      // If we get a permission error, continue with saving
+      if (docError.code === 'permission-denied') {
+        console.log(`Permission denied when checking existing prayer, proceeding with save anyway`);
+      } else {
+        console.error(`Error checking existing prayer: ${docError.message}`);
       }
     }
     
-    // Save to Firestore with timezone information
-    await setDoc(prayerRef, {
-      userId: user.uid,
-      prayerId,
-      prayerName: prayerName,
-      time: prayerData.time || '',
-      status: prayerData.status,
-      date: prayerData.date,
-      timezoneOffset: timezoneOffset,
-      timestamp: Timestamp.now()
-    }, { merge: true });
+    if (shouldSave) {
+      // Prepare the prayer data
+      const prayerDocData = {
+        userId: user.uid,
+        prayerId,
+        prayerName: prayerName,
+        time: prayerData.time || '',
+        status: prayerData.status,
+        date: prayerData.date,
+        timezoneOffset: timezoneOffset,
+        timestamp: Timestamp.now()
+      };
+      
+      console.log(`Saving prayer data to Firestore:`, prayerDocData);
+      
+      // Save to Firestore with timezone information
+      await setDoc(prayerRef, prayerDocData, { merge: true });
+      console.log(`Successfully saved prayer ${prayerName} on ${prayerData.date} as ${prayerData.status}`);
 
-    // Invalidate cache after updating
-    invalidatePrayerHistoryCache();
-    
-    // Update badges if needed - do this in the background
-    Promise.resolve().then(() => updatePrayerProgress()).catch(error => {
-      console.error('Error updating prayer progress:', error);
-    });
+      // Update the local store immediately for better UI responsiveness
+      prayerHistoryStore.update(store => {
+        const history = store.history || [];
+        const index = history.findIndex(
+          p => p.date === prayerData.date && p.prayerName === prayerName
+        );
+        
+        if (index !== -1) {
+          history[index] = { ...history[index], status: prayerData.status };
+        } else {
+          history.push({
+            date: prayerData.date,
+            prayerName: prayerName,
+            status: prayerData.status,
+            time: prayerData.time || ''
+          });
+        }
+        
+        // Remove from pendingByDate if status is final
+        if (['ontime', 'late', 'missed', 'excused'].includes(prayerData.status)) {
+          if (store.pendingByDate[prayerData.date]) {
+            store.pendingByDate[prayerData.date].prayers = 
+              store.pendingByDate[prayerData.date].prayers.filter(
+                p => p.prayerName !== prayerName
+              );
+            
+            // Remove the date if no prayers left
+            if (store.pendingByDate[prayerData.date].prayers.length === 0) {
+              delete store.pendingByDate[prayerData.date];
+            }
+          }
+        }
+        
+        return { ...store, history };
+      });
+
+      // Invalidate cache after updating
+      invalidatePrayerHistoryCache();
+      
+      // Update badges if needed - do this in the background
+      Promise.resolve().then(() => updatePrayerProgress()).catch(error => {
+        console.error('Error updating prayer progress:', error);
+      });
+    }
     
     return true;
   } catch (error) {
     console.error('Error saving prayer status:', error);
+    console.error('Error details:', {
+      code: error.code,
+      message: error.message,
+      stack: error.stack
+    });
     return false;
   }
 }
@@ -734,6 +909,13 @@ async function fetchFreshPrayerHistory(user) {
   const MAX_RETRIES = 3;
   let lastError = null;
 
+  // Add detailed logging of user authentication state
+  console.log('=== PRAYER HISTORY DEBUG ===');
+  console.log('User authenticated:', !!user);
+  console.log('User ID:', user?.uid);
+  console.log('Auth current user:', auth.currentUser?.uid);
+  console.log('Is same user:', user?.uid === auth.currentUser?.uid);
+
   while (retryCount < MAX_RETRIES) {
     try {
       console.log(`Fetching prayer history (attempt ${retryCount + 1}/${MAX_RETRIES})...`);
@@ -746,13 +928,27 @@ async function fetchFreshPrayerHistory(user) {
       today.setHours(0, 0, 0, 0); // Set to start of day
       const todayStr = today.toLocaleDateString('en-CA');
       
+      // Log date information
+      console.log('Today date:', today.toISOString());
+      console.log('Today string:', todayStr);
+      console.log('Seven days ago date:', sevenDaysAgo.toISOString());
+      console.log('Seven days ago string:', sevenDaysAgoStr);
+      
       // Query prayer_history collection
       const prayerHistoryRef = collection(db, 'prayer_history');
+      console.log('Collection path:', prayerHistoryRef.path);
       
       let querySnapshot;
       
       // Try the indexed query first
       try {
+        console.log('Attempting indexed query with date range...');
+        console.log('Query parameters:', {
+          userId: user.uid,
+          dateRangeStart: sevenDaysAgoStr,
+          dateRangeEnd: todayStr
+        });
+        
         const q = query(
           prayerHistoryRef,
           where('userId', '==', user.uid),
@@ -761,17 +957,43 @@ async function fetchFreshPrayerHistory(user) {
           orderBy('date', 'desc')
         );
         
+        console.log('Query created, executing...');
         querySnapshot = await getDocs(q);
         console.log(`Retrieved ${querySnapshot.docs.length} prayer records`);
+        
+        // Log the first few documents for debugging
+        if (querySnapshot.docs.length > 0) {
+          console.log('Sample documents:');
+          querySnapshot.docs.slice(0, 3).forEach((doc, i) => {
+            console.log(`Doc ${i}:`, doc.id, doc.data());
+          });
+        } else {
+          console.log('No documents found in the date range');
+        }
       } catch (indexError) {
-        console.warn('Indexed query failed, falling back to client-side filtering:', indexError);
+        console.warn('Indexed query failed, error details:', indexError);
+        console.log('Falling back to client-side filtering...');
+        
+        // Try a simpler query with just userId
+        console.log('Attempting simpler query with just userId...');
         const q = query(
           prayerHistoryRef,
           where('userId', '==', user.uid)
         );
         
+        console.log('Simple query created, executing...');
         const snapshot = await getDocs(q);
         console.log(`Retrieved ${snapshot.docs.length} total prayer records, filtering for last 7 days`);
+        
+        // Log the first few documents for debugging
+        if (snapshot.docs.length > 0) {
+          console.log('Sample documents from simple query:');
+          snapshot.docs.slice(0, 3).forEach((doc, i) => {
+            console.log(`Doc ${i}:`, doc.id, doc.data());
+          });
+        } else {
+          console.log('No documents found with userId filter');
+        }
         
         const filteredDocs = snapshot.docs.filter(doc => {
           const data = doc.data();
@@ -784,6 +1006,11 @@ async function fetchFreshPrayerHistory(user) {
       }
 
       const result = processQueryResults(querySnapshot);
+      console.log('Processed query results:', {
+        historyCount: result.history.length,
+        pendingDatesCount: Object.keys(result.pendingByDate).length,
+        missedDatesCount: Object.keys(result.missedByDate).length
+      });
       
       // Check if data has actually changed
       const newHash = getDataHash(result);
@@ -804,14 +1031,21 @@ async function fetchFreshPrayerHistory(user) {
           data: result,
           timestamp: cache.lastFetched
         }));
+        console.log('Saved prayer history to localStorage');
       } catch (storageError) {
         console.warn('Failed to save prayer history to localStorage:', storageError);
       }
       
       prayerHistoryStore.set(result);
+      console.log('Prayer history store updated successfully');
       return result;
     } catch (error) {
       console.error(`Error fetching prayer history (attempt ${retryCount + 1}/${MAX_RETRIES}):`, error);
+      console.error('Error details:', {
+        code: error.code,
+        message: error.message,
+        stack: error.stack
+      });
       lastError = error;
       retryCount++;
       
@@ -825,6 +1059,7 @@ async function fetchFreshPrayerHistory(user) {
   }
 
   console.error('Failed to fetch prayer history after multiple attempts');
+  console.error('Last error:', lastError);
   
   // Try to load from localStorage as a last resort
   try {
@@ -844,6 +1079,7 @@ async function fetchFreshPrayerHistory(user) {
   }
   
   // If all else fails, return empty result
+  console.log('Returning empty prayer history result as last resort');
   const emptyResult = { history: [], pendingByDate: {}, missedByDate: {} };
   prayerHistoryStore.set(emptyResult);
   return emptyResult;
