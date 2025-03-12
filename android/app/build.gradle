@@ -16,8 +16,8 @@ android {
         applicationId "com.islamicjournal.app"
         minSdkVersion 24
         targetSdkVersion 34
-        versionCode 11
-        versionName "0.0.11"
+        versionCode 12
+        versionName "0.0.12"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
             ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
