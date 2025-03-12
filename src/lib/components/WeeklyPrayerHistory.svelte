@@ -6,7 +6,8 @@
     getPrayerDateTime,
     shouldMarkPrayerExcused,
     savePrayerStatus,
-    invalidatePrayerHistoryCache
+    invalidatePrayerHistoryCache,
+    initializeTodaysPrayers
   } from '../stores/prayerHistoryStore';
   import { prayerTimesStore, fetchPrayerTimes } from '../stores/prayerTimes';
   import { iconMap } from '../utils/icons';
@@ -86,6 +87,9 @@
           // Mark data as initialized
           dataInitialized = true;
         });
+        
+        // Check if we need to initialize future prayer records
+        await ensureFuturePrayerRecords();
       } else {
         console.log('Using existing data from store, skipping fetch');
         // If we have recent data, we can skip loading state
@@ -146,6 +150,11 @@
       
       // Get user's account creation date
       const user = auth.currentUser;
+      if (!user) {
+        console.error('No authenticated user found');
+        return;
+      }
+      
       const db = getFirestore();
       const trialRef = doc(db, 'trials', user.uid);
       const trialDoc = await getDoc(trialRef);
@@ -190,6 +199,23 @@
       // Create a unique identifier for this cell
       const cellId = `${prayer.name}-${day.date}`;
       
+      // Check if the prayer record exists in the database
+      const prayerId = `${day.date}_${prayer.name}`;
+      const prayerDocRef = doc(db, 'prayer_history', `${user.uid}_${prayerId}`);
+      
+      let existingPrayerData = null;
+      try {
+        const prayerDocSnap = await getDoc(prayerDocRef);
+        if (prayerDocSnap.exists()) {
+          existingPrayerData = prayerDocSnap.data();
+          console.log(`Found existing prayer record for ${prayer.name} on ${day.date}:`, existingPrayerData);
+        } else {
+          console.log(`No existing prayer record found for ${prayer.name} on ${day.date}, will create new record`);
+        }
+      } catch (error) {
+        console.log(`Error checking for existing prayer record: ${error.message}, will create new record`);
+      }
+      
       // Handle double tap logic
       if (lastTappedCell === cellId && tapTimeout) {
         // This is a double tap
@@ -211,7 +237,13 @@
         
         console.log('Double tap - Saving prayer data as late:', prayerData);
         // Don't await this - let it happen in the background
-        savePrayerStatus(prayerData).catch(error => {
+        savePrayerStatus(prayerData).then(() => {
+          console.log(`Successfully saved prayer ${prayer.name} on ${day.date} as late`);
+          // Refresh prayer history after saving
+          getPrayerHistory().catch(error => {
+            console.error('Error refreshing prayer history after save:', error);
+          });
+        }).catch(error => {
           console.error('Error saving prayer status:', error);
           // Revert UI update if save fails
           updateUIForPrayer(prayer.name, day.date, day.status);
@@ -249,7 +281,13 @@
           
           console.log('Single tap - Saving prayer data as on time:', prayerData);
           // Don't await this - let it happen in the background
-          savePrayerStatus(prayerData).catch(error => {
+          savePrayerStatus(prayerData).then(() => {
+            console.log(`Successfully saved prayer ${prayer.name} on ${day.date} as on time`);
+            // Refresh prayer history after saving
+            getPrayerHistory().catch(error => {
+              console.error('Error refreshing prayer history after save:', error);
+            });
+          }).catch(error => {
             console.error('Error saving prayer status:', error);
             // Revert UI update if save fails
             updateUIForPrayer(prayer.name, day.date, day.status);
@@ -570,21 +608,35 @@
 
   async function generatePrayerGrid() {
     try {
+      console.log('=== GENERATE PRAYER GRID DEBUG ===');
       // Get current week start date
       const currentWeekStart = getWeekStartDate();
+      console.log('Current week start date:', currentWeekStart);
       
       // Check if we can use cached data
       const currentHistoryHash = getPrayerHistoryHash($prayerHistoryStore.history);
+      console.log('Current history hash:', currentHistoryHash);
+      console.log('Cache status:', {
+        hasCache: !!gridCache.data,
+        cacheHistoryHash: gridCache.historyHash,
+        cacheWeekStartDate: gridCache.weekStartDate,
+        cacheTimestamp: gridCache.timestamp,
+        cacheAge: gridCache.timestamp ? Date.now() - gridCache.timestamp : 'N/A'
+      });
       
       // Improved caching: Check cache first before generating days
       if (gridCache.data && 
           gridCache.historyHash === currentHistoryHash && 
           gridCache.weekStartDate === currentWeekStart &&
           Date.now() - gridCache.timestamp < 30 * 60 * 1000) { // Cache valid for 30 minutes
+        console.log('Using cached grid data');
         return gridCache.data;
       }
       
+      console.log('Generating new grid data...');
       const days = getCurrentWeekDays();
+      console.log('Generated week days:', JSON.stringify(days));
+      
       const prayers = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
       const grid = [];
       
@@ -597,12 +649,28 @@
       // Convert to string format for easier comparison
       const sevenDaysAgoStr = sevenDaysAgo.toLocaleDateString('en-CA');
       const todayStr = today.toLocaleDateString('en-CA');
+      console.log('Date range for grid:', {
+        today: today.toISOString(),
+        todayStr,
+        sevenDaysAgo: sevenDaysAgo.toISOString(),
+        sevenDaysAgoStr
+      });
       
       // Get user's account creation date from trial data
       const user = auth.currentUser;
+      console.log('Current user:', user?.uid);
+      
+      if (!user) {
+        console.error('No authenticated user found');
+        throw new Error('User not authenticated');
+      }
+      
       const db = getFirestore();
       const trialRef = doc(db, 'trials', user.uid);
+      console.log('Fetching trial document:', trialRef.path);
+      
       const trialDoc = await getDoc(trialRef);
+      console.log('Trial document exists:', trialDoc.exists());
       
       // Get account creation date and convert to user's local timezone
       let accountCreationDate = trialDoc.exists() ? trialDoc.data().startDate.toDate() : new Date();
@@ -625,9 +693,22 @@
       
       // First, let's ensure we have the most up-to-date prayer history from the database
       // This helps prevent race conditions where the store might not be fully populated
-      await getPrayerHistory();
+      console.log('Fetching prayer history before generating grid...');
+      try {
+        await getPrayerHistory();
+        console.log('Prayer history fetched successfully');
+        console.log('Prayer history store data:', {
+          historyCount: $prayerHistoryStore.history?.length || 0,
+          pendingDatesCount: Object.keys($prayerHistoryStore.pendingByDate || {}).length,
+          missedDatesCount: Object.keys($prayerHistoryStore.missedByDate || {}).length
+        });
+      } catch (historyError) {
+        console.error('Error fetching prayer history:', historyError);
+        console.error('Will attempt to continue with existing data');
+      }
 
       // Process each prayer
+      console.log('Processing prayers...');
       for (const prayer of prayers) {
         const row = {
           name: prayer,
@@ -657,16 +738,35 @@
               // with a status other than 'none' or 'pending'
               const prayerId = `${day.date}_${prayer}`;
               const prayerDocRef = doc(db, 'prayer_history', `${user.uid}_${prayerId}`);
-              const prayerDocSnap = await getDoc(prayerDocRef);
+              console.log(`Checking prayer document: ${prayerDocRef.path}`);
               
-              if (prayerDocSnap.exists()) {
-                const dbPrayerData = prayerDocSnap.data();
-                // If the prayer exists in the database with a final status, use that status
-                if (['ontime', 'late', 'excused'].includes(dbPrayerData.status)) {
-                  console.log(`Found existing prayer ${prayer} for ${day.date} with status ${dbPrayerData.status}, using that instead of marking as missed`);
-                  status = dbPrayerData.status;
+              try {
+                const prayerDocSnap = await getDoc(prayerDocRef);
+                console.log(`Prayer document exists: ${prayerDocSnap.exists()}`);
+                
+                if (prayerDocSnap.exists()) {
+                  const dbPrayerData = prayerDocSnap.data();
+                  console.log(`Prayer data:`, dbPrayerData);
+                  
+                  // If the prayer exists in the database with a final status, use that status
+                  if (['ontime', 'late', 'excused'].includes(dbPrayerData.status)) {
+                    console.log(`Found existing prayer ${prayer} for ${day.date} with status ${dbPrayerData.status}, using that instead of marking as missed`);
+                    status = dbPrayerData.status;
+                  } else {
+                    console.log(`Marking ${prayer} as missed for ${day.date} (existing record with non-final status: ${dbPrayerData.status})`);
+                    status = 'missed';
+                    
+                    // Add this prayer to the list to save to the database
+                    const prayerTime = $prayerTimesStore.find(p => p.name === prayer)?.time || '00:00';
+                    prayersToSave.push({
+                      prayerName: prayer,
+                      date: day.date,
+                      status: 'missed',
+                      time: prayerTime
+                    });
+                  }
                 } else {
-                  console.log(`Marking ${prayer} as missed for ${day.date} (existing record with non-final status: ${dbPrayerData.status})`);
+                  console.log(`Marking ${prayer} as missed for ${day.date} (no existing record found)`);
                   status = 'missed';
                   
                   // Add this prayer to the list to save to the database
@@ -678,18 +778,31 @@
                     time: prayerTime
                   });
                 }
-              } else {
-                console.log(`Marking ${prayer} as missed for ${day.date} (no existing record found)`);
-                status = 'missed';
+              } catch (prayerDocError) {
+                console.error(`Error checking prayer document for ${prayer} on ${day.date}:`, prayerDocError);
                 
-                // Add this prayer to the list to save to the database
-                const prayerTime = $prayerTimesStore.find(p => p.name === prayer)?.time || '00:00';
-                prayersToSave.push({
-                  prayerName: prayer,
-                  date: day.date,
-                  status: 'missed',
-                  time: prayerTime
-                });
+                // Handle permission errors by creating a new prayer record
+                if (prayerDocError.code === 'permission-denied') {
+                  console.log(`Permission denied when checking ${prayer} on ${day.date}, marking as missed and will create new record`);
+                  status = 'missed';
+                  
+                  // Add this prayer to the list to save to the database
+                  const prayerTime = $prayerTimesStore.find(p => p.name === prayer)?.time || '00:00';
+                  prayersToSave.push({
+                    prayerName: prayer,
+                    date: day.date,
+                    status: 'missed',
+                    time: prayerTime
+                  });
+                  
+                  // Also trigger initialization of future prayer records
+                  ensureFuturePrayerRecords().catch(error => {
+                    console.error('Error ensuring future prayer records:', error);
+                  });
+                } else {
+                  // Default to missed if we can't check the document for other reasons
+                  status = 'missed';
+                }
               }
             } else {
               console.log(`Skipping ${prayer} for ${day.date} (before one day prior to account creation: ${oneDayBeforeCreation.toLocaleDateString('en-CA')})`);
@@ -742,6 +855,11 @@
       return { days, grid, weeklyStats };
     } catch (error) {
       console.error('Error generating prayer grid:', error);
+      console.error('Error details:', {
+        code: error.code,
+        message: error.message,
+        stack: error.stack
+      });
       return {
         days: getCurrentWeekDays(),
         grid: [],
@@ -840,6 +958,9 @@
       
       // Invalidate the prayer history cache to force a fresh fetch
       await invalidatePrayerHistoryCache();
+      
+      // Check if we need to initialize future prayer records
+      await ensureFuturePrayerRecords();
       
       // Force fetch fresh prayer history
       await getPrayerHistory();
@@ -945,6 +1066,42 @@
   // Update stats whenever prayer history changes
   $: if ($prayerHistoryStore?.history) {
     updateWeeklyStats();
+  }
+
+  // Add this function after the preloadData function
+  async function ensureFuturePrayerRecords() {
+    try {
+      console.log('Checking if future prayer records need to be initialized...');
+      
+      // Get the date range for the next 7 days
+      const today = new Date();
+      const sevenDaysLater = new Date(today);
+      sevenDaysLater.setDate(today.getDate() + 7);
+      
+      // Convert to string format for easier comparison
+      const todayStr = today.toLocaleDateString('en-CA');
+      const sevenDaysLaterStr = sevenDaysLater.toLocaleDateString('en-CA');
+      
+      console.log(`Checking prayer records from ${todayStr} to ${sevenDaysLaterStr}`);
+      
+      // Check if we have any prayer records for today
+      const hasTodayRecords = $prayerHistoryStore.history.some(p => p.date === todayStr);
+      
+      if (!hasTodayRecords) {
+        console.log('No prayer records found for today, initializing future prayers...');
+        await initializeTodaysPrayers();
+        
+        // Refresh prayer history after initialization
+        await invalidatePrayerHistoryCache();
+        await getPrayerHistory();
+        
+        console.log('Future prayer records initialized successfully');
+      } else {
+        console.log('Prayer records for today already exist, no initialization needed');
+      }
+    } catch (error) {
+      console.error('Error ensuring future prayer records:', error);
+    }
   }
 </script>
 
