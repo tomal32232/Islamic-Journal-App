@@ -45,3 +45,50 @@ If you have state that's important to retain within a component, consider creati
 import { writable } from 'svelte/store'
 export default writable(0)
 ```
+
+run android
+Buld:
+npm run build && rm -rf www && cp -r dist/ www/ && npx cap sync android && npx cap run android
+
+Live reload Host:
+npm run dev -- --host
+
+npx cap run android
+
+
+git add . && git commit -m ""
+
+npm run build && rm -rf ios/App/App/public && mkdir -p ios/App/App/public && cp -r dist/* ios/App/App/public/
+
+
+
+Make Admin:
+node scripts/setAdmin.js Yg3hyxb9OWMq9mVuMYsgThaV2r83
+
+
+
+
+
+Primary Colors:
+Teal/Blue-green: #216974 (Main brand color, used extensively)
+Darker variant: #185761
+Used for buttons, links, and primary UI elements
+Orange/Brown: #E09453
+Darker variant: #c77f43
+Used for alternative buttons/actions
+Neutral Colors:
+1. White: #FFFFFF (or white)
+Light Gray: #F8FAFC (background)
+Gray variations:
+#666666 (text)
+#999999 (lighter text)
+#333333 (dark text)
+#444444 (dark text)
+#888888 (medium gray)
+#E0E0E0 (very light gray, borders)
+Utility Colors:
+Error Red: #ef4444, #dc3545
+Google Blue: #4285f4
+Darker variant: #357ae8
+
+
